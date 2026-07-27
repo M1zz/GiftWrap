@@ -1,0 +1,1695 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GiftSheet — 오퍼코드 선물 포장</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --line: #d2d2d7;
+    --accent: #0071e3;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); font-size: 13px; }
+
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 12px; color: var(--ink-2); }
+  input[type=text], input[type=number], select, textarea {
+    font: inherit; padding: 7px 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit;
+  }
+  input[type=number] { width: 92px; }
+  textarea { width: 100%; resize: vertical; }
+  button {
+    font: inherit; font-weight: 500; padding: 7px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer;
+  }
+  button:hover { background: #f0f0f2; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.mini { padding: 4px 9px; font-size: 12px; }
+
+  .drop {
+    border: 2px dashed var(--line); border-radius: var(--radius);
+    padding: 26px; text-align: center; color: var(--ink-2); cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: #f0f7ff; }
+  .drop strong { color: var(--ink); }
+
+  .appline { display: flex; gap: 14px; align-items: center; }
+  .appline img { width: 56px; height: 56px; border-radius: 13px; border: 1px solid var(--line); background: #eee; }
+
+  .tabs { display: flex; gap: 6px; margin: 22px 0 14px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    border: none; background: none; border-bottom: 2px solid transparent;
+    border-radius: 0; padding: 9px 14px; color: var(--ink-2);
+  }
+  .tabs button:hover { background: none; color: var(--ink); }
+  .tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+
+  .note {
+    background: #fff8e6; border: 1px solid #f0dca8; border-radius: 10px;
+    padding: 13px 15px; font-size: 13.5px; line-height: 1.6; margin-bottom: 16px;
+  }
+  .note b { font-weight: 600; }
+  .note ol { margin: 8px 0 0; padding-left: 20px; }
+  .note li { margin: 3px 0; }
+  .warn { color: #a15c00; }
+
+  table.ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.ledger th, table.ledger td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  table.ledger th { color: var(--ink-2); font-weight: 500; }
+  table.ledger td.code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  table.ledger input[type=text] { padding: 3px 7px; font-size: 13px; width: 100%; }
+
+  .list { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  .item {
+    display: flex; gap: 12px; align-items: center;
+    padding: 9px 12px; border-bottom: 1px solid var(--line);
+  }
+  .item:last-child { border-bottom: none; }
+  .item.sent { background: #f2fbf5; }
+  .item .idx { width: 44px; color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .item .code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; flex: 1; min-width: 140px; }
+  .item .who { width: 130px; }
+  .item .who input { width: 100%; padding: 4px 8px; font-size: 13px; }
+
+  .previewWrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .previewWrap canvas { max-width: 470px; width: 100%; height: auto; touch-action: none; outline: none; }
+  .previewWrap canvas:focus-visible { box-shadow: 0 0 0 3px rgba(0,113,227,.4); border-radius: 8px; }
+  .previewSide { flex: 1; min-width: 300px; }
+  .editorbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; max-width: 470px; }
+
+  .pagecount { font-size: 13px; color: var(--ink-2); margin-left: auto; }
+
+  /* ================= gift card ================= */
+  /*
+   * Geometry follows the CR80 plastic-card standard used by real gift cards:
+   * 85.6 × 54 mm, 3 mm corner radius, 3 mm safe area. Type scales with --u so
+   * every preset keeps the same proportions.
+   */
+  #sheets { margin-top: 18px; }
+  .sheet {
+    width: 210mm; height: 297mm;
+    margin: 0 auto 18px;
+    background: #fff;
+    box-shadow: 0 1px 8px rgba(0,0,0,.14);
+    display: grid;
+    justify-content: center; align-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .sheet .facelabel {
+    position: absolute; top: 4mm; left: 50%; transform: translateX(-50%);
+    font-size: 3mm; color: #8e8e93; letter-spacing: .2em;
+  }
+
+  .card {
+    position: relative; overflow: hidden;
+    border-radius: calc(var(--u) * 3mm);
+    display: flex;
+    color: #fff;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .card.guides {
+    outline: 0.2mm dashed rgba(0,0,0,.34);
+    outline-offset: 1.1mm;
+  }
+  .card .bg { position: absolute; inset: 0; z-index: 0; }
+  /* Specular sweep — the highlight a laminated plastic card catches. */
+  .card .sheen {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(104deg,
+      rgba(255,255,255,0) 28%, rgba(255,255,255,.17) 45%, rgba(255,255,255,0) 60%);
+  }
+  /* Hairline inset frame, sitting on the 3 mm safe-area boundary. */
+  .card .frame {
+    position: absolute; z-index: 2; pointer-events: none;
+    inset: calc(var(--u) * 2mm);
+    border: 0.22mm solid rgba(255,255,255,.34);
+    border-radius: calc(var(--u) * 1.8mm);
+  }
+  .card .inner {
+    position: relative; z-index: 3; flex: 1;
+    display: flex; gap: calc(var(--u) * 3mm);
+    padding: calc(var(--u) * 4.4mm);
+    min-width: 0;
+  }
+  /* Front faces are laid out from the shared drag layout, so each piece is
+     absolutely placed at the fraction of the card the preview put it at. */
+  .card .block { position: absolute; z-index: 3; }
+  .card .block.b-code { width: 47%; }
+  .card .block.b-fine { width: 66%; }
+  .card .block.b-qr { width: 21.4%; }
+  /* The block's own position supplies the spacing that flow margins used to. */
+  .card .block .kicker,
+  .card .block .msg,
+  .card .block .fine { margin-top: 0; }
+  .card .block.b-code .codebox {
+    background: rgba(255,255,255,.18);
+    border-radius: calc(var(--u) * 1.71mm);
+    padding: calc(var(--u) * 1.2mm) calc(var(--u) * 1.88mm);
+  }
+  .card.paper .block.b-code .codebox { background: #f5f5f7; box-shadow: inset 0 0 0 0.2mm #d2d2d7; }
+  .card .block.b-qr .qrbox { width: 100%; }
+  .card .block.b-qr .scan { margin-top: calc(var(--u) * 1mm); }
+  .card .left { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .card .spacer { flex: 1; min-height: calc(var(--u) * 1mm); }
+
+  .card .brandrow { display: flex; gap: calc(var(--u) * 1.54mm); align-items: center; }
+  .card .brandrow img { width: calc(var(--u) * 6.33mm); height: calc(var(--u) * 6.33mm); border-radius: calc(var(--u) * 1.46mm); flex: none; }
+  .card .brand { font-weight: 700; font-size: calc(var(--u) * 2.83mm); letter-spacing: -0.02em; line-height: 1.1; }
+
+  .card .kicker {
+    font-size: calc(var(--u) * 1.71mm); letter-spacing: .2em; opacity: .82; line-height: 1.2;
+    text-transform: uppercase; margin-top: calc(var(--u) * 3.4mm);
+  }
+  .card .value {
+    font-size: calc(var(--u) * 5.82mm); font-weight: 800; letter-spacing: -0.03em;
+    line-height: 1.05; margin-top: calc(var(--u) * 0.68mm);
+  }
+  .card .msg {
+    font-size: calc(var(--u) * 2.31mm); line-height: 1.407; opacity: .9;
+    margin-top: calc(var(--u) * 1.6mm); white-space: pre-wrap;
+  }
+  .card .fromto { font-size: calc(var(--u) * 2.31mm); line-height: 1.407; opacity: .75; margin-top: 0; }
+
+  .card .codelabel { font-size: calc(var(--u) * 1.37mm); letter-spacing: .19em; opacity: .6; line-height: 1.3; }
+  .card .code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: calc(var(--u) * 2.57mm); letter-spacing: .05em; font-weight: 600;
+    margin-top: calc(var(--u) * 0.55mm);
+  }
+  .card .fine { font-size: calc(var(--u) * 1.37mm); line-height: 1.35; opacity: .55; margin-top: calc(var(--u) * 1.2mm); }
+
+  .card .right {
+    width: max(14mm, calc(var(--u) * 21mm)); flex: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: calc(var(--u) * 1mm);
+  }
+  .card .qrbox { background: #fff; padding: calc(var(--u) * 1.2mm); border-radius: calc(var(--u) * 1.54mm); line-height: 0; width: 100%; }
+  .card .qrbox svg { display: block; width: 100%; height: auto; }
+  .card .scan { font-size: calc(var(--u) * 1.37mm); opacity: .82; text-align: center; line-height: 1.3; }
+  .card .serial {
+    position: absolute; z-index: 3; right: calc(var(--u) * 3.6mm); bottom: calc(var(--u) * 3mm);
+    font-size: calc(var(--u) * 1.6mm); opacity: .45; font-variant-numeric: tabular-nums;
+  }
+
+  /* Ink-saving mono theme */
+  .card.paper { color: #111; background: #fff; box-shadow: inset 0 0 0 0.25mm #c7c7cc; }
+  .card.paper .frame { border-color: rgba(0,0,0,.16); }
+  .card.paper .sheen { display: none; }
+
+  /* Card back — light stock with a colour band, the way real cards are printed */
+  .card.back { color: #1d1d1f; background: #fff; box-shadow: inset 0 0 0 0.25mm #d2d2d7; }
+  .card.back .band { position: absolute; top: 0; left: 0; right: 0; height: calc(var(--u) * 6mm); z-index: 1; }
+  .card.back .frame, .card.back .sheen { display: none; }
+  .card.back .inner { padding-top: calc(var(--u) * 7.6mm); }
+  .card.back .issuer {
+    font-size: calc(var(--u) * 1.9mm); font-weight: 600; opacity: .8;
+    margin-bottom: calc(var(--u) * 2.2mm);
+  }
+  .card.back .steps { font-size: calc(var(--u) * 1.85mm); line-height: 1.5; opacity: .82; }
+  .card.back .steps b { display: block; letter-spacing: .16em; font-size: calc(var(--u) * 1.7mm); opacity: .6; margin-bottom: calc(var(--u) * 0.7mm); font-weight: 600; }
+  .card.back .codewell {
+    margin-top: calc(var(--u) * 1.6mm);
+    border: 0.25mm solid #d2d2d7; border-radius: calc(var(--u) * 1.2mm);
+    padding: calc(var(--u) * 1.3mm) calc(var(--u) * 1.6mm);
+    background: #f5f5f7;
+  }
+  .card.back .codelabel { opacity: .55; }
+  .card.back .fine { opacity: .55; }
+  .card.back .scan { opacity: .6; }
+  .card.back .serial { opacity: .35; }
+
+  @page { size: A4; margin: 0; }
+  @media print {
+    body { background: #fff; }
+    .noprint { display: none !important; }
+    .wrap { padding: 0; max-width: none; }
+    #sheets { margin: 0; }
+    .sheet { box-shadow: none; margin: 0; break-after: page; page-break-after: always; }
+    .sheet:last-child { break-after: auto; page-break-after: auto; }
+    .sheet .facelabel { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="noprint">
+  <header class="top">
+    <h1>GiftSheet</h1>
+    <span class="sub">App Store 오퍼코드 CSV → 기프트 카드 인쇄 · 전송용 메시지</span>
+  </header>
+
+  <!-- 1. 코드 불러오기 -->
+  <section class="panel">
+    <h2>1 · 코드 불러오기</h2>
+    <div id="drop" class="drop">
+      <strong>CSV 파일을 여기에 끌어다 놓으세요</strong><br>
+      <span class="sub">App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 선택할 수도 있습니다</span>
+      <input type="file" id="file" accept=".csv,.txt" hidden>
+    </div>
+    <details style="margin-top:12px">
+      <summary class="sub" style="cursor:pointer">직접 붙여넣기</summary>
+      <textarea id="paste" rows="4" placeholder="코드,리딤링크 형식 또는 링크만 한 줄에 하나씩" style="margin-top:8px"></textarea>
+      <button class="mini" id="pasteBtn" style="margin-top:6px">불러오기</button>
+    </details>
+    <div id="loadStatus" class="sub" style="margin-top:10px"></div>
+  </section>
+
+  <!-- 2. 앱 -->
+  <section class="panel">
+    <h2>2 · 앱 <span class="sub" style="font-weight:400">— 링크에서 자동으로 찾습니다</span></h2>
+    <div class="appline">
+      <img id="appIcon" alt="">
+      <div style="flex:1">
+        <div id="appName" style="font-weight:600">코드를 불러오면 자동으로 채워집니다</div>
+        <div id="appMeta" class="sub"></div>
+      </div>
+      <div class="field">
+        <label for="appId">Apple ID · 앱 링크 · 리딤 링크 — 아무거나 붙여넣으세요</label>
+        <div class="row" style="gap:6px">
+          <input type="text" id="appId" style="width:280px" placeholder="6759643878 또는 https://apps.apple.com/…">
+          <button class="mini" id="lookupBtn">조회</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 카드 내용 -->
+  <section class="panel">
+    <h2>3 · 카드 내용</h2>
+    <div class="row">
+      <div class="field">
+        <label for="value">액면 — 카드에서 가장 큰 글씨</label>
+        <input type="text" id="value" style="width:190px" value="1개월 무료" maxlength="18">
+      </div>
+      <div class="field" style="flex:1; min-width:230px">
+        <label for="message">메시지</label>
+        <input type="text" id="message" value="즐겁게 써 주세요" maxlength="46">
+      </div>
+      <div class="field">
+        <label for="sender">보내는 사람</label>
+        <input type="text" id="sender" style="width:130px" placeholder="예: 현호">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field">
+        <label for="theme">테마</label>
+        <select id="theme">
+          <option value="sunrise">Sunrise</option>
+          <option value="aurora" selected>Aurora</option>
+          <option value="mint">Mint</option>
+          <option value="blossom">Blossom</option>
+          <option value="graphite">Graphite</option>
+          <option value="paper">Paper (흑백 · 잉크 절약)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="expiry">유효기간 (선택)</label>
+        <input type="text" id="expiry" style="width:150px" placeholder="예: 2026.12.31까지">
+      </div>
+      <div class="field" style="flex:1; min-width:260px">
+        <label for="terms">약관 한 줄</label>
+        <input type="text" id="terms" value="현금 교환·환불 불가 · 분실 시 재발행 불가 · 판매 목적 사용 불가">
+      </div>
+    </div>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="print" aria-selected="true">실물 인쇄</button>
+    <button role="tab" data-tab="send" aria-selected="false">디지털 전송</button>
+    <button role="tab" data-tab="ledger" aria-selected="false">배포 대장</button>
+  </div>
+
+  <!-- 실물 인쇄 -->
+  <section class="panel" id="tab-print">
+    <div class="note">
+      <b>1회용 코드라 같은 카드를 여러 장 찍을 수 없습니다.</b> 카드마다 코드가 달라야 하죠.
+      대신 A4 한 장에 서로 다른 카드를 여러 개 얹어서 <b>한 번의 인쇄 작업</b>으로 뽑고 잘라 쓰면 됩니다.
+      500장이라도 인쇄 버튼은 한 번만 누릅니다.
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="preset">카드 규격</label>
+        <select id="preset">
+          <option value="giftcard" selected>기프트 카드 85.6×54mm (CR80) — A4당 10장</option>
+          <option value="namecard">명함 90×50mm — A4당 10장</option>
+          <option value="wide">와이드 100×62mm — A4당 8장</option>
+          <option value="a6">엽서 A6 105×148mm — A4당 4장</option>
+          <option value="label24">라벨 63.5×33.9mm — A4당 24칸</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sides">면</label>
+        <select id="sides">
+          <option value="single">단면 — 앞면에 코드까지</option>
+          <option value="duplex">양면 — 앞면 디자인 / 뒷면 코드</option>
+        </select>
+      </div>
+      <div class="field"><label for="from">시작 번호</label><input type="number" id="from" value="1" min="1"></div>
+      <div class="field"><label for="count">장수</label><input type="number" id="count" value="20" min="1"></div>
+      <div class="field"><label for="offX">가로 보정 mm</label><input type="number" id="offX" value="0" step="0.5"></div>
+      <div class="field"><label for="offY">세로 보정 mm</label><input type="number" id="offY" value="0" step="0.5"></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <label><input type="checkbox" id="guides" checked> 재단선</label>
+      <label><input type="checkbox" id="showIcon" checked> 앱 아이콘</label>
+      <label><input type="checkbox" id="serial" checked> 일련번호</label>
+      <button class="primary" id="renderBtn">미리보기 만들기</button>
+      <button id="printBtn">인쇄 / PDF 저장</button>
+      <span class="pagecount" id="pageCount"></span>
+    </div>
+    <div class="sub" id="printHint" style="margin-top:10px"></div>
+  </section>
+
+  <!-- 디지털 전송 -->
+  <section class="panel" id="tab-send" hidden>
+    <div class="note">
+      <b>이미지만 보내면 받는 사람이 못 씁니다.</b> 카톡으로 받은 사진 속 QR은 눌러도 아무 일이 없고,
+      같은 폰에서는 스캔할 수도 없어서 결국 18자리를 손으로 옮겨 적게 됩니다.
+      <ol>
+        <li><b>문구(링크 포함)를 먼저</b> 보내세요 — 링크를 누르면 App Store 리딤 창이 코드까지 채워진 채로 열립니다.</li>
+        <li>이미지는 그 뒤에 <b>포장지로</b> 붙이세요.</li>
+        <li>QR은 실물 카드용입니다. 남의 폰으로 스캔할 때만 제 역할을 합니다.</li>
+      </ol>
+      그래서 아래 버튼은 <b>문구 복사</b>가 먼저, 이미지가 나중입니다.
+    </div>
+    <div class="previewWrap">
+      <div>
+        <canvas id="cardCanvas" width="1240" height="880" tabindex="0"
+                aria-label="기프트 카드 미리보기 — 요소를 끌어서 배치할 수 있습니다"></canvas>
+        <div class="editorbar">
+          <span class="sub" id="editorHint">카드 위의 요소를 끌어서 옮겨 보세요. 배치는 인쇄 카드에도 그대로 적용됩니다.</span>
+          <button class="mini" id="resetLayout" style="margin-left:auto">배치 초기화</button>
+        </div>
+      </div>
+      <div class="previewSide">
+        <div class="field">
+          <label for="recipient">받는 사람 (선택 · 카드와 문구에 들어갑니다)</label>
+          <input type="text" id="recipient" placeholder="예: 지민">
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label for="shareText">보낼 문구</label>
+          <textarea id="shareText" rows="9"></textarea>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="copyText">문구 복사</button>
+          <button id="copyImg">이미지 복사</button>
+          <button id="saveImg">PNG 저장</button>
+          <button id="markSent">보냄 표시 + 다음</button>
+        </div>
+        <div class="sub" id="sendStatus" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div style="margin-top:16px" class="row">
+      <input type="text" id="search" placeholder="코드 · 받는 사람 검색" style="flex:1;min-width:200px">
+      <label><input type="checkbox" id="hideSent"> 보낸 것 숨기기</label>
+    </div>
+    <div class="list" id="sendList" style="margin-top:10px"></div>
+  </section>
+
+  <!-- 배포 대장 -->
+  <section class="panel" id="tab-ledger" hidden>
+    <div class="row" style="margin-bottom:12px">
+      <span class="sub" id="ledgerSummary"></span>
+      <button class="mini" id="exportLedger" style="margin-left:auto">대장 CSV 내보내기</button>
+      <button class="mini" id="clearLedger">기록 지우기</button>
+    </div>
+    <table class="ledger"><thead>
+      <tr><th style="width:56px">번호</th><th>코드</th><th style="width:150px">받는 사람</th><th style="width:110px">보낸 날</th><th style="width:70px"></th></tr>
+    </thead><tbody id="ledgerBody"></tbody></table>
+  </section>
+</div>
+
+<div id="sheets"></div>
+
+</div>
+
+<script src="qr.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- themes (mirrors GiftTheme.swift) ----------
+  var THEMES = {
+    sunrise:  { stops: ['#FF3D77', '#FF7A59', '#FFC15E'], blooms: ['#FFD98A', '#FF4FA3'], band: '#FF5C77' },
+    aurora:   { stops: ['#3D5AFE', '#7A5BFF', '#2ED8C3'], blooms: ['#8AF0FF', '#B08CFF'], band: '#6A5BFF' },
+    mint:     { stops: ['#0BA98A', '#34E0A1', '#B8F5D8'], blooms: ['#EFFFF7', '#00C2A8'], band: '#19C39A' },
+    blossom:  { stops: ['#E0489A', '#FF7FB2', '#FFD3C1'], blooms: ['#FFE7C9', '#FF5C9E'], band: '#F0629F' },
+    graphite: { stops: ['#161618', '#2C2C2E', '#5B5B60'], blooms: ['#8E8E93', '#3A3A3C'], band: '#2C2C2E' },
+    paper:    { stops: ['#FFFFFF', '#FFFFFF', '#FFFFFF'], blooms: [], band: '#1d1d1f' }
+  };
+
+  // CR80 is the plastic-card standard: 85.6 × 54 mm, 3 mm radius, 3 mm safe area.
+  var PRESETS = {
+    giftcard: { w: 85.6, h: 54,   cols: 2, rows: 5, gx: 4, gy: 3 },
+    namecard: { w: 90,   h: 50,   cols: 2, rows: 5, gx: 3, gy: 2 },
+    wide:     { w: 100,  h: 62,   cols: 2, rows: 4, gx: 3, gy: 3 },
+    a6:       { w: 105,  h: 148,  cols: 2, rows: 2, gx: 0, gy: 0 },
+    label24:  { w: 63.5, h: 33.9, cols: 3, rows: 8, gx: 0, gy: 0 }
+  };
+
+  // ---------- state ----------
+  var codes = [];        // [{code, url, id}]
+  var app = { id: '', name: '', developer: '', icon: '' };
+  var iconImg = null;
+  var current = 0;
+  var ledger = loadLedger();
+
+  function loadLedger() {
+    try { return JSON.parse(localStorage.getItem('giftsheet.ledger') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveLedger() {
+    try { localStorage.setItem('giftsheet.ledger', JSON.stringify(ledger)); } catch (e) {}
+  }
+
+  // ---------- card layout ----------
+  /*
+   * One layout drives both outputs. Positions are the top-left corner of each
+   * block as a fraction of the card box, so the same numbers place things on a
+   * 1000×631 canvas and on an 85.6×54 mm print card. The defaults reproduce the
+   * composed design exactly — nothing moves until the user drags something.
+   */
+  var BLOCK_IDS = ['brand', 'hero', 'note', 'code', 'fine', 'qr'];
+  var BLOCK_NAMES = { brand: '앱 이름', hero: '액면', note: '메시지', code: '코드', fine: '약관', qr: 'QR' };
+  var DEFAULT_LAYOUT = {
+    brand: { x: 0.0560, y: 0.0888 },
+    hero:  { x: 0.0560, y: 0.2916 },
+    note:  { x: 0.0560, y: 0.4786 },
+    code:  { x: 0.0560, y: 0.7242 },
+    fine:  { x: 0.0560, y: 0.8796 },
+    qr:    { x: 0.7300, y: 0.5246 }   // panel + caption ends on the bottom padding line
+  };
+  var layout = loadLayout();
+
+  function loadLayout() {
+    var out = {};
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem('giftsheet.layout') || '{}'); } catch (e) {}
+    BLOCK_IDS.forEach(function (id) {
+      var p = saved[id];
+      out[id] = (p && isFinite(p.x) && isFinite(p.y))
+        ? { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) }
+        : { x: DEFAULT_LAYOUT[id].x, y: DEFAULT_LAYOUT[id].y };
+    });
+    return out;
+  }
+  function saveLayout() {
+    try { localStorage.setItem('giftsheet.layout', JSON.stringify(layout)); } catch (e) {}
+  }
+  function resetLayout() {
+    BLOCK_IDS.forEach(function (id) { layout[id] = { x: DEFAULT_LAYOUT[id].x, y: DEFAULT_LAYOUT[id].y }; });
+    saveLayout();
+  }
+  function layoutIsDefault() {
+    return BLOCK_IDS.every(function (id) {
+      return Math.abs(layout[id].x - DEFAULT_LAYOUT[id].x) < 1e-6 &&
+             Math.abs(layout[id].y - DEFAULT_LAYOUT[id].y) < 1e-6;
+    });
+  }
+
+  // ---------- CSV ----------
+  function parse(text) {
+    var out = [];
+    var seen = {};
+    text.split(/\r?\n/).forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var url = (line.match(/https?:\/\/\S*apps\.apple\.com\/\S*/i) || [])[0];
+      if (url) url = url.replace(/[",;]+$/, '');
+      var code = null, id = null;
+      if (url) {
+        code = (url.match(/[?&]code=([^&\s]+)/i) || [])[1] || null;
+        id = (url.match(/[?&]id=(\d+)/i) || [])[1] || null;
+      }
+      if (!code) {
+        var first = line.split(',')[0].trim().replace(/^"|"$/g, '');
+        if (/^[A-Z0-9]{8,24}$/.test(first)) code = first;
+      }
+      if (!code) return;
+      if (seen[code]) return;
+      seen[code] = true;
+      out.push({ code: code, url: url || '', id: id || '' });
+    });
+    return out;
+  }
+
+  function redeemURL(entry) {
+    if (entry.url) return entry.url;
+    var id = app.id || entry.id;
+    if (!id) return '';
+    return 'https://apps.apple.com/redeem?ctx=offercodes&id=' + id + '&code=' + entry.code;
+  }
+
+  function ingest(text, label) {
+    var parsed = parse(text);
+    if (!parsed.length) {
+      $('loadStatus').textContent = '코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.';
+      return;
+    }
+    codes = parsed;
+    current = 0;
+    var dropped = text.split(/\r?\n/).filter(function (l) { return l.trim(); }).length - parsed.length;
+    $('loadStatus').textContent = label + ' — 코드 ' + parsed.length + '개' +
+      (dropped > 0 ? ' (중복·머리글 ' + dropped + '줄 제외)' : '');
+    $('count').value = Math.min(parsed.length, 20);
+    $('count').max = parsed.length;
+    $('from').max = parsed.length;
+
+    var found = parsed.find(function (c) { return c.id; });
+    if (found) lookupFrom(found.id, true);
+    renderSendList();
+    renderLedger();
+    renderCard();
+  }
+
+  // ---------- App Store lookup ----------
+  /**
+   * Pulls the numeric Apple ID out of anything pasted into the field:
+   *   6759643878
+   *   https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=…
+   *   https://apps.apple.com/kr/app/실수-100/id6759643878?uo=4
+   *   itms-apps://…/id6759643878
+   */
+  function extractAppId(input) {
+    var s = String(input || '').trim();
+    if (!s) return '';
+    if (/^\d{5,}$/.test(s)) return s;
+    var m = s.match(/[?&]id=(\d{5,})/i) || s.match(/\bid(\d{5,})/i) || s.match(/(\d{9,})/);
+    return m ? m[1] : '';
+  }
+
+  /** @param quiet suppress the "no ID here" notice while the user is still typing */
+  function lookupFrom(raw, quiet) {
+    var id = extractAppId(raw);
+    if (!id) {
+      if (!quiet && String(raw || '').trim()) {
+        $('appName').textContent = '이 값에서는 Apple ID를 찾지 못했습니다';
+        $('appMeta').textContent = '숫자 ID, 앱 링크, 리딤 링크 중 아무거나 넣어도 됩니다.';
+      }
+      return;
+    }
+    if ($('appId').value.trim() !== id) $('appId').value = id;  // a pasted link collapses to the ID
+    if (id === app.id && app.name) { paintApp(); return; }      // already resolved, no refetch
+    lookup(id);
+  }
+
+  /** Writes the resolved app back into the panel — also clears a stale error notice. */
+  function paintApp() {
+    if (!app.name) return;
+    $('appName').textContent = app.name;
+    $('appMeta').textContent = app.meta || '';
+    if (app.icon) $('appIcon').src = app.icon;
+  }
+
+  function lookup(id) {
+    if (!id) return;
+    app.id = id;
+    $('appName').textContent = '조회 중…';
+
+    // Korea first; fall back to the default storefront for apps not released here.
+    function fetchIn(country) {
+      var url = 'https://itunes.apple.com/lookup?id=' + encodeURIComponent(id) +
+        (country ? '&country=' + country : '');
+      return fetch(url).then(function (r) { return r.json(); });
+    }
+
+    fetchIn('kr')
+      .then(function (d) { return d.resultCount ? d : fetchIn(''); })
+      .then(function (d) {
+        if (!d.resultCount) throw new Error('결과 없음');
+        var r = d.results[0];
+        app.name = r.trackName;
+        app.developer = r.artistName;
+        app.icon = (r.artworkUrl512 || r.artworkUrl100 || '').replace(/\/\d+x\d+bb/, '/256x256bb');
+        app.meta = [app.developer, r.primaryGenreName, r.formattedPrice].filter(Boolean).join(' · ');
+        paintApp();
+        loadIcon(app.icon);
+        renderCard();
+      })
+      .catch(function () {
+        app.name = '';
+        $('appName').textContent = '앱 정보를 불러오지 못했습니다 (ID ' + id + ')';
+        $('appMeta').textContent = '오프라인이거나 ID가 잘못됐을 수 있습니다. 카드는 그대로 만들 수 있어요.';
+        renderCard();
+      });
+  }
+
+  function loadIcon(src) {
+    if (!src) { iconImg = null; return; }
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function () { iconImg = img; renderCard(); };
+    img.onerror = function () { iconImg = null; };
+    img.src = src;
+  }
+
+  // ---------- helpers ----------
+  function groupCode(code) { return code.replace(/(.{6})/g, '$1 ').trim(); }
+  function pad(n) { return String(n).padStart(3, '0'); }
+  function hexA(hex, a) {
+    var v = parseInt(hex.slice(1), 16);
+    return 'rgba(' + ((v >> 16) & 255) + ',' + ((v >> 8) & 255) + ',' + (v & 255) + ',' + a + ')';
+  }
+  function mix(hex, amount) {   // lighten toward white
+    var v = parseInt(hex.slice(1), 16);
+    var r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255;
+    return 'rgb(' + Math.round(r + (255 - r) * amount) + ',' +
+                    Math.round(g + (255 - g) * amount) + ',' +
+                    Math.round(b + (255 - b) * amount) + ')';
+  }
+
+  function qrSVG(text) {
+    var m = window.QR.matrix(text, 'M');
+    var n = m.length;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + n + ' ' + n);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', window.QR.path(m));
+    p.setAttribute('fill', '#000');
+    svg.appendChild(p);
+    return svg;
+  }
+
+  function el(cls, text) {
+    var d = document.createElement('div');
+    d.className = cls;
+    if (text !== undefined) d.textContent = text;
+    return d;
+  }
+
+  function settings() {
+    return {
+      theme: $('theme').value,
+      value: $('value').value.trim(),
+      message: $('message').value.trim(),
+      sender: $('sender').value.trim(),
+      expiry: $('expiry').value.trim(),
+      terms: $('terms').value.trim()
+    };
+  }
+
+  // ---------- print cards ----------
+  function buildCard(entry, index, opts, face) {
+    var s = opts.s;
+    var theme = THEMES[s.theme];
+    var card = document.createElement('div');
+    card.className = 'card' + (opts.guides ? ' guides' : '') +
+      (face === 'back' ? ' back' : (s.theme === 'paper' ? ' paper' : ''));
+    card.style.width = opts.w + 'mm';
+    card.style.height = opts.h + 'mm';
+    card.style.setProperty('--u', opts.u);
+
+    if (face === 'back') {
+      var band = el('band');
+      band.style.background = 'linear-gradient(90deg, ' + theme.stops.join(', ') + ')';
+      card.appendChild(band);
+    } else if (s.theme !== 'paper') {
+      var bg = el('bg');
+      bg.style.background =
+        'radial-gradient(58% 78% at 12% 8%, ' + hexA(theme.blooms[0], .5) + ', transparent 62%),' +
+        'radial-gradient(70% 90% at 96% 96%, ' + hexA(theme.blooms[1], .45) + ', transparent 58%),' +
+        'linear-gradient(38deg, ' + theme.stops.join(', ') + ')';
+      card.appendChild(bg);
+      card.appendChild(el('sheen'));
+      card.appendChild(el('frame'));
+    } else {
+      card.appendChild(el('frame'));
+    }
+
+    if (face !== 'back') {
+      // Front faces mirror the preview: every piece sits where it was dragged.
+      var place = function (id, node) {
+        var pos = layout[id];
+        var holder = el('block b-' + id);
+        holder.style.left = (pos.x * 100).toFixed(3) + '%';
+        holder.style.top = (pos.y * 100).toFixed(3) + '%';
+        // Canvas and CSS measure text differently, so a block placed near the
+        // right edge in the preview could still spill here. Wrap instead.
+        holder.style.maxWidth = (100 - pos.x * 100).toFixed(3) + '%';
+        holder.appendChild(node);
+        card.appendChild(holder);
+      };
+
+      var brandrow = el('brandrow');
+      if (opts.showIcon && app.icon) {
+        var bimg = document.createElement('img');
+        bimg.src = app.icon;
+        brandrow.appendChild(bimg);
+      }
+      brandrow.appendChild(el('brand', app.name || 'App Store'));
+      place('brand', brandrow);
+
+      var heroWrap = document.createDocumentFragment();
+      heroWrap.appendChild(el('kicker', '기프트 카드'));
+      if (s.value) heroWrap.appendChild(el('value', s.value));
+      var heroBox = el('herobox');
+      heroBox.appendChild(heroWrap);
+      place('hero', heroBox);
+
+      if (s.message || s.sender) {
+        var noteBox = el('notebox');
+        if (s.message) noteBox.appendChild(el('msg', s.message));
+        if (s.sender) noteBox.appendChild(el('fromto', 'from. ' + s.sender));
+        place('note', noteBox);
+      }
+
+      if (face === 'single') {
+        var codeBox = el('codebox');
+        codeBox.appendChild(el('codelabel', 'CODE'));
+        codeBox.appendChild(el('code', groupCode(entry.code)));
+        place('code', codeBox);
+
+        var qrWrap = el('qrwrap');
+        var qrbox2 = el('qrbox');
+        var url2 = redeemURL(entry);
+        if (url2) qrbox2.appendChild(qrSVG(url2));
+        qrWrap.appendChild(qrbox2);
+        qrWrap.appendChild(el('scan', '스캔해서 받기'));
+        place('qr', qrWrap);
+      }
+
+      var fineBits = [];
+      if (s.expiry) fineBits.push(s.expiry);
+      if (face === 'single' && s.terms) fineBits.push(s.terms);
+      if (fineBits.length) place('fine', el('fine', fineBits.join(' · ')));
+
+      if (opts.serial) card.appendChild(el('serial', pad(index + 1)));
+      return card;
+    }
+
+    var inner = el('inner');
+    var left = el('left');
+
+    if (face === 'back') {
+      // A card back should say who issued it.
+      var issuer = el('issuer');
+      issuer.textContent = (app.name || 'App Store') + ' · App Store 기프트 카드';
+      left.appendChild(issuer);
+
+      var steps = el('steps');
+      var b = document.createElement('b');
+      b.textContent = '사용 방법';
+      steps.appendChild(b);
+      steps.appendChild(document.createTextNode(
+        '1. QR을 스캔하면 App Store가 열립니다\n2. 코드가 채워진 화면에서 사용을 누르세요'));
+      steps.style.whiteSpace = 'pre-line';
+      left.appendChild(steps);
+
+      var well = el('codewell');
+      well.appendChild(el('codelabel', 'CODE'));
+      well.appendChild(el('code', groupCode(entry.code)));
+      left.appendChild(well);
+
+      left.appendChild(el('spacer'));
+      var fineParts = [];
+      if (s.expiry) fineParts.push(s.expiry);
+      if (s.terms) fineParts.push(s.terms);
+      if (fineParts.length) left.appendChild(el('fine', fineParts.join(' · ')));
+    }
+    inner.appendChild(left);
+
+    var right = el('right');
+    var qrbox = el('qrbox');
+    var url = redeemURL(entry);
+    if (url) qrbox.appendChild(qrSVG(url));
+    right.appendChild(qrbox);
+    right.appendChild(el('scan', '스캔해서 받기'));
+    inner.appendChild(right);
+
+    card.appendChild(inner);
+
+    if (opts.serial) card.appendChild(el('serial', pad(index + 1)));
+    return card;
+  }
+
+  function renderSheets() {
+    var host = $('sheets');
+    host.innerHTML = '';
+    if (!codes.length) { $('pageCount').textContent = '먼저 코드를 불러오세요.'; return; }
+
+    var p = PRESETS[$('preset').value];
+    var duplex = $('sides').value === 'duplex';
+    var opts = {
+      w: p.w, h: p.h,
+      u: (p.w / 85.6).toFixed(3),
+      s: settings(),
+      guides: $('guides').checked,
+      showIcon: $('showIcon').checked,
+      serial: $('serial').checked
+    };
+
+    var from = Math.max(1, parseInt($('from').value, 10) || 1) - 1;
+    var count = Math.max(1, parseInt($('count').value, 10) || 1);
+    var slice = codes.slice(from, from + count);
+    var perPage = p.cols * p.rows;
+    var pages = Math.ceil(slice.length / perPage);
+    var offX = parseFloat($('offX').value) || 0;
+    var offY = parseFloat($('offY').value) || 0;
+
+    function makeSheet(label) {
+      var sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      sheet.style.gridTemplateColumns = 'repeat(' + p.cols + ', ' + p.w + 'mm)';
+      sheet.style.gridAutoRows = p.h + 'mm';
+      sheet.style.gap = p.gy + 'mm ' + p.gx + 'mm';
+      sheet.style.transform = 'translate(' + offX + 'mm, ' + offY + 'mm)';
+      if (label) sheet.appendChild(el('facelabel', label));
+      return sheet;
+    }
+
+    for (var i = 0; i < pages; i++) {
+      var pageItems = slice.slice(i * perPage, (i + 1) * perPage);
+      var base = from + i * perPage;
+
+      var front = makeSheet(duplex ? '앞면 ' + (i + 1) : '');
+      pageItems.forEach(function (item, j) {
+        front.appendChild(buildCard(item, base + j, opts, duplex ? 'front' : 'single'));
+      });
+      host.appendChild(front);
+
+      if (duplex) {
+        // Long-edge duplex flips the sheet horizontally, so the back page needs
+        // its columns reversed for card N to land behind card N.
+        var back = makeSheet('뒷면 ' + (i + 1));
+        for (var r = 0; r < Math.ceil(pageItems.length / p.cols); r++) {
+          var rowItems = [];
+          for (var c = 0; c < p.cols; c++) {
+            var idx = r * p.cols + c;
+            rowItems.push(idx < pageItems.length ? { item: pageItems[idx], n: base + idx } : null);
+          }
+          rowItems.reverse().forEach(function (cell) {
+            if (cell) back.appendChild(buildCard(cell.item, cell.n, opts, 'back'));
+            else back.appendChild(el('')); // keep the grid aligned
+          });
+        }
+        host.appendChild(back);
+      }
+    }
+
+    var sheetCount = duplex ? pages * 2 : pages;
+    $('pageCount').textContent = slice.length + '장 · A4 ' + sheetCount + '쪽 · 한 장당 ' + perPage + '개';
+
+    var qrMM = Math.max(14, (p.h / 54) * 21) - 2 * (p.h / 54) * 1.1;
+    var hints = [];
+    if (duplex) hints.push('양면 인쇄는 프린터 설정에서 <b>양면 · 긴 쪽 넘기기</b>를 고르세요. 뒷면 페이지는 이미 좌우를 뒤집어 두었습니다.');
+    if (qrMM < 15) hints.push('<span class="warn">QR이 약 ' + qrMM.toFixed(0) + 'mm로 작습니다. 카메라를 가까이 대야 인식됩니다 — 더 큰 규격을 권합니다.</span>');
+    if ($('preset').value === 'giftcard') hints.push('CR80 규격입니다. 3mm 모서리 펀치로 모서리를 둥글리면 실물 기프트 카드와 같은 형태가 됩니다.');
+    $('printHint').innerHTML = hints.join('<br>');
+  }
+
+  // ---------- digital card (canvas) ----------
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function tracked(ctx, text, x, y, spacing) {
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = spacing + 'px';
+      ctx.fillText(text, x, y);
+      ctx.letterSpacing = '0px';
+      return;
+    }
+    var cx = x;
+    for (var i = 0; i < text.length; i++) {
+      ctx.fillText(text[i], cx, y);
+      cx += ctx.measureText(text[i]).width + spacing;
+    }
+  }
+
+  function renderCard() {
+    var canvas = $('cardCanvas');
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    var s = settings();
+    var t = THEMES[s.theme];
+    var entry = codes[current];
+    var mono = s.theme === 'paper';
+    var ink = mono ? '#1d1d1f' : '#fff';
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.textBaseline = 'top';
+
+    // Backdrop — a soft tint of the card so the card reads as an object on a surface.
+    var back = ctx.createLinearGradient(0, 0, W, H);
+    back.addColorStop(0, mix(t.stops[0], mono ? 0.94 : 0.86));
+    back.addColorStop(1, mix(t.stops[2], mono ? 0.9 : 0.8));
+    ctx.fillStyle = back;
+    ctx.fillRect(0, 0, W, H);
+
+    // CR80 proportions: 85.6 × 54 → 1.585:1
+    var CW = 1000, CH = 631, CX = (W - CW) / 2, CY = (H - CH) / 2;
+    var R = 42;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(20,16,40,.30)';
+    ctx.shadowBlur = 64;
+    ctx.shadowOffsetY = 26;
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, CX, CY, CW, CH, R);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, CX, CY, CW, CH, R);
+    ctx.clip();
+    ctx.translate(CX, CY);
+
+    if (mono) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, CW, CH);
+    } else {
+      var g = ctx.createLinearGradient(0, CH, CW, 0);
+      g.addColorStop(0, t.stops[0]);
+      g.addColorStop(0.5, t.stops[1]);
+      g.addColorStop(1, t.stops[2]);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, CW, CH);
+
+      [[CW * 0.12, CH * 0.08, CW * 0.58, t.blooms[0], 0.5],
+       [CW * 0.96, CH * 0.96, CW * 0.62, t.blooms[1], 0.45]].forEach(function (b) {
+        var rg = ctx.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+        rg.addColorStop(0, hexA(b[3], b[4]));
+        rg.addColorStop(1, hexA(b[3], 0));
+        ctx.fillStyle = rg;
+        ctx.fillRect(0, 0, CW, CH);
+      });
+
+      // specular sweep
+      var sw = ctx.createLinearGradient(CW * 0.15, CH, CW * 0.72, 0);
+      sw.addColorStop(0, 'rgba(255,255,255,0)');
+      sw.addColorStop(0.5, 'rgba(255,255,255,.16)');
+      sw.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sw;
+      ctx.fillRect(0, 0, CW, CH);
+    }
+
+    // hairline frame on the safe-area boundary
+    ctx.strokeStyle = mono ? 'rgba(0,0,0,.14)' : 'rgba(255,255,255,.34)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, 24, 24, CW - 48, CH - 48, 22);
+    ctx.stroke();
+
+    // Blocks are placed from the shared layout, so dragging here moves them everywhere.
+    var blocks = buildBlocks(ctx, s, entry, ink, mono);
+    blocks.forEach(function (b) {
+      b.x = layout[b.id].x * CW;
+      b.y = layout[b.id].y * CH;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      b.draw(ctx);
+      ctx.restore();
+    });
+
+    ctx.restore();
+
+    CARD = { x: CX, y: CY, w: CW, h: CH };
+    hitBlocks = blocks.map(function (b) {
+      return { id: b.id, rect: { x: CX + b.x, y: CY + b.y, w: b.w, h: b.h } };
+    });
+    drawEditorOverlay(ctx);
+    updateShareText();
+  }
+
+  var FONT = {
+    brand: '700 33px "Apple SD Gothic Neo", -apple-system, sans-serif',
+    kicker: '600 20px "Apple SD Gothic Neo", -apple-system, sans-serif',
+    value: '800 68px "Apple SD Gothic Neo", -apple-system, sans-serif',
+    note: '500 27px "Apple SD Gothic Neo", -apple-system, sans-serif',
+    codeLabel: '600 16px "Apple SD Gothic Neo", -apple-system, sans-serif',
+    code: '600 30px ui-monospace, "SF Mono", Menlo, monospace',
+    fine: '400 16px "Apple SD Gothic Neo", -apple-system, sans-serif'
+  };
+
+  function measureTracked(ctx, text, spacing) {
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = spacing + 'px';
+      var w = ctx.measureText(text).width;
+      ctx.letterSpacing = '0px';
+      return w;
+    }
+    return ctx.measureText(text).width + spacing * Math.max(0, text.length - 1);
+  }
+
+  function wrapLines(ctx, text, maxW) {
+    var out = [], line = '';
+    String(text).split(/\s+/).forEach(function (w) {
+      var test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && line) { out.push(line); line = w; }
+      else line = test;
+    });
+    if (line) out.push(line);
+    return out;
+  }
+
+  /** Each block draws from its own origin; the caller translates it into place. */
+  function buildBlocks(ctx, s, entry, ink, mono) {
+    var blocks = [];
+    var name = app.name || 'App Store';
+    var hasIcon = !!iconImg;
+
+    ctx.font = FONT.brand;
+    blocks.push({
+      id: 'brand',
+      w: (hasIcon ? 92 : 0) + ctx.measureText(name).width,
+      h: 74,
+      draw: function (c) {
+        if (hasIcon) {
+          c.save(); roundRect(c, 0, 0, 74, 74, 17); c.clip();
+          c.drawImage(iconImg, 0, 0, 74, 74); c.restore();
+        }
+        c.fillStyle = ink;
+        c.font = FONT.brand;
+        c.fillText(name, hasIcon ? 92 : 0, 20);
+      }
+    });
+
+    ctx.font = FONT.kicker;
+    var kickerW = measureTracked(ctx, '기프트 카드', 4);
+    ctx.font = FONT.value;
+    var valueW = s.value ? ctx.measureText(s.value).width : 0;
+    blocks.push({
+      id: 'hero',
+      w: Math.max(kickerW, valueW),
+      h: s.value ? 110 : 26,
+      draw: function (c) {
+        c.fillStyle = ink;
+        c.globalAlpha = 0.82;
+        c.font = FONT.kicker;
+        tracked(c, '기프트 카드', 0, 0, 4);
+        c.globalAlpha = 1;
+        if (s.value) { c.font = FONT.value; c.fillText(s.value, 0, 32); }
+      }
+    });
+
+    var recipient = $('recipient').value.trim();
+    ctx.font = FONT.note;
+    var noteLines = [];
+    if (recipient) noteLines.push({ text: 'to. ' + recipient, dim: 0.9 });
+    if (s.message) wrapLines(ctx, s.message, 560).forEach(function (l) { noteLines.push({ text: l, dim: 0.9 }); });
+    if (s.sender) noteLines.push({ text: 'from. ' + s.sender, dim: 0.75 });
+    if (noteLines.length) {
+      var noteW = 0;
+      noteLines.forEach(function (l) { noteW = Math.max(noteW, ctx.measureText(l.text).width); });
+      blocks.push({
+        id: 'note',
+        w: noteW,
+        h: noteLines.length * 38,
+        draw: function (c) {
+          c.fillStyle = ink;
+          c.font = FONT.note;
+          noteLines.forEach(function (l, i) {
+            c.globalAlpha = l.dim;
+            c.fillText(l.text, 0, i * 38);
+          });
+          c.globalAlpha = 1;
+        }
+      });
+    }
+
+    if (entry) {
+      blocks.push({
+        id: 'code',
+        w: 470,
+        h: 84,
+        draw: function (c) {
+          c.globalAlpha = mono ? 1 : 0.18;
+          c.fillStyle = mono ? '#f5f5f7' : '#fff';
+          roundRect(c, 0, 0, 470, 84, 20);
+          c.fill();
+          if (mono) { c.strokeStyle = '#d2d2d7'; c.lineWidth = 2; c.stroke(); }
+          c.globalAlpha = 1;
+          c.fillStyle = ink;
+          c.globalAlpha = 0.6;
+          c.font = FONT.codeLabel;
+          tracked(c, 'CODE', 22, 14, 3);
+          c.globalAlpha = 1;
+          c.font = FONT.code;
+          c.fillText(groupCode(entry.code), 22, 38);
+        }
+      });
+
+      var url = redeemURL(entry);
+      blocks.push({
+        id: 'qr',
+        w: 214,
+        h: 214 + 30,   // panel plus the caption the printed card carries
+        draw: function (c) {
+          c.fillStyle = '#fff';
+          roundRect(c, 0, 0, 214, 214, 18);
+          c.fill();
+          c.fillStyle = ink;
+          c.globalAlpha = 0.82;
+          c.font = FONT.fine;
+          c.textAlign = 'center';
+          c.fillText('스캔해서 받기', 107, 222);
+          c.textAlign = 'left';
+          c.globalAlpha = 1;
+          if (!url) return;
+          var m = window.QR.matrix(url, 'M');
+          var n = m.length;
+          var cell = (214 - 28) / n;
+          c.fillStyle = '#000';
+          for (var r = 0; r < n; r++) {
+            for (var col = 0; col < n; col++) {
+              if (m[r][col]) c.fillRect(14 + col * cell, 14 + r * cell, Math.ceil(cell), Math.ceil(cell));
+            }
+          }
+        }
+      });
+    }
+
+    var fine = [];
+    if (s.expiry) fine.push(s.expiry);
+    if (entry && s.terms) fine.push(s.terms);
+    if (fine.length) {
+      var fineText = fine.join(' · ');
+      ctx.font = FONT.fine;
+      blocks.push({
+        id: 'fine',
+        w: ctx.measureText(fineText).width,
+        h: 20,
+        draw: function (c) {
+          c.fillStyle = ink;
+          c.globalAlpha = 0.55;
+          c.font = FONT.fine;
+          c.fillText(fineText, 0, 0);
+          c.globalAlpha = 1;
+        }
+      });
+    }
+
+    return blocks;
+  }
+
+  // ---------- drag-to-place editor ----------
+  var CARD = { x: 0, y: 0, w: 1000, h: 631 };
+  var hitBlocks = [];
+  var editor = { hover: null, sel: null, drag: null, guides: [] };
+
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+  function findBlock(id) {
+    for (var i = 0; i < hitBlocks.length; i++) if (hitBlocks[i].id === id) return hitBlocks[i];
+    return null;
+  }
+
+  function drawEditorOverlay(ctx) {
+    editor.guides.forEach(function (g) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,113,227,.85)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      if (g.axis === 'x') { ctx.moveTo(g.at, CARD.y - 14); ctx.lineTo(g.at, CARD.y + CARD.h + 14); }
+      else { ctx.moveTo(CARD.x - 14, g.at); ctx.lineTo(CARD.x + CARD.w + 14, g.at); }
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    [[editor.hover, false], [editor.sel, true]].forEach(function (pair) {
+      var b = pair[0] && findBlock(pair[0]);
+      if (!b) return;
+      var strong = pair[1];
+      var r = b.rect, m = 8;
+      ctx.save();
+      ctx.strokeStyle = strong ? 'rgba(0,113,227,1)' : 'rgba(0,113,227,.5)';
+      ctx.lineWidth = strong ? 2 : 1.5;
+      if (!strong) ctx.setLineDash([6, 4]);
+      roundRect(ctx, r.x - m, r.y - m, r.w + m * 2, r.h + m * 2, 10);
+      ctx.stroke();
+      if (strong) {
+        var label = BLOCK_NAMES[b.id] || b.id;
+        ctx.font = '600 15px "Apple SD Gothic Neo", -apple-system, sans-serif';
+        var tw = ctx.measureText(label).width;
+        var lx = r.x - m, ly = r.y - m - 24;
+        if (ly < 4) ly = r.y + r.h + m + 4;
+        ctx.fillStyle = 'rgba(0,113,227,1)';
+        roundRect(ctx, lx, ly, tw + 18, 22, 7);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.textBaseline = 'top';
+        ctx.fillText(label, lx + 9, ly + 3);
+      }
+      ctx.restore();
+    });
+  }
+
+  function toCanvasPoint(e) {
+    var c = $('cardCanvas'), r = c.getBoundingClientRect();
+    if (!r.width || !r.height) return null;   // canvas not laid out (hidden tab)
+    return { x: (e.clientX - r.left) * c.width / r.width,
+             y: (e.clientY - r.top) * c.height / r.height };
+  }
+
+  function blockAt(p) {
+    for (var i = hitBlocks.length - 1; i >= 0; i--) {
+      var r = hitBlocks[i].rect;
+      if (p.x >= r.x - 6 && p.x <= r.x + r.w + 6 && p.y >= r.y - 6 && p.y <= r.y + r.h + 6) return hitBlocks[i];
+    }
+    return null;
+  }
+
+  /** Snap to the padding lines, the card centre, and the edges of other blocks. */
+  function snapTo(id, x, y, w, h) {
+    var TH = 7, PAD = 56;
+    var xs = [PAD, CARD.w - PAD - w, (CARD.w - w) / 2];
+    var ys = [PAD, CARD.h - PAD - h, (CARD.h - h) / 2];
+    hitBlocks.forEach(function (b) {
+      if (b.id === id) return;
+      var bx = b.rect.x - CARD.x, by = b.rect.y - CARD.y;
+      xs.push(bx, bx + b.rect.w - w);
+      ys.push(by, by + b.rect.h - h);
+    });
+
+    var guides = [];
+    function nearest(v, targets) {
+      var best = null;
+      targets.forEach(function (t) {
+        var d = Math.abs(v - t);
+        if (d < TH && (!best || d < best.d)) best = { d: d, v: t };
+      });
+      return best;
+    }
+    var hx = nearest(x, xs);
+    if (hx) { x = hx.v; guides.push({ axis: 'x', at: CARD.x + x }); }
+    var hy = nearest(y, ys);
+    if (hy) { y = hy.v; guides.push({ axis: 'y', at: CARD.y + y }); }
+    editor.guides = guides;
+    return { x: x, y: y };
+  }
+
+  function moveBlock(id, x, y, w, h, withSnap) {
+    x = clamp(x, 0, CARD.w - w);
+    y = clamp(y, 0, CARD.h - h);
+    if (withSnap) {
+      var sn = snapTo(id, x, y, w, h);
+      x = clamp(sn.x, 0, CARD.w - w);
+      y = clamp(sn.y, 0, CARD.h - h);
+    } else editor.guides = [];
+    layout[id] = { x: x / CARD.w, y: y / CARD.h };
+  }
+
+  function updateEditorHint() {
+    var hint = $('editorHint');
+    if (editor.sel) {
+      hint.textContent = (BLOCK_NAMES[editor.sel] || editor.sel) +
+        ' 선택됨 — 끌어서 옮기거나 방향키로 미세 조정 (Shift: 10칸)';
+    } else if (!layoutIsDefault()) {
+      hint.textContent = '배치를 바꿨습니다. 인쇄 카드에도 그대로 적용됩니다.';
+    } else {
+      hint.textContent = '카드 위의 요소를 끌어서 옮겨 보세요. 배치는 인쇄 카드에도 그대로 적용됩니다.';
+    }
+  }
+
+  /** Renders without selection chrome so exports never bake in the editor UI. */
+  function withCleanCard(cb) {
+    var keep = { hover: editor.hover, sel: editor.sel, guides: editor.guides };
+    editor.hover = null; editor.sel = null; editor.guides = [];
+    renderCard();
+    $('cardCanvas').toBlob(function (blob) {
+      editor.hover = keep.hover; editor.sel = keep.sel; editor.guides = keep.guides;
+      renderCard();
+      cb(blob);
+    });
+  }
+
+  function bindEditor() {
+    var canvas = $('cardCanvas');
+
+    canvas.addEventListener('pointerdown', function (e) {
+      var p = toCanvasPoint(e);
+      if (!p) return;
+      var hit = blockAt(p);
+      editor.sel = hit ? hit.id : null;
+      if (hit) {
+        editor.drag = {
+          id: hit.id, w: hit.rect.w, h: hit.rect.h,
+          dx: p.x - hit.rect.x, dy: p.y - hit.rect.y
+        };
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      }
+      canvas.focus();
+      updateEditorHint();
+      renderCard();
+    });
+
+    canvas.addEventListener('pointermove', function (e) {
+      var p = toCanvasPoint(e);
+      if (!p) return;
+      if (editor.drag) {
+        var d = editor.drag;
+        moveBlock(d.id, p.x - d.dx - CARD.x, p.y - d.dy - CARD.y, d.w, d.h, !e.altKey);
+        renderCard();
+        return;
+      }
+      var hit = blockAt(p);
+      var id = hit ? hit.id : null;
+      canvas.style.cursor = id ? 'move' : 'default';
+      if (id !== editor.hover) { editor.hover = id; renderCard(); }
+    });
+
+    canvas.addEventListener('pointerleave', function () {
+      if (editor.drag) return;
+      if (editor.hover) { editor.hover = null; renderCard(); }
+    });
+
+    function endDrag() {
+      if (!editor.drag) return;
+      editor.drag = null;
+      editor.guides = [];
+      saveLayout();
+      updateEditorHint();
+      renderCard();
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+
+    canvas.addEventListener('keydown', function (e) {
+      var STEPS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      if (e.key === 'Escape') { editor.sel = null; updateEditorHint(); renderCard(); return; }
+      var step = STEPS[e.key];
+      if (!step || !editor.sel) return;
+      var b = findBlock(editor.sel);
+      if (!b) return;
+      e.preventDefault();
+      var n = e.shiftKey ? 10 : 1;
+      moveBlock(editor.sel, b.rect.x - CARD.x + step[0] * n, b.rect.y - CARD.y + step[1] * n,
+                b.rect.w, b.rect.h, false);
+      saveLayout();
+      renderCard();
+    });
+  }
+
+  function updateShareText() {
+    var entry = codes[current];
+    if (!entry) { $('shareText').value = ''; return; }
+    var s = settings();
+    var recipient = $('recipient').value.trim();
+    var name = app.name || '앱';
+    var lines = [];
+    lines.push('🎁 ' + (recipient ? recipient + '님, ' : '') + '‘' + name + '’ 기프트 카드가 도착했어요' +
+      (s.value ? ' — ' + s.value : ''));
+    if (s.message) lines.push(s.message);
+    lines.push('');
+    lines.push('아래 링크를 누르면 App Store가 열리고 코드까지 자동으로 입력됩니다.');
+    lines.push(redeemURL(entry));
+    lines.push('');
+    lines.push('링크가 안 열릴 때는');
+    lines.push('App Store 앱 → 오른쪽 위 프로필 → ‘기프트 카드 또는 코드 사용’ → 아래 코드 입력');
+    lines.push(groupCode(entry.code));
+    if (s.expiry) { lines.push(''); lines.push(s.expiry); }
+    if (s.sender) { lines.push(''); lines.push('— ' + s.sender); }
+    $('shareText').value = lines.join('\n');
+  }
+
+  // ---------- send list ----------
+  function renderSendList() {
+    var host = $('sendList');
+    host.innerHTML = '';
+    var q = $('search').value.trim().toLowerCase();
+    var hide = $('hideSent').checked;
+    var shown = 0;
+
+    codes.forEach(function (entry, i) {
+      var rec = ledger[entry.code];
+      if (hide && rec && rec.sentAt) return;
+      if (q && entry.code.toLowerCase().indexOf(q) < 0 &&
+          (!rec || !rec.who || rec.who.toLowerCase().indexOf(q) < 0)) return;
+      if (shown >= 300) return;
+      shown++;
+
+      var row = document.createElement('div');
+      row.className = 'item' + (rec && rec.sentAt ? ' sent' : '');
+      row.appendChild(el('idx', pad(i + 1)));
+      row.appendChild(el('code', groupCode(entry.code)));
+
+      var who = el('who');
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = '받는 사람';
+      input.value = rec && rec.who ? rec.who : '';
+      input.addEventListener('input', function () {
+        ledger[entry.code] = ledger[entry.code] || {};
+        ledger[entry.code].who = input.value;
+        saveLedger();
+        renderLedger();
+      });
+      who.appendChild(input);
+      row.appendChild(who);
+
+      var pick = document.createElement('button');
+      pick.className = 'mini';
+      pick.textContent = i === current ? '선택됨' : '고르기';
+      pick.disabled = i === current;
+      pick.addEventListener('click', function () {
+        current = i;
+        $('recipient').value = (ledger[entry.code] && ledger[entry.code].who) || '';
+        renderCard();
+        renderSendList();
+      });
+      row.appendChild(pick);
+      host.appendChild(row);
+    });
+
+    if (!shown) {
+      var empty = el('item sub', codes.length ? '조건에 맞는 코드가 없습니다.' : '먼저 CSV를 불러오세요.');
+      host.appendChild(empty);
+    }
+  }
+
+  // ---------- ledger ----------
+  function renderLedger() {
+    var body = $('ledgerBody');
+    body.innerHTML = '';
+    var sent = 0;
+    codes.forEach(function (entry, i) {
+      var rec = ledger[entry.code] || {};
+      if (rec.sentAt) sent++;
+      if (!rec.who && !rec.sentAt) return;
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + pad(i + 1) + '</td><td class="code">' + groupCode(entry.code) + '</td>';
+
+      var tdWho = document.createElement('td');
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = rec.who || '';
+      input.addEventListener('input', function () {
+        ledger[entry.code] = ledger[entry.code] || {};
+        ledger[entry.code].who = input.value;
+        saveLedger();
+      });
+      tdWho.appendChild(input);
+      tr.appendChild(tdWho);
+
+      var tdDate = document.createElement('td');
+      tdDate.textContent = rec.sentAt ? rec.sentAt.slice(0, 10) : '—';
+      tr.appendChild(tdDate);
+
+      var tdAct = document.createElement('td');
+      var undo = document.createElement('button');
+      undo.className = 'mini';
+      undo.textContent = '해제';
+      undo.addEventListener('click', function () {
+        delete ledger[entry.code];
+        saveLedger();
+        renderLedger();
+        renderSendList();
+      });
+      tdAct.appendChild(undo);
+      tr.appendChild(tdAct);
+      body.appendChild(tr);
+    });
+    $('ledgerSummary').textContent = codes.length
+      ? '전체 ' + codes.length + '개 중 보냄 ' + sent + '개 · 남은 코드 ' + (codes.length - sent) + '개'
+      : '코드를 불러오면 집계됩니다.';
+  }
+
+  function exportLedger() {
+    var rows = [['no', 'code', 'redeem_url', 'recipient', 'sent_at']];
+    codes.forEach(function (entry, i) {
+      var rec = ledger[entry.code] || {};
+      rows.push([i + 1, entry.code, redeemURL(entry), rec.who || '', rec.sentAt || '']);
+    });
+    var csv = rows.map(function (r) {
+      return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\n');
+    download(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), 'gift-ledger.csv');
+  }
+
+  function download(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function flash(msg) {
+    $('sendStatus').textContent = msg;
+    setTimeout(function () { $('sendStatus').textContent = ''; }, 2600);
+  }
+
+  // ---------- wiring ----------
+  var drop = $('drop');
+  drop.addEventListener('click', function () { $('file').click(); });
+  ['dragenter', 'dragover'].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (e) {
+    drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (ev) {
+    var f = ev.dataTransfer.files[0];
+    if (f) f.text().then(function (t) { ingest(t, f.name); });
+  });
+  $('file').addEventListener('change', function () {
+    var f = this.files[0];
+    if (f) f.text().then(function (t) { ingest(t, f.name); });
+  });
+  $('pasteBtn').addEventListener('click', function () { ingest($('paste').value, '붙여넣기'); });
+
+  $('lookupBtn').addEventListener('click', function () { lookupFrom($('appId').value); });
+  $('appId').addEventListener('change', function () { lookupFrom(this.value); });
+  // A pasted link resolves on its own. Bare digits wait for Enter/blur so that
+  // half-typed IDs never fire a lookup.
+  var idTimer = null;
+  $('appId').addEventListener('input', function () {
+    var raw = this.value;
+    if (!/apple\.com|:\/\//i.test(raw)) return;
+    clearTimeout(idTimer);
+    idTimer = setTimeout(function () { lookupFrom(raw, true); }, 250);
+  });
+
+  ['value', 'message', 'sender', 'recipient', 'expiry', 'terms'].forEach(function (id) {
+    $(id).addEventListener('input', renderCard);
+  });
+  $('theme').addEventListener('change', renderCard);
+
+  document.querySelectorAll('.tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tabs button').forEach(function (b) {
+        b.setAttribute('aria-selected', String(b === btn));
+      });
+      ['print', 'send', 'ledger'].forEach(function (t) {
+        $('tab-' + t).hidden = t !== btn.dataset.tab;
+      });
+      if (btn.dataset.tab !== 'print') $('sheets').innerHTML = '';
+      if (btn.dataset.tab === 'ledger') renderLedger();
+    });
+  });
+
+  $('renderBtn').addEventListener('click', renderSheets);
+  $('printBtn').addEventListener('click', function () {
+    if (!$('sheets').children.length) renderSheets();
+    setTimeout(function () { window.print(); }, 120);
+  });
+
+  $('search').addEventListener('input', renderSendList);
+  $('hideSent').addEventListener('change', renderSendList);
+
+  $('copyText').addEventListener('click', function () {
+    navigator.clipboard.writeText($('shareText').value)
+      .then(function () { flash('문구를 복사했습니다. 링크를 먼저 보내세요.'); })
+      .catch(function () { flash('복사에 실패했습니다. 문구를 직접 선택해 주세요.'); });
+  });
+
+  $('copyImg').addEventListener('click', function () {
+    withCleanCard(function (blob) {
+      if (!window.ClipboardItem) { flash('이 브라우저는 이미지 복사를 지원하지 않습니다. PNG로 저장해 주세요.'); return; }
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        .then(function () { flash('이미지를 복사했습니다.'); })
+        .catch(function () { flash('이미지 복사에 실패했습니다. PNG로 저장해 주세요.'); });
+    });
+  });
+
+  $('saveImg').addEventListener('click', function () {
+    var entry = codes[current];
+    if (!entry) return;
+    withCleanCard(function (blob) { download(blob, 'gift-' + entry.code + '.png'); });
+  });
+
+  $('resetLayout').addEventListener('click', function () {
+    resetLayout();
+    editor.sel = null;
+    editor.guides = [];
+    updateEditorHint();
+    renderCard();
+    flash('배치를 기본값으로 되돌렸습니다.');
+  });
+
+  $('markSent').addEventListener('click', function () {
+    var entry = codes[current];
+    if (!entry) return;
+    ledger[entry.code] = ledger[entry.code] || {};
+    ledger[entry.code].who = $('recipient').value.trim() || ledger[entry.code].who || '';
+    ledger[entry.code].sentAt = new Date().toISOString();
+    saveLedger();
+    if (current < codes.length - 1) current++;
+    $('recipient').value = '';
+    renderCard();
+    renderSendList();
+    renderLedger();
+    flash('보냄으로 기록했습니다. 다음 코드로 넘어갔어요.');
+  });
+
+  $('exportLedger').addEventListener('click', exportLedger);
+  $('clearLedger').addEventListener('click', function () {
+    if (!confirm('배포 기록을 모두 지웁니다. 계속할까요?')) return;
+    ledger = {};
+    saveLedger();
+    renderLedger();
+    renderSendList();
+  });
+
+  bindEditor();
+  renderCard();
+  updateEditorHint();
+  renderSendList();
+  renderLedger();
+})();
+</script>
+</body>
+</html>

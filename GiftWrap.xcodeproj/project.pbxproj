@@ -1,0 +1,366 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		11515F1DAB10C016789EDF7A /* GiftCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D994C837CBB3C7BECDE2A8 /* GiftCardView.swift */; };
+		1219DBCC20D2038519BDEB4B /* GiftPageTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E735CAA8AC117C8BB9F70 /* GiftPageTemplate.swift */; };
+		21EE5C22D42D946434400301 /* GiftExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0401630E14090C990F6F144F /* GiftExporter.swift */; };
+		2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */; };
+		4BE4815B2A4DB6C622DC8053 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF87329F1F80F6102F683158 /* ContentView.swift */; };
+		56A382E1F0A2B9561E3D48E9 /* RedeemLinkBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2850266ADA0841E6486A3733 /* RedeemLinkBuilder.swift */; };
+		5D7368D8AC6904744441CA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */; };
+		6EAD4AD6BA089C2E597E12B5 /* LedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CD01C3838A55F87A569EEDE /* LedgerView.swift */; };
+		7A61052B6333387B2DFECF6E /* GiftCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654C1E3379E180E26089F726 /* GiftCard.swift */; };
+		80A9CCDB754C005A278779ED /* GiftLedger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D818B7D13288CDC40C1F8B2A /* GiftLedger.swift */; };
+		88193A737FABAAFBC80D95FB /* GiftWrapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5669FE9AF720E3ED3A9F4F5 /* GiftWrapApp.swift */; };
+		A0E550A010C58938FA267076 /* ComposerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BB98F86B576591849611BE9 /* ComposerModel.swift */; };
+		A6B6485A111811F0DDAACF2E /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012488A6DC2571086D479AEA /* QRCodeRenderer.swift */; };
+		C5E1337EEAB55888EB664698 /* BatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0720D3CD84ED567769874C7B /* BatchView.swift */; };
+		F3ED5D3364B62739A5ACC98C /* GiftTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AEBA174CEA43862109A1B40 /* GiftTheme.swift */; };
+		F9D836C26C0602E37B60101D /* AppStoreLookupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 655F1B0203F77D9746E9D74C /* AppStoreLookupService.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		012488A6DC2571086D479AEA /* QRCodeRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
+		03D994C837CBB3C7BECDE2A8 /* GiftCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCardView.swift; sourceTree = "<group>"; };
+		0401630E14090C990F6F144F /* GiftExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftExporter.swift; sourceTree = "<group>"; };
+		0720D3CD84ED567769874C7B /* BatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchView.swift; sourceTree = "<group>"; };
+		1CD01C3838A55F87A569EEDE /* LedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerView.swift; sourceTree = "<group>"; };
+		2850266ADA0841E6486A3733 /* RedeemLinkBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedeemLinkBuilder.swift; sourceTree = "<group>"; };
+		654C1E3379E180E26089F726 /* GiftCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftCard.swift; sourceTree = "<group>"; };
+		655F1B0203F77D9746E9D74C /* AppStoreLookupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreLookupService.swift; sourceTree = "<group>"; };
+		6AEBA174CEA43862109A1B40 /* GiftTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftTheme.swift; sourceTree = "<group>"; };
+		75E8087D10C8F6B94BDDEB5A /* GiftWrap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GiftWrap.entitlements; sourceTree = "<group>"; };
+		8BB98F86B576591849611BE9 /* ComposerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerModel.swift; sourceTree = "<group>"; };
+		92D098F8A1930D887B48048F /* GiftWrap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiftWrap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BF87329F1F80F6102F683158 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreApp.swift; sourceTree = "<group>"; };
+		D818B7D13288CDC40C1F8B2A /* GiftLedger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftLedger.swift; sourceTree = "<group>"; };
+		F5669FE9AF720E3ED3A9F4F5 /* GiftWrapApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftWrapApp.swift; sourceTree = "<group>"; };
+		F66E735CAA8AC117C8BB9F70 /* GiftPageTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GiftPageTemplate.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		424153ED3CD079DB4DB459AF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A1C86A29E589D48EC70B6A32 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */,
+				654C1E3379E180E26089F726 /* GiftCard.swift */,
+				6AEBA174CEA43862109A1B40 /* GiftTheme.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		887A6F90336FF23D95C3914B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F66E735CAA8AC117C8BB9F70 /* GiftPageTemplate.swift */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		609874F33224C0C09F1FEE42 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				655F1B0203F77D9746E9D74C /* AppStoreLookupService.swift */,
+				0401630E14090C990F6F144F /* GiftExporter.swift */,
+				D818B7D13288CDC40C1F8B2A /* GiftLedger.swift */,
+				012488A6DC2571086D479AEA /* QRCodeRenderer.swift */,
+				2850266ADA0841E6486A3733 /* RedeemLinkBuilder.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		38DF21AEF4612506D6BE5CBE /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				0720D3CD84ED567769874C7B /* BatchView.swift */,
+				8BB98F86B576591849611BE9 /* ComposerModel.swift */,
+				BF87329F1F80F6102F683158 /* ContentView.swift */,
+				03D994C837CBB3C7BECDE2A8 /* GiftCardView.swift */,
+				1CD01C3838A55F87A569EEDE /* LedgerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		82CF2A43A7100F086D7FCFDD /* GiftWrap */ = {
+			isa = PBXGroup;
+			children = (
+				75E8087D10C8F6B94BDDEB5A /* GiftWrap.entitlements */,
+				F5669FE9AF720E3ED3A9F4F5 /* GiftWrapApp.swift */,
+				A1C86A29E589D48EC70B6A32 /* Models */,
+				887A6F90336FF23D95C3914B /* Resources */,
+				609874F33224C0C09F1FEE42 /* Services */,
+				38DF21AEF4612506D6BE5CBE /* Views */,
+				A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */,
+			);
+			path = GiftWrap;
+			sourceTree = "<group>";
+		};
+		518DA81DB9B99529C0C0AEBE = {
+			isa = PBXGroup;
+			children = (
+				82CF2A43A7100F086D7FCFDD /* GiftWrap */,
+				547D009064F7C3F13BEF3460 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		547D009064F7C3F13BEF3460 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				92D098F8A1930D887B48048F /* GiftWrap.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		42AEFBAE01D2DFD981F7DA7D /* GiftWrap */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F2F62AAE534BA46EC59716F3 /* Build configuration list for PBXNativeTarget "GiftWrap" */;
+			buildPhases = (
+				7A70D71C385290AF96BF1031 /* Sources */,
+				424153ED3CD079DB4DB459AF /* Frameworks */,
+				285BB1C1430063331E9F5DD0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GiftWrap;
+			productName = GiftWrap;
+			productReference = 92D098F8A1930D887B48048F /* GiftWrap.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		46F86FAA6BBF9AC94A7E4595 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1520;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					42AEFBAE01D2DFD981F7DA7D = {
+						CreatedOnToolsVersion = 15.2;
+					};
+				};
+			};
+			buildConfigurationList = 7EF2517A8FE63F4681EC5EEA /* Build configuration list for PBXProject "GiftWrap" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 518DA81DB9B99529C0C0AEBE;
+			productRefGroup = 547D009064F7C3F13BEF3460 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				42AEFBAE01D2DFD981F7DA7D /* GiftWrap */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		285BB1C1430063331E9F5DD0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D7368D8AC6904744441CA08 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		7A70D71C385290AF96BF1031 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				88193A737FABAAFBC80D95FB /* GiftWrapApp.swift in Sources */,
+				2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */,
+				7A61052B6333387B2DFECF6E /* GiftCard.swift in Sources */,
+				F3ED5D3364B62739A5ACC98C /* GiftTheme.swift in Sources */,
+				1219DBCC20D2038519BDEB4B /* GiftPageTemplate.swift in Sources */,
+				F9D836C26C0602E37B60101D /* AppStoreLookupService.swift in Sources */,
+				21EE5C22D42D946434400301 /* GiftExporter.swift in Sources */,
+				80A9CCDB754C005A278779ED /* GiftLedger.swift in Sources */,
+				A6B6485A111811F0DDAACF2E /* QRCodeRenderer.swift in Sources */,
+				56A382E1F0A2B9561E3D48E9 /* RedeemLinkBuilder.swift in Sources */,
+				C5E1337EEAB55888EB664698 /* BatchView.swift in Sources */,
+				A0E550A010C58938FA267076 /* ComposerModel.swift in Sources */,
+				4BE4815B2A4DB6C622DC8053 /* ContentView.swift in Sources */,
+				11515F1DAB10C016789EDF7A /* GiftCardView.swift in Sources */,
+				6EAD4AD6BA089C2E597E12B5 /* LedgerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		EA36911E0558335EF93E3D17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C00C43CE64E88EBFBEA4D182 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		2B300D60D80F64DC44AB8175 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GiftWrap/GiftWrap.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devkoan.GiftWrap;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FCCECCC0341448E789A096F7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = GiftWrap/GiftWrap.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.devkoan.GiftWrap;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7EF2517A8FE63F4681EC5EEA /* Build configuration list for PBXProject "GiftWrap" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EA36911E0558335EF93E3D17 /* Debug */,
+				C00C43CE64E88EBFBEA4D182 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F2F62AAE534BA46EC59716F3 /* Build configuration list for PBXNativeTarget "GiftWrap" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2B300D60D80F64DC44AB8175 /* Debug */,
+				FCCECCC0341448E789A096F7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595 /* Project object */;
+}

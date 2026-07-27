@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# App Store Connect offer/promo code exports — never commit live codes
+OfferCode*.csv
+*OneTimeUseCodes*.csv
+gift-ledger.csv
