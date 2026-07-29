@@ -151,7 +151,10 @@
     position: relative; overflow: hidden; text-align: left;
     width: 100%; aspect-ratio: 1000 / 630;
     container-type: inline-size;
-    border-radius: 5.6cqw;
+    /* The app rounds this at 56 of 1000 with SwiftUI's continuous curve, which hugs
+       the corner far less than a plain circular arc of the same radius. Matching the
+       number would over-round it here, so the arc is pulled back to look the same. */
+    border-radius: 4.2cqw;
     background: linear-gradient(38deg, var(--g1), var(--g2) 52%, var(--g3));
     box-shadow: 0 24px 54px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.25);
   }
@@ -246,9 +249,17 @@
   .back p { margin: 0 0 12px; font-size: 15px; }
   .back .cta { margin: 0; }
 
+  /* Loud on purpose. Without a payload this page shows a made-up gift, and a quiet
+     footnote was easy to miss — the sample's own name and developer got mistaken for
+     a real one that had gone wrong. */
   .demo {
-    margin-top: 22px; font-size: 12px; opacity: .45;
+    margin: 0 0 20px; padding: 12px 14px;
+    border-radius: 12px; text-align: left;
+    background: rgba(255, 214, 102, .16);
+    border: 1px solid rgba(255, 214, 102, .45);
+    font-size: 13px; line-height: 1.5;
   }
+  .demo b { display: block; margin-bottom: 2px; }
 
   @media (prefers-reduced-motion: reduce) {
     .is-opening .band.v, .is-opening .band.h, .is-opening .knot, .is-opening .tile,
@@ -259,6 +270,8 @@
 </head>
 <body>
 <main class="stage" id="stage">
+
+  <div class="demo" id="demo" hidden><b id="demoTitle">샘플 선물입니다</b><span id="demoWhy"></span></div>
 
   <div class="closed" id="closed">
     <p class="lead" id="lead">선물이 도착했어요</p>
@@ -292,7 +305,6 @@
     </div>
   </div>
 
-  <p class="demo" id="demo" hidden>미리보기입니다 — 실제 선물 링크에는 받는 사람의 내용이 담깁니다.</p>
 </main>
 
 <script>
@@ -692,17 +704,26 @@
     q: true, k: true
   };
 
-  var gift = DEMO, isDemo = true;
-  try {
-    var hash = location.hash.replace(/^#/, '');
-    if (hash) {
+  var gift = DEMO, why = '';
+  var hash = location.hash.replace(/^#/, '');
+  if (!hash) {
+    why = '주소 뒤에 선물 내용이 없어서, 페이지가 어떻게 보이는지 알려 주는 예시를 대신 띄웠습니다. ' +
+          '아래 이름과 아이콘은 실제 선물의 것이 아닙니다.';
+  } else {
+    try {
       var parsed = JSON.parse(decode(hash));
-      if (parsed && typeof parsed === 'object') { gift = parsed; isDemo = false; }
+      if (parsed && typeof parsed === 'object') gift = parsed;
+      else why = '선물 내용을 읽지 못했습니다.';
+    } catch (e) {
+      // A mangled link shouldn't show a blank page — say what happened and show the sample.
+      why = '선물 내용이 깨져 있습니다. 링크가 중간에 잘렸을 수 있으니 (# 뒤가 길어서) ' +
+            '보낸 사람에게 다시 받아 보세요.';
     }
-  } catch (e) {
-    // A mangled link shouldn't show a blank page — fall through to the demo and say so.
   }
-  $('demo').hidden = !isDemo;
+  if (why) {
+    $('demoWhy').textContent = why;
+    $('demo').hidden = false;
+  }
 
   /* ---------- the card ---------- */
 
