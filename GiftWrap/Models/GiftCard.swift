@@ -291,7 +291,10 @@ struct GiftDraft: Codable, Hashable {
     var theme: GiftTheme = .sunrise
     var expiry: Date? = nil
     var showCodeOnCard: Bool = true
-    var showQRCode: Bool = false
+    /// On by default. The gift page carries the QR through to the recipient, and a
+    /// card opened on a laptop is exactly where scanning with a phone works — the
+    /// case the printed card was always for.
+    var showQRCode: Bool = true
     var providerToken: String = ""   // pt= campaign tracking
     var campaignCode: String = ""    // ct= campaign tracking
 

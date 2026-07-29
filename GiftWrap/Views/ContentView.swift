@@ -229,38 +229,39 @@ struct ComposerView: View {
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    // The two redeem-link actions belong next to the link itself, not
+                    // in a menu away from the thing they act on.
+                    Button("복사") { model.copyLink() }
+                        .controlSize(.small)
                     Button("열기") { model.openLink() }
                         .controlSize(.small)
                 }
             }
 
-            HStack(spacing: 10) {
+            // Sending. Every way to hand the gift over, in one row and none of it hidden.
+            HStack(spacing: 8) {
                 // One action carries both halves — the link that works and the
                 // wrapping that makes it a gift.
                 ShareAnchor { view in model.share(from: view) } label: {
                     Label("공유", systemImage: "square.and.arrow.up")
                 }
-                .frame(width: 88, height: 22)
+                .frame(width: 96, height: 28)
 
-                Button("메시지 복사") { model.copyMessage() }
+                Button("선물 링크 복사") { model.copyGiftLink() }
+                Button("문구 복사") { model.copyMessage() }
                 Button("이미지 복사") { model.copyCardImage() }
+                Spacer()
+            }
+            .disabled(!model.draft.isReady)
 
-                Menu("더보기") {
-                    Button("선물 링크 복사") { model.copyGiftLink() }
-                    Button("선물 페이지 미리보기") { model.openGiftLink() }
-                    Divider()
-                    Button("리딤 링크 복사") { model.copyLink() }
-                    Button("리딤 링크 열기") { model.openLink() }
-                    Divider()
-                    Button("PNG 저장") { model.saveCardImage() }
-                    Button("낱장 HTML 저장") { model.saveGiftPage() }
-                }
-                .frame(width: 92)
-
+            // Checking and keeping.
+            HStack(spacing: 8) {
+                Button("받는 화면 미리보기") { model.openGiftLink() }
+                Button("PNG 저장") { model.saveCardImage() }
+                Button("낱장 HTML 저장") { model.saveGiftPage() }
                 Spacer()
                 Button("보낸 기록에 추가") { model.recordIssued(into: ledger) }
                     .keyboardShortcut(.return, modifiers: .command)
-                    .buttonStyle(.borderedProminent)
             }
             .disabled(!model.draft.isReady)
 
@@ -291,6 +292,8 @@ struct ShareAnchor<Label: View>: NSViewRepresentable {
                 guard let view = coordinator?.view else { return }
                 action(view)
             }, label: label)
+            // Sharing is what this pane is for, so it carries the emphasis.
+            .buttonStyle(.borderedProminent)
         )
         host.translatesAutoresizingMaskIntoConstraints = false
         context.coordinator.view = host

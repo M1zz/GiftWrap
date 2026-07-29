@@ -801,6 +801,39 @@
       var y = parseFloat(el.dataset.y) * ch;
       el.style.left = (Math.min(Math.max(x, 0), Math.max(0, cw - w)) / cw * 100).toFixed(3) + '%';
       el.style.top = (Math.min(Math.max(y, 0), Math.max(0, ch - h)) / ch * 100).toFixed(3) + '%';
+      el._k = k;
+    });
+
+    separate();
+  }
+
+  /**
+   * Last resort against one block sitting on top of another.
+   *
+   * With the composer's measurements the blocks already land where they were placed,
+   * so this finds nothing. It matters for a link made before those were sent, or if
+   * they were missing: the wider web text can push the code chip under the QR, and a
+   * recipient should never see that. The block on the left gives way, since the one
+   * on the right is where the eye is going.
+   */
+  function separate() {
+    var blocks = [].slice.call($('card').querySelectorAll('.blk'));
+    blocks.forEach(function (a) {
+      var ra = a.getBoundingClientRect();
+      blocks.forEach(function (b) {
+        if (a === b) return;
+        var rb = b.getBoundingClientRect();
+        var vertical = ra.top < rb.bottom && rb.top < ra.bottom;
+        if (!vertical || ra.left >= rb.left || ra.right <= rb.left) return;
+
+        var room = rb.left - 6 - ra.left;
+        if (room <= 0) return;
+        var shrink = Math.max(0.4, room / (ra.width || 1));
+        a.style.transformOrigin = '0 0';
+        a.style.transform = 'scale(' + ((a._k || 1) * shrink).toFixed(4) + ')';
+        a._k = (a._k || 1) * shrink;
+        ra = a.getBoundingClientRect();
+      });
     });
   }
 
