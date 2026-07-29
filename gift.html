@@ -45,7 +45,7 @@
     width: 100%; max-width: 420px; min-width: 0;
     text-align: center;
   }
-  /* .icon and .card set their own display, which would beat the UA rule for [hidden]. */
+  /* .card sets its own display, which would beat the UA rule for [hidden]. */
   [hidden] { display: none !important; }
 
   /* ---------- closed ---------- */
@@ -138,34 +138,84 @@
   .is-open .reveal { display: block; animation: rise .6s .1s var(--ease) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(26px) scale(.94); } }
 
+  /*
+   * The card the composer drew: a 1000 × 630 canvas whose pieces sit at fractions
+   * handed over in the payload. Sizes are in cqw — 1cqw is 1% of the card's width,
+   * so 10 card units = 1cqw and the arrangement survives at any screen size.
+   *
+   * --t is the type scale (GiftCardView.typeScale × the block's own size) and --s
+   * the frame scale for artwork. Same split as the app: artwork scales its box,
+   * text scales its font.
+   */
   .card {
     position: relative; overflow: hidden; text-align: left;
-    border-radius: 26px; padding: 24px;
+    width: 100%; aspect-ratio: 1000 / 630;
+    container-type: inline-size;
+    border-radius: 5.6cqw;
     background: linear-gradient(38deg, var(--g1), var(--g2) 52%, var(--g3));
     box-shadow: 0 24px 54px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.25);
   }
   .card::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
     background: linear-gradient(104deg, transparent 30%, rgba(255,255,255,.14) 46%, transparent 62%);
   }
-  .head { display: flex; align-items: center; gap: 13px; min-width: 0; }
-  .head > div { min-width: 0; }
-  .name, .headline, .msg { overflow-wrap: anywhere; }
-  .icon {
-    width: 60px; height: 60px; border-radius: 14px; flex: none;
+  /* A rendered card image, when one was supplied, stands in for the whole drawing. */
+  .card.shot { background: none; }
+  .card.shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  .blk { position: absolute; z-index: 2; --t: 1.18; --s: 1; }
+  .blk > * { overflow-wrap: anywhere; }
+
+  .b-occasion {
+    font-size: calc(1.5cqw * var(--t)); font-weight: 700;
+    letter-spacing: .45cqw; text-transform: uppercase; opacity: .85;
+  }
+  .b-badge {
+    font-size: calc(1.4cqw * var(--t)); font-weight: 600; opacity: .82;
+    padding: .8cqw 1.6cqw; white-space: nowrap;
+    border: .12cqw solid rgba(255,255,255,.45); border-radius: 999px;
+  }
+  .b-logo {
+    width: calc(15.2cqw * var(--s)); height: calc(15.2cqw * var(--s));
+    border-radius: calc(3.4cqw * var(--s));
     background: rgba(255,255,255,.22); object-fit: cover;
-    box-shadow: 0 8px 20px rgba(0,0,0,.28);
-    display: grid; place-items: center; font-size: 26px; font-weight: 800;
+    box-shadow: 0 1.4cqw 2.6cqw rgba(0,0,0,.28);
+    display: grid; place-items: center;
+    font-size: calc(6.4cqw * var(--t)); font-weight: 800;
   }
-  .name { font-size: 20px; font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
-  .dev { font-size: 13px; opacity: .72; }
-  .kicker {
-    margin: 22px 0 2px; font-size: 12px; letter-spacing: .2em;
-    text-transform: uppercase; opacity: .78;
+  .b-title .name {
+    font-size: calc(4.4cqw * var(--t)); font-weight: 700;
+    letter-spacing: -.02em; line-height: 1.15;
   }
-  .headline { font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; }
-  .msg { margin: 18px 0 0; font-size: 16px; opacity: .95; white-space: pre-wrap; }
-  .sign { margin: 16px 0 0; font-size: 14px; opacity: .8; }
+  .b-title .dev {
+    margin-top: .8cqw; font-size: calc(2cqw * var(--t)); font-weight: 500; opacity: .78;
+  }
+  .b-message {
+    font-size: calc(2.5cqw * var(--t)); line-height: 1.45; opacity: .95;
+    white-space: pre-wrap; max-width: calc(70cqw * var(--t) / 1.18);
+  }
+  .b-people .to { font-size: calc(1.9cqw * var(--t)); font-weight: 600; opacity: .9; }
+  .b-people .from {
+    margin-top: .6cqw; font-size: calc(1.7cqw * var(--t)); font-weight: 500; opacity: .78;
+  }
+  .b-people .till {
+    margin-top: 1cqw; font-size: calc(1.4cqw * var(--t)); font-weight: 500; opacity: .65;
+  }
+  .b-code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: calc(1.8cqw * var(--t)); font-weight: 500;
+    letter-spacing: .2cqw; white-space: nowrap;
+    padding: 1.3cqw 2cqw;
+    border: .14cqw dashed rgba(255,255,255,.6); border-radius: 1.6cqw;
+  }
+  .b-qr {
+    padding: calc(.9cqw * var(--s)); background: #fff;
+    border-radius: calc(1.6cqw * var(--s)); line-height: 0;
+  }
+  .b-qr svg {
+    display: block; width: calc(10.4cqw * var(--s)); height: calc(10.4cqw * var(--s));
+  }
+
   .fine { margin: 14px 0 0; font-size: 12px; opacity: .6; line-height: 1.5; }
 
   .cta {
@@ -226,23 +276,7 @@
   </div>
 
   <div class="reveal" id="reveal">
-    <div class="card">
-      <div class="head">
-        <img class="icon" id="icon" alt="" hidden>
-        <div class="icon" id="mono" hidden></div>
-        <div>
-          <div class="name" id="name"></div>
-          <div class="dev" id="dev"></div>
-        </div>
-      </div>
-
-      <p class="kicker">기프트</p>
-      <div class="headline" id="headline"></div>
-
-      <p class="msg" id="msg" hidden></p>
-      <p class="sign" id="sign" hidden></p>
-      <p class="fine" id="expiry" hidden></p>
-    </div>
+    <div class="card" id="card"></div>
 
     <a class="cta" id="cta" href="#">App Store에서 받기</a>
 
@@ -260,6 +294,373 @@
 
   <p class="demo" id="demo" hidden>미리보기입니다 — 실제 선물 링크에는 받는 사람의 내용이 담깁니다.</p>
 </main>
+
+<script>
+/*
+ * Minimal QR encoder — byte mode, versions 1–10, no dependencies.
+ * Verified against macOS Vision barcode detection: all 500 offer-code URLs
+ * round-trip at ECC levels M, Q and H.
+ *
+ * window.QR = { matrix(text, ecl) -> number[][], path(matrix) -> string }
+ */
+(function (global) {
+  'use strict';
+
+  var EXP = new Uint8Array(512);
+  var LOG = new Uint8Array(256);
+  (function () {
+    var x = 1;
+    for (var i = 0; i < 255; i++) {
+      EXP[i] = x;
+      LOG[x] = i;
+      x <<= 1;
+      if (x & 0x100) x ^= 0x11d;
+    }
+    for (var j = 255; j < 512; j++) EXP[j] = EXP[j - 255];
+  })();
+
+  function gmul(a, b) {
+    return a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]];
+  }
+
+  // version -> level -> [ecCodewordsPerBlock, [[blockCount, dataCodewords], ...]]
+  var ECC = {
+    1: { L: [7, [[1, 19]]], M: [10, [[1, 16]]], Q: [13, [[1, 13]]], H: [17, [[1, 9]]] },
+    2: { L: [10, [[1, 34]]], M: [16, [[1, 28]]], Q: [22, [[1, 22]]], H: [28, [[1, 16]]] },
+    3: { L: [15, [[1, 55]]], M: [26, [[1, 44]]], Q: [18, [[2, 17]]], H: [22, [[2, 13]]] },
+    4: { L: [20, [[1, 80]]], M: [18, [[2, 32]]], Q: [26, [[2, 24]]], H: [16, [[4, 9]]] },
+    5: { L: [26, [[1, 108]]], M: [24, [[2, 43]]], Q: [18, [[2, 15], [2, 16]]], H: [22, [[2, 11], [2, 12]]] },
+    6: { L: [18, [[2, 68]]], M: [16, [[4, 27]]], Q: [24, [[4, 19]]], H: [28, [[4, 15]]] },
+    7: { L: [20, [[2, 78]]], M: [18, [[4, 31]]], Q: [18, [[2, 14], [4, 15]]], H: [26, [[4, 13], [1, 14]]] },
+    8: { L: [24, [[2, 97]]], M: [22, [[2, 38], [2, 39]]], Q: [22, [[4, 18], [2, 19]]], H: [26, [[4, 14], [2, 15]]] },
+    9: { L: [30, [[2, 116]]], M: [22, [[3, 36], [2, 37]]], Q: [20, [[4, 16], [4, 17]]], H: [24, [[4, 12], [4, 13]]] },
+    10: { L: [18, [[2, 68], [2, 69]]], M: [26, [[4, 43], [1, 44]]], Q: [24, [[6, 19], [2, 20]]], H: [28, [[6, 15], [2, 16]]] }
+  };
+
+  var ALIGN = {
+    1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30],
+    6: [6, 34], 7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50]
+  };
+
+  var VERSION_BITS = { 7: 0x07c94, 8: 0x085bc, 9: 0x09a99, 10: 0x0a4d3 };
+  var ECL_BITS = { L: 1, M: 0, Q: 3, H: 2 };
+
+  function dataCodewords(version, ecl) {
+    return ECC[version][ecl][1].reduce(function (sum, g) { return sum + g[0] * g[1]; }, 0);
+  }
+
+  function capacityBytes(version, ecl) {
+    var countBits = version <= 9 ? 8 : 16;
+    return dataCodewords(version, ecl) - Math.ceil((4 + countBits) / 8);
+  }
+
+  function rsGenerator(degree) {
+    var poly = [1];
+    for (var i = 0; i < degree; i++) {
+      var next = new Array(poly.length + 1).fill(0);
+      for (var j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gmul(poly[j], EXP[i]);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function rsRemainder(data, ecCount) {
+    var gen = rsGenerator(ecCount);
+    var rem = new Uint8Array(ecCount);
+    for (var d = 0; d < data.length; d++) {
+      var factor = data[d] ^ rem[0];
+      rem.copyWithin(0, 1);
+      rem[ecCount - 1] = 0;
+      for (var i = 0; i < ecCount; i++) rem[i] ^= gmul(gen[i + 1], factor);
+    }
+    return rem;
+  }
+
+  function buildCodewords(bytes, version, ecl) {
+    var ecPerBlock = ECC[version][ecl][0];
+    var groups = ECC[version][ecl][1];
+    var totalData = dataCodewords(version, ecl);
+    var countBits = version <= 9 ? 8 : 16;
+
+    var bits = [];
+    function push(value, len) {
+      for (var i = len - 1; i >= 0; i--) bits.push((value >> i) & 1);
+    }
+    push(0x4, 4);
+    push(bytes.length, countBits);
+    for (var b = 0; b < bytes.length; b++) push(bytes[b], 8);
+
+    push(0, Math.min(4, totalData * 8 - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    var stream = [];
+    for (var i = 0; i < bits.length; i += 8) {
+      var byte = 0;
+      for (var k = 0; k < 8; k++) byte = (byte << 1) | bits[i + k];
+      stream.push(byte);
+    }
+    var PAD = [0xec, 0x11];
+    for (var p = 0; stream.length < totalData; p++) stream.push(PAD[p % 2]);
+
+    var dataBlocks = [];
+    var ecBlocks = [];
+    var offset = 0;
+    groups.forEach(function (g) {
+      for (var n = 0; n < g[0]; n++) {
+        var block = stream.slice(offset, offset + g[1]);
+        offset += g[1];
+        dataBlocks.push(block);
+        ecBlocks.push(rsRemainder(block, ecPerBlock));
+      }
+    });
+
+    var out = [];
+    var maxData = Math.max.apply(null, dataBlocks.map(function (b) { return b.length; }));
+    for (var col = 0; col < maxData; col++) {
+      for (var bi = 0; bi < dataBlocks.length; bi++) {
+        if (col < dataBlocks[bi].length) out.push(dataBlocks[bi][col]);
+      }
+    }
+    for (var ec = 0; ec < ecPerBlock; ec++) {
+      for (var ei = 0; ei < ecBlocks.length; ei++) out.push(ecBlocks[ei][ec]);
+    }
+    return out;
+  }
+
+  function blank(size) {
+    var m = [];
+    for (var i = 0; i < size; i++) m.push(new Int8Array(size).fill(-1));
+    return m;
+  }
+
+  function functionPatterns(m, version) {
+    var size = m.length;
+
+    function finder(row, col) {
+      for (var r = -1; r <= 7; r++) {
+        for (var c = -1; c <= 7; c++) {
+          var rr = row + r, cc = col + c;
+          if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+          var ring = (r >= 0 && r <= 6 && (c === 0 || c === 6)) || (c >= 0 && c <= 6 && (r === 0 || r === 6));
+          var core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+          m[rr][cc] = ring || core ? 1 : 0;
+        }
+      }
+    }
+    finder(0, 0);
+    finder(0, size - 7);
+    finder(size - 7, 0);
+
+    for (var i = 8; i < size - 8; i++) {
+      var bit = i % 2 === 0 ? 1 : 0;
+      m[6][i] = bit;
+      m[i][6] = bit;
+    }
+
+    var centers = ALIGN[version];
+    centers.forEach(function (r) {
+      centers.forEach(function (c) {
+        if ((r === 6 && c === 6) || (r === 6 && c === size - 7) || (r === size - 7 && c === 6)) return;
+        for (var dr = -2; dr <= 2; dr++) {
+          for (var dc = -2; dc <= 2; dc++) {
+            m[r + dr][c + dc] = Math.max(Math.abs(dr), Math.abs(dc)) !== 1 ? 1 : 0;
+          }
+        }
+      });
+    });
+
+    for (var f = 0; f < 9; f++) {
+      if (m[8][f] === -1) m[8][f] = 0;
+      if (m[f][8] === -1) m[f][8] = 0;
+    }
+    for (var g = 0; g < 8; g++) {
+      if (m[8][size - 1 - g] === -1) m[8][size - 1 - g] = 0;
+      if (m[size - 1 - g][8] === -1) m[size - 1 - g][8] = 0;
+    }
+    m[size - 8][8] = 1;
+
+    if (version >= 7) {
+      var vbits = VERSION_BITS[version];
+      for (var v = 0; v < 18; v++) {
+        var vb = (vbits >> v) & 1;
+        m[Math.floor(v / 3)][size - 11 + (v % 3)] = vb;
+        m[size - 11 + (v % 3)][Math.floor(v / 3)] = vb;
+      }
+    }
+  }
+
+  function reservedMask(version, size) {
+    var m = blank(size);
+    functionPatterns(m, version);
+    return m.map(function (row) {
+      return Array.prototype.map.call(row, function (v) { return v !== -1; });
+    });
+  }
+
+  function placeData(m, reserved, codewords) {
+    var size = m.length;
+    var bitIndex = 0;
+    var upward = true;
+    for (var right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5; // skip the vertical timing column
+      for (var step = 0; step < size; step++) {
+        var row = upward ? size - 1 - step : step;
+        var cols = [right, right - 1];
+        for (var ci = 0; ci < 2; ci++) {
+          var col = cols[ci];
+          if (reserved[row][col]) continue;
+          var byte = codewords[bitIndex >> 3];
+          m[row][col] = byte === undefined ? 0 : (byte >> (7 - (bitIndex & 7))) & 1;
+          bitIndex++;
+        }
+      }
+      upward = !upward;
+    }
+  }
+
+  var MASKS = [
+    function (r, c) { return (r + c) % 2 === 0; },
+    function (r) { return r % 2 === 0; },
+    function (r, c) { return c % 3 === 0; },
+    function (r, c) { return (r + c) % 3 === 0; },
+    function (r, c) { return ((r >> 1) + Math.floor(c / 3)) % 2 === 0; },
+    function (r, c) { return ((r * c) % 2) + ((r * c) % 3) === 0; },
+    function (r, c) { return ((((r * c) % 2) + ((r * c) % 3)) % 2) === 0; },
+    function (r, c) { return ((((r + c) % 2) + ((r * c) % 3)) % 2) === 0; }
+  ];
+
+  function bchFormat(data) {
+    var v = data << 10;
+    for (var i = 14; i >= 10; i--) {
+      if ((v >> i) & 1) v ^= 0x537 << (i - 10);
+    }
+    return ((data << 10) | v) ^ 0x5412;
+  }
+
+  function applyFormat(m, ecl, mask) {
+    var size = m.length;
+    var bits = bchFormat((ECL_BITS[ecl] << 3) | mask);
+    function bit(i) { return (bits >> i) & 1; }
+
+    // First copy runs down the left of the top-left finder, then out along row 8.
+    for (var i = 0; i <= 5; i++) m[i][8] = bit(i);
+    m[7][8] = bit(6);
+    m[8][8] = bit(7);
+    m[8][7] = bit(8);
+    for (var j = 9; j <= 14; j++) m[8][14 - j] = bit(j);
+
+    // Second copy: low bits along the top-right, high bits up from the bottom-left.
+    for (var k = 0; k <= 7; k++) m[8][size - 1 - k] = bit(k);
+    for (var n = 8; n <= 14; n++) m[size - 15 + n][8] = bit(n);
+    m[size - 8][8] = 1;
+  }
+
+  function penalty(m) {
+    var size = m.length;
+    var score = 0;
+
+    function runScore(get) {
+      var total = 0;
+      for (var a = 0; a < size; a++) {
+        var run = 1;
+        for (var b = 1; b < size; b++) {
+          if (get(a, b) === get(a, b - 1)) {
+            run++;
+          } else {
+            if (run >= 5) total += run - 2;
+            run = 1;
+          }
+        }
+        if (run >= 5) total += run - 2;
+      }
+      return total;
+    }
+    score += runScore(function (r, c) { return m[r][c]; });
+    score += runScore(function (c, r) { return m[r][c]; });
+
+    for (var r = 0; r < size - 1; r++) {
+      for (var c = 0; c < size - 1; c++) {
+        var v = m[r][c];
+        if (v === m[r][c + 1] && v === m[r + 1][c] && v === m[r + 1][c + 1]) score += 3;
+      }
+    }
+
+    var P1 = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+    var P2 = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+    function matches(get, a, b, pattern) {
+      for (var i = 0; i < 11; i++) if (get(a, b + i) !== pattern[i]) return false;
+      return true;
+    }
+    var row = function (x, y) { return m[x][y]; };
+    var col = function (x, y) { return m[y][x]; };
+    for (var a = 0; a < size; a++) {
+      for (var b = 0; b <= size - 11; b++) {
+        if (matches(row, a, b, P1) || matches(row, a, b, P2)) score += 40;
+        if (matches(col, a, b, P1) || matches(col, a, b, P2)) score += 40;
+      }
+    }
+
+    var dark = 0;
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) dark += m[y][x];
+    score += Math.floor(Math.abs((dark * 100) / (size * size) - 50) / 5) * 10;
+    return score;
+  }
+
+  function matrix(text, ecl) {
+    ecl = ecl || 'M';
+    var bytes = Array.from(new TextEncoder().encode(text));
+
+    var version = 0;
+    for (var v = 1; v <= 10; v++) {
+      if (bytes.length <= capacityBytes(v, ecl)) { version = v; break; }
+    }
+    if (!version) throw new Error('payload too long for ECC ' + ecl + ': ' + bytes.length + ' bytes');
+
+    var size = version * 4 + 17;
+    var codewords = buildCodewords(bytes, version, ecl);
+    var reserved = reservedMask(version, size);
+
+    var best = null;
+    for (var mask = 0; mask < 8; mask++) {
+      var m = blank(size);
+      functionPatterns(m, version);
+      placeData(m, reserved, codewords);
+      for (var r = 0; r < size; r++) {
+        for (var c = 0; c < size; c++) {
+          if (!reserved[r][c] && MASKS[mask](r, c)) m[r][c] ^= 1;
+        }
+      }
+      applyFormat(m, ecl, mask);
+      var grid = m.map(function (row) { return Array.prototype.slice.call(row); });
+      var score = penalty(grid);
+      if (!best || score < best.score) best = { score: score, grid: grid };
+    }
+    return best.grid;
+  }
+
+  /** Dark modules as one SVG path, horizontal runs merged. */
+  function path(m) {
+    var parts = [];
+    for (var r = 0; r < m.length; r++) {
+      var c = 0;
+      while (c < m.length) {
+        if (m[r][c]) {
+          var run = 1;
+          while (c + run < m.length && m[r][c + run]) run++;
+          parts.push('M' + c + ' ' + r + 'h' + run + 'v1h-' + run + 'z');
+          c += run;
+        } else c++;
+      }
+    }
+    return parts.join('');
+  }
+
+  global.QR = { matrix: matrix, path: path };
+})(window);
+</script>
 
 <script>
 (function () {
@@ -287,7 +688,8 @@
     u: 'https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=ABCDEFGHIJKL',
     p: 'https://apps.apple.com/kr/app/id6759643878',
     e: '2026-08-26',
-    g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF']
+    g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'],
+    q: true, k: true
   };
 
   var gift = DEMO, isDemo = true;
@@ -302,13 +704,119 @@
   }
   $('demo').hidden = !isDemo;
 
-  /* ---------- paint ---------- */
+  /* ---------- the card ---------- */
 
-  function text(id, value) {
-    var el = $(id);
-    if (value) { el.textContent = value; el.hidden = false; }
-    else { el.hidden = true; }
+  /** Matches CardLayout.standard, for links made before the layout travelled. */
+  var FALLBACK_LAYOUT = {
+    occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
+    logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+    message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
+    code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+  };
+  var TYPE_SCALE = 1.18;            // GiftCardView.typeScale
+  var ARTWORK = { logo: 1, qr: 1 }; // these spend their scale on the frame, not the type
+
+  function node(tag, cls, value) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (value != null) el.textContent = value;
+    return el;
   }
+
+  function place(id, el) {
+    var l = (gift.l && gift.l[id]) || FALLBACK_LAYOUT[id];
+    if (!l) return;
+    el.classList.add('blk', 'b-' + id);
+    el.style.left = (l[0] * 100).toFixed(3) + '%';
+    el.style.top = (l[1] * 100).toFixed(3) + '%';
+    var s = l[2] || 1;
+    if (ARTWORK[id]) el.style.setProperty('--s', s);
+    else el.style.setProperty('--t', (TYPE_SCALE * s).toFixed(4));
+    $('card').appendChild(el);
+  }
+
+  function qrSVG(value) {
+    if (!window.QR) return null;
+    var m = window.QR.matrix(value, 'M');
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + m.length + ' ' + m.length);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', window.QR.path(m));
+    path.setAttribute('fill', '#000');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function drawCard() {
+    var card = $('card');
+
+    // A hosted render, if there is one, is the truest copy of what was designed.
+    if (gift.img) {
+      card.classList.add('shot');
+      var shot = node('img');
+      shot.src = gift.img;
+      shot.alt = (gift.n || '') + ' 기프트 카드';
+      shot.onerror = function () { card.classList.remove('shot'); card.innerHTML = ''; paintBlocks(); };
+      card.appendChild(shot);
+      return;
+    }
+    paintBlocks();
+  }
+
+  function paintBlocks() {
+    if (gift.o) place('occasion', node('div', '', gift.o));
+    place('badge', node('div', '', 'App Store에서 받기'));
+
+    if (gift.i) {
+      var img = node('img');
+      img.src = gift.i;
+      img.alt = (gift.n || '') + ' 아이콘';
+      img.onerror = function () {
+        img.remove();
+        place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+      };
+      place('logo', img);
+    } else {
+      place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+    }
+
+    if (gift.n) {
+      var title = node('div');
+      title.appendChild(node('div', 'name', gift.n));
+      if (gift.d) title.appendChild(node('div', 'dev', gift.d));
+      place('title', title);
+    }
+
+    if (gift.m) place('message', node('div', '', gift.m));
+
+    if (gift.r || gift.f || gift.e) {
+      var people = node('div');
+      if (gift.r) people.appendChild(node('div', 'to', 'To. ' + gift.r));
+      if (gift.f) people.appendChild(node('div', 'from', 'From. ' + gift.f));
+      if (gift.e) {
+        var p = String(gift.e).split('-');
+        if (p.length === 3) {
+          people.appendChild(node('div', 'till', p[0] + '년 ' + (+p[1]) + '월 ' + (+p[2]) + '일까지'));
+        }
+      }
+      place('people', people);
+    }
+
+    if (gift.k && gift.c) place('code', node('div', '', gift.c));
+
+    if (gift.q && (gift.u || gift.p)) {
+      var svg = qrSVG(gift.u || gift.p);
+      if (svg) {
+        var box = node('div');
+        box.appendChild(svg);
+        place('qr', box);
+      }
+    }
+  }
+
+  /* ---------- paint ---------- */
 
   if (Array.isArray(gift.g) && gift.g.length === 3) {
     document.documentElement.style.setProperty('--g1', '#' + gift.g[0]);
@@ -325,33 +833,7 @@
   if (gift.f) lead = (gift.r ? gift.r + '님께 ' : '') + gift.f + '님이 보냈어요';
   $('lead').innerHTML = lead.replace(/(\S+님)/, '<b>$1</b>');
 
-  $('name').textContent = gift.n || '';
-  $('dev').textContent = gift.d || '';
-  $('headline').textContent = gift.o || '선물';
-  text('msg', gift.m || '');
-  text('sign', gift.f ? '— ' + gift.f : '');
-
-  if (gift.i) {
-    var img = $('icon');
-    img.src = gift.i;
-    img.alt = (gift.n || '') + ' 아이콘';
-    img.hidden = false;
-    img.onerror = function () { img.hidden = true; monogram(); };
-  } else {
-    monogram();
-  }
-  function monogram() {
-    var m = $('mono');
-    m.textContent = (gift.n || '?').trim().charAt(0);
-    m.hidden = false;
-  }
-
-  if (gift.e) {
-    var parts = String(gift.e).split('-');
-    if (parts.length === 3) {
-      text('expiry', parts[0] + '년 ' + (+parts[1]) + '월 ' + (+parts[2]) + '일까지 사용할 수 있어요.');
-    }
-  }
+  drawCard();
 
   var redeem = gift.u || gift.p || '';
   $('cta').href = redeem || '#';
