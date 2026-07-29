@@ -162,10 +162,12 @@
     position: relative; overflow: hidden; text-align: left;
     width: 100%; aspect-ratio: 1000 / 630;
     container-type: inline-size;
-    /* The app rounds this at 56 of 1000 with SwiftUI's continuous curve, which hugs
-       the corner far less than a plain circular arc of the same radius. Matching the
-       number would over-round it here, so the arc is pulled back to look the same. */
-    border-radius: 4.2cqw;
+    /* Squarer than the app's card on purpose — a harder corner reads as a card you
+       were handed rather than a button. The app rounds at 56 of 1000 with SwiftUI's
+       continuous curve, which hugs the corner far less than a plain circular arc of
+       the same radius; 4.2cqw was the arc that matched it. This is deliberately
+       under that. */
+    border-radius: 2.2cqw;
     background: linear-gradient(38deg, var(--g1), var(--g2) 52%, var(--g3));
     box-shadow: 0 24px 54px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.25);
   }
