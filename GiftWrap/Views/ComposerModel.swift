@@ -14,12 +14,58 @@ final class ComposerModel: ObservableObject {
     @Published var status: String?
     @Published var errorMessage: String?
 
+    /// What the last pasted link decided on its own, shown so the user can see why the
+    /// form filled itself in. Nil when nothing was inferred.
+    @Published var autoFillNotice: String?
+
+    /// Set once the user touches the kind picker, so a later lookup stops second-guessing
+    /// them. An explicit `ctx=` in a freshly pasted link still wins — that's a new intent.
+    @Published private(set) var kindChosenManually = false
+
     /// Multi-line input for batch mode: one gift per line, `CODE` or `CODE, 받는 사람`.
     @Published var batchInput: String = ""
 
+    /// Where the card's pieces sit. Shared by the preview, the PNG export and the
+    /// batch run, so what you arrange is what ships.
+    @Published var layout: CardLayout = .load()
+    @Published var selectedBlock: CardBlock?
+
+    /// How big each block drew in the preview, in canvas points. Handed to the gift
+    /// link so the web page can reserve the same footprint under different fonts.
+    @Published var blockSizes: [String: CGSize] = [:]
+
+    func resetLayout() {
+        layout = .standard
+        layout.save()
+        selectedBlock = nil
+        status = "카드 배치를 기본값으로 되돌렸습니다."
+    }
+
     var link: String { draft.redeemURL?.absoluteString ?? "" }
 
+    /// The wrapped link. Nil only while no app has been resolved — at which point
+    /// there's no redeem link either, so nothing is shareable yet.
+    var giftPageURL: URL? { GiftLinkBuilder.url(for: draft, layout: layout, sizes: blockSizes) }
+
+    /// What goes in the message. The bare redeem URL is the fallback for a draft that
+    /// somehow has a link but no page URL; in practice the two appear together.
+    var shareLink: String { giftPageURL?.absoluteString ?? link }
+    var shareStyle: GiftExporter.LinkStyle { giftPageURL == nil ? .redeem : .giftPage }
+
     // MARK: - Lookup
+
+    /// The kind picker writes through here so a deliberate choice survives the next lookup.
+    var kindSelection: Binding<GiftLinkKind> {
+        Binding(
+            get: { self.draft.kind },
+            set: { newValue in
+                guard newValue != self.draft.kind else { return }
+                self.draft.kind = newValue
+                self.kindChosenManually = true
+                self.autoFillNotice = nil
+            }
+        )
+    }
 
     func lookup() async {
         let input = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -28,15 +74,15 @@ final class ComposerModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         status = nil
+        autoFillNotice = nil
         defer { isLoading = false }
 
+        let parsed = RedeemLinkBuilder.parse(input)
         let service = AppStoreLookupService(storefront: storefront)
         do {
             let app = try await service.lookup(input)
             draft.app = app
-            // A free app can't carry an app promo code, so nudge toward the right kind.
-            if app.isFree, draft.kind == .appPromoCode { draft.kind = .offerCode }
-            if !app.isFree, draft.kind == .offerCode { draft.kind = .appPromoCode }
+            apply(parsed, isFree: app.isFree)
 
             let data = await service.artworkData(for: app)
             iconBase64 = data?.base64EncodedString()
@@ -50,6 +96,42 @@ final class ComposerModel: ObservableObject {
         }
     }
 
+    /// Pours the pasted link into the form: code and campaign params come straight from
+    /// the URL, the delivery kind from `ctx=` if it's there and from the app's price if not.
+    private func apply(_ parsed: RedeemLinkBuilder.ParsedLink?, isFree: Bool) {
+        var filled: [String] = []
+
+        if let code = parsed?.code, code != draft.trimmedCode {
+            draft.code = code
+            filled.append("코드")
+        }
+        if let pt = parsed?.providerToken, pt != draft.providerToken {
+            draft.providerToken = pt
+            filled.append("pt")
+        }
+        if let ct = parsed?.campaignCode, ct != draft.campaignCode {
+            draft.campaignCode = ct
+            filled.append("ct")
+        }
+
+        // An explicit ctx= is a fresh statement of intent and outranks an earlier manual pick.
+        let explicit = parsed?.kind
+        if explicit != nil || !kindChosenManually {
+            let resolved = RedeemLinkBuilder.inferredKind(
+                explicit: explicit,
+                isFree: isFree,
+                hasCode: !draft.trimmedCode.isEmpty
+            )
+            if resolved != draft.kind {
+                draft.kind = resolved
+                filled.insert(resolved.label, at: 0)
+            }
+            kindChosenManually = false
+        }
+
+        autoFillNotice = filled.isEmpty ? nil : "링크에서 " + filled.joined(separator: " · ") + " 자동 설정"
+    }
+
     // MARK: - Single gift actions
 
     func copyLink() {
@@ -60,8 +142,30 @@ final class ComposerModel: ObservableObject {
 
     func copyMessage() {
         guard !link.isEmpty else { return }
-        GiftExporter.copy(text: GiftExporter.messageText(for: draft, link: link))
-        status = "메시지를 복사했습니다."
+        GiftExporter.copy(
+            text: GiftExporter.messageText(for: draft, link: shareLink, style: shareStyle)
+        )
+        status = "메시지를 복사했습니다 — 카드 이미지도 함께 보내세요."
+    }
+
+    /// One action: the message (carrying the gift-page link) plus the card image.
+    func share(from view: NSView) {
+        guard !link.isEmpty else { return }
+        let text = GiftExporter.messageText(for: draft, link: shareLink, style: shareStyle)
+        let image = cardPNG().flatMap(NSImage.init(data:))
+        GiftExporter.share(text: text, image: image, from: view)
+        status = "선물 링크와 카드 이미지를 함께 공유합니다."
+    }
+
+    func copyGiftLink() {
+        guard let url = giftPageURL else { return }
+        GiftExporter.copy(text: url.absoluteString)
+        status = "선물 링크를 복사했습니다."
+    }
+
+    func openGiftLink() {
+        guard let url = giftPageURL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func copyCardImage() {
@@ -94,7 +198,7 @@ final class ComposerModel: ObservableObject {
 
     func cardPNG(scale: CGFloat = 3) -> Data? {
         GiftExporter.png(
-            of: GiftCardView(draft: draft, artwork: artwork),
+            of: GiftCardView(draft: draft, artwork: artwork, layout: layout),
             size: GiftCardView.canvas,
             scale: scale
         )
@@ -109,7 +213,7 @@ final class ComposerModel: ObservableObject {
                 kind: draft.kind,
                 code: draft.trimmedCode,
                 recipient: draft.recipient,
-                link: link,
+                link: shareLink,
                 expiry: draft.expiry
             )
         )
@@ -149,7 +253,7 @@ final class ComposerModel: ObservableObject {
         }
         guard let folder = GiftExporter.chooseFolder() else { return }
 
-        var manifest = ["code,recipient,link,png,html"]
+        var manifest = ["code,recipient,gift_link,redeem_link,png,html"]
         var written = 0
 
         for entry in entries {
@@ -158,12 +262,18 @@ final class ComposerModel: ObservableObject {
             if !entry.recipient.isEmpty { copy.recipient = entry.recipient }
             guard let url = copy.redeemURL else { continue }
 
+            // The wrapped link, same as the single-gift path. Block sizes come from the
+            // composed preview: the codes are all the same length, so the only piece
+            // that differs per recipient is their name, by a few points.
+            let giftURL = GiftLinkBuilder.url(for: copy, layout: layout, sizes: blockSizes)
+            let sendLink = giftURL?.absoluteString ?? url.absoluteString
+
             let stem = GiftExporter.fileStem(for: copy)
             let pngURL = folder.appendingPathComponent("\(stem).png")
             let htmlURL = folder.appendingPathComponent("\(stem).html")
 
             if let png = GiftExporter.png(
-                of: GiftCardView(draft: copy, artwork: artwork),
+                of: GiftCardView(draft: copy, artwork: artwork, layout: layout),
                 size: GiftCardView.canvas,
                 scale: 3
             ) {
@@ -177,7 +287,10 @@ final class ComposerModel: ObservableObject {
             )
             try? Data(html.utf8).write(to: htmlURL, options: .atomic)
 
-            manifest.append("\(entry.code),\(entry.recipient),\(url.absoluteString),\(pngURL.lastPathComponent),\(htmlURL.lastPathComponent)")
+            manifest.append(
+                "\(entry.code),\(entry.recipient),\(sendLink),\(url.absoluteString),"
+                + "\(pngURL.lastPathComponent),\(htmlURL.lastPathComponent)"
+            )
 
             if let app = copy.app {
                 ledger.add(
@@ -187,7 +300,7 @@ final class ComposerModel: ObservableObject {
                         kind: copy.kind,
                         code: copy.trimmedCode,
                         recipient: copy.recipient,
-                        link: url.absoluteString,
+                        link: sendLink,
                         expiry: copy.expiry
                     )
                 )

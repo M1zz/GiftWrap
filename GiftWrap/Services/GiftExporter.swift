@@ -63,21 +63,46 @@ enum GiftExporter {
     // MARK: - Message text
 
     /// The text you paste into KakaoTalk, iMessage, or an email.
-    static func messageText(for draft: GiftDraft, link: String) -> String {
+    /// Hands the message and the card to the system share sheet as one action, so the
+    /// wrapping and the working link travel together instead of being pasted twice.
+    static func share(text: String, image: NSImage?, from view: NSView) {
+        var items: [Any] = [text]
+        if let image { items.append(image) }
+        let picker = NSSharingServicePicker(items: items)
+        picker.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
+    }
+
+    /// How the link in the message behaves, which decides how much the message may say.
+    enum LinkStyle {
+        /// A bare redeem URL. The message has to carry the fallback itself.
+        case redeem
+        /// The gift page, which wraps the reveal. Naming the app or printing the code
+        /// here would spoil what the page is about to unwrap — and the page already
+        /// carries the code and the manual instructions, so nothing is lost.
+        case giftPage
+    }
+
+    static func messageText(for draft: GiftDraft, link: String, style: LinkStyle = .redeem) -> String {
         var lines: [String] = []
 
         if !draft.recipient.isEmpty { lines.append("\(draft.recipient)님께") }
-        if !draft.message.isEmpty { lines.append(draft.message) }
 
-        if let app = draft.app {
+        if style == .giftPage {
             lines.append("")
-            lines.append("🎁 \(app.name)")
-        }
-        lines.append(link)
+            lines.append("🎁 선물이 도착했어요")
+            lines.append(link)
+        } else {
+            if !draft.message.isEmpty { lines.append(draft.message) }
+            if let app = draft.app {
+                lines.append("")
+                lines.append("🎁 \(app.name)")
+            }
+            lines.append(link)
 
-        if draft.kind.requiresCode && !draft.trimmedCode.isEmpty {
-            lines.append("코드: \(draft.trimmedCode)")
-            lines.append("링크가 열리지 않으면 App Store → 프로필 → ‘기프트 카드 또는 코드 사용’에 입력하세요.")
+            if draft.kind.requiresCode && !draft.trimmedCode.isEmpty {
+                lines.append("코드: \(draft.trimmedCode)")
+                lines.append("링크가 열리지 않으면 App Store → 프로필 → ‘기프트 카드 또는 코드 사용’에 입력하세요.")
+            }
         }
 
         if let expiry = draft.expiry, draft.kind.hasExpiry {

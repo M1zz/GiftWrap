@@ -33,11 +33,18 @@ struct ComposerView: View {
                 .frame(minWidth: 380, idealWidth: 420, maxWidth: 520)
 
             VStack(spacing: 0) {
-                GiftCardPreview(draft: model.draft, artwork: model.artwork)
-                    .padding(28)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(previewBackdrop)
+                EditableCardPreview(
+                    draft: model.draft,
+                    artwork: model.artwork,
+                    layout: $model.layout,
+                    selection: $model.selectedBlock,
+                    onMeasure: { model.blockSizes = $0 }
+                )
+                .padding(28)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(previewBackdrop)
 
+                layoutBar
                 actionBar
             }
             .frame(minWidth: 520)
@@ -74,12 +81,18 @@ struct ComposerView: View {
             }
 
             Section("전달 방식") {
-                Picker("방식", selection: $model.draft.kind) {
+                Picker("방식", selection: model.kindSelection) {
                     ForEach(GiftLinkKind.allCases) { kind in
                         Text(kind.label).tag(kind)
                     }
                 }
                 .pickerStyle(.segmented)
+
+                if let notice = model.autoFillNotice {
+                    Label(notice, systemImage: "wand.and.stars")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 Text(model.draft.kind.explanation)
                     .font(.caption)
@@ -173,6 +186,38 @@ struct ComposerView: View {
         )
     }
 
+    /// Tells you what dragging does, and what you've done, without a manual.
+    private var layoutBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "hand.draw")
+                .foregroundStyle(.secondary)
+
+            Text(layoutHint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer()
+
+            Button("배치 초기화") { model.resetLayout() }
+                .controlSize(.small)
+                .disabled(model.layout.isStandard)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.quaternary.opacity(0.4))
+    }
+
+    private var layoutHint: String {
+        guard let block = model.selectedBlock else {
+            return model.layout.isStandard
+                ? "카드 위의 요소를 끌어서 옮겨 보세요. PNG로 내보낼 때도 그대로 나갑니다."
+                : "배치를 바꿨습니다. 내보내는 이미지에도 그대로 적용됩니다."
+        }
+        return "\(block.label) 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절"
+    }
+
     private var actionBar: some View {
         VStack(spacing: 10) {
             if !model.link.isEmpty {
@@ -190,12 +235,29 @@ struct ComposerView: View {
             }
 
             HStack(spacing: 10) {
+                // One action carries both halves — the link that works and the
+                // wrapping that makes it a gift.
+                ShareAnchor { view in model.share(from: view) } label: {
+                    Label("공유", systemImage: "square.and.arrow.up")
+                }
+                .frame(width: 88, height: 22)
+
                 Button("메시지 복사") { model.copyMessage() }
-                Button("링크 복사") { model.copyLink() }
                 Button("이미지 복사") { model.copyCardImage() }
+
+                Menu("더보기") {
+                    Button("선물 링크 복사") { model.copyGiftLink() }
+                    Button("선물 페이지 미리보기") { model.openGiftLink() }
+                    Divider()
+                    Button("리딤 링크 복사") { model.copyLink() }
+                    Button("리딤 링크 열기") { model.openLink() }
+                    Divider()
+                    Button("PNG 저장") { model.saveCardImage() }
+                    Button("낱장 HTML 저장") { model.saveGiftPage() }
+                }
+                .frame(width: 92)
+
                 Spacer()
-                Button("PNG 저장") { model.saveCardImage() }
-                Button("선물 페이지 저장") { model.saveGiftPage() }
                 Button("보낸 기록에 추가") { model.recordIssued(into: ledger) }
                     .keyboardShortcut(.return, modifiers: .command)
                     .buttonStyle(.borderedProminent)
@@ -211,6 +273,37 @@ struct ComposerView: View {
         }
         .padding(16)
         .background(.bar)
+    }
+}
+
+// MARK: - Share button
+
+/// A button that can hand the share sheet a real `NSView` to hang off, which
+/// `NSSharingServicePicker` needs and SwiftUI won't give up on its own.
+@MainActor
+struct ShareAnchor<Label: View>: NSViewRepresentable {
+    let action: (NSView) -> Void
+    @ViewBuilder let label: () -> Label
+
+    func makeNSView(context: Context) -> NSView {
+        let host = NSHostingView(
+            rootView: Button(action: { [weak coordinator = context.coordinator] in
+                guard let view = coordinator?.view else { return }
+                action(view)
+            }, label: label)
+        )
+        host.translatesAutoresizingMaskIntoConstraints = false
+        context.coordinator.view = host
+        return host
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    @MainActor
+    final class Coordinator {
+        weak var view: NSView?
     }
 }
 

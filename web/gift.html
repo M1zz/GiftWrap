@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>선물이 도착했어요</title>
+<style>
+  /*
+   * One page, many gifts. Everything it shows arrives in the URL fragment, so the
+   * file is static and can sit on any host. The fragment never reaches the server,
+   * which is why the redeem code and the recipient's name live there rather than in
+   * a query string.
+   */
+  :root {
+    --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;   /* gradient stops, overwritten by the payload */
+    --b1: #8AF0FF; --b2: #B08CFF;                  /* soft blooms */
+    --ink: #fff;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+    background: #0e0e12;
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* The room the gift sits in — a wash of the card's own colours. */
+  body::before {
+    content: ""; position: fixed; inset: -20%;
+    background:
+      radial-gradient(45% 45% at 22% 18%, color-mix(in srgb, var(--b1) 45%, transparent), transparent 70%),
+      radial-gradient(50% 50% at 80% 82%, color-mix(in srgb, var(--b2) 40%, transparent), transparent 70%);
+    filter: blur(40px); opacity: .5; z-index: 0; pointer-events: none;
+  }
+  /* A flex item defaults to min-width:auto, which lets the card's intrinsic width
+     push it past the screen. Pin it to 0 so max-width actually wins. */
+  .stage {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 420px; min-width: 0;
+    text-align: center;
+  }
+  /* .card sets its own display, which would beat the UA rule for [hidden]. */
+  [hidden] { display: none !important; }
+
+  /* ---------- closed ---------- */
+  .lead { font-size: 17px; opacity: .85; margin: 0 0 4px; }
+  .lead b { font-weight: 700; }
+  .sub { font-size: 14px; opacity: .55; margin: 0 0 28px; }
+
+  .box {
+    position: relative; width: min(240px, 62vw); aspect-ratio: 1;
+    margin: 0 auto; border: 0; padding: 0; cursor: pointer;
+    background: none; -webkit-tap-highlight-color: transparent;
+    transform-style: preserve-3d;
+  }
+  .box:focus-visible { outline: 3px solid #fff6; outline-offset: 10px; border-radius: 28px; }
+
+  .tile {
+    position: absolute; inset: 0; border-radius: 22%;
+    background: linear-gradient(38deg, var(--g1), var(--g2) 52%, var(--g3));
+    box-shadow: 0 26px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    overflow: hidden;
+  }
+  .tile::after {   /* the same laminate sweep the printed card gets */
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(104deg, transparent 28%, rgba(255,255,255,.18) 45%, transparent 60%);
+  }
+  /* Ribbon, drawn as two bands so each half can leave on its own. */
+  .band { position: absolute; background: rgba(255,255,255,.95); }
+  .band.v { left: 50%; top: 0; width: 15.5%; height: 100%; transform: translateX(-50%); }
+  .band.h { top: 45.5%; left: 0; height: 15.5%; width: 100%; transform: translateY(-50%); }
+  /* The bow. Loops are drawn as rings — you see the wrapping through them, which is
+     what makes it read as a bow instead of two dots. */
+  .knot {
+    position: absolute; left: 50%; top: 45.5%; width: 52%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+  }
+  .knot i {
+    position: absolute; top: 20%; width: 44%; height: 44%;
+    /* em is the box's own size, so the ribbon keeps its proportions at any width.
+       The loop is ~23% of the tile, so the stroke has to stay well under that or it
+       closes the ring up. */
+    border: .032em solid #fff; font-size: inherit;
+    border-radius: 62% 38% 46% 54% / 58% 58% 42% 42%;
+    box-shadow: 0 2px 6px rgba(0,0,0,.14);
+    /* The loop sits on the white cross band, so an open ring would read as solid
+       white. Filling it with the wrapping's mid colour — what the tile actually is
+       at this point — puts the paper back inside the loop. */
+    background: var(--g2);
+  }
+  .knot i:first-child { left: 2%;  transform: rotate(-20deg); }
+  .knot i:last-child  { right: 2%; transform: rotate(20deg) scaleX(-1); }
+  .knot b {
+    position: absolute; left: 50%; top: 42%; width: 20%; height: 16%;
+    background: #fff; border-radius: 40%; transform: translate(-50%, -50%);
+    box-shadow: 0 2px 6px rgba(0,0,0,.16);
+  }
+
+  .open {
+    display: block; margin: 26px auto 0; padding: 13px 26px;
+    border: 0; border-radius: 999px; cursor: pointer;
+    background: #fff; color: #16161a; font: inherit; font-weight: 700;
+    box-shadow: 0 10px 26px rgba(0,0,0,.32);
+  }
+  .skip {
+    display: inline-block; margin-top: 14px; padding: 6px;
+    background: none; border: 0; cursor: pointer;
+    color: #fff; opacity: .45; font: inherit; font-size: 13px;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .skip:hover { opacity: .75; }
+
+  /* ---------- opening ---------- */
+  .is-opening .band.v { animation: slip-v .55s var(--ease) forwards; }
+  .is-opening .band.h { animation: slip-h .55s var(--ease) forwards; }
+  .is-opening .knot   { animation: pop .45s var(--ease) forwards; }
+  .is-opening .tile   { animation: burst .75s .3s var(--ease) forwards; }
+  .is-opening .open, .is-opening .skip, .is-opening .lead, .is-opening .sub {
+    animation: fade-out .3s ease forwards;
+  }
+  @keyframes slip-v { to { transform: translateX(-50%) translateY(-130%); opacity: 0; } }
+  @keyframes slip-h { to { transform: translateY(-50%) translateX(115%); opacity: 0; } }
+  @keyframes pop    { 40% { transform: translate(-50%,-50%) scale(1.25); }
+                      to  { transform: translate(-50%,-90%) scale(.6); opacity: 0; } }
+  @keyframes burst  { 45% { transform: scale(1.06); }
+                      to  { transform: scale(1.9); opacity: 0; } }
+  @keyframes fade-out { to { opacity: 0; } }
+
+  /* ---------- revealed ---------- */
+  .reveal { display: none; }
+  .is-open .closed { display: none; }
+  .is-open .reveal { display: block; animation: rise .6s .1s var(--ease) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(26px) scale(.94); } }
+
+  /*
+   * The card the composer drew: a 1000 × 630 canvas whose pieces sit at fractions
+   * handed over in the payload. Sizes are in cqw — 1cqw is 1% of the card's width,
+   * so 10 card units = 1cqw and the arrangement survives at any screen size.
+   *
+   * --t is the type scale (GiftCardView.typeScale × the block's own size) and --s
+   * the frame scale for artwork. Same split as the app: artwork scales its box,
+   * text scales its font.
+   */
+  .card {
+    position: relative; overflow: hidden; text-align: left;
+    width: 100%; aspect-ratio: 1000 / 630;
+    container-type: inline-size;
+    border-radius: 5.6cqw;
+    background: linear-gradient(38deg, var(--g1), var(--g2) 52%, var(--g3));
+    box-shadow: 0 24px 54px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background: linear-gradient(104deg, transparent 30%, rgba(255,255,255,.14) 46%, transparent 62%);
+  }
+  /* A rendered card image, when one was supplied, stands in for the whole drawing. */
+  .card.shot { background: none; }
+  .card.shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+  .blk { position: absolute; z-index: 2; --t: 1.18; --s: 1; }
+  .blk > * { overflow-wrap: anywhere; }
+
+  .b-occasion {
+    font-size: calc(1.5cqw * var(--t)); font-weight: 700;
+    letter-spacing: .45cqw; text-transform: uppercase; opacity: .85;
+  }
+  .b-badge {
+    font-size: calc(1.4cqw * var(--t)); font-weight: 600; opacity: .82;
+    padding: .8cqw 1.6cqw; white-space: nowrap;
+    border: .12cqw solid rgba(255,255,255,.45); border-radius: 999px;
+  }
+  .b-logo {
+    width: calc(15.2cqw * var(--s)); height: calc(15.2cqw * var(--s));
+    border-radius: calc(3.4cqw * var(--s));
+    background: rgba(255,255,255,.22); object-fit: cover;
+    box-shadow: 0 1.4cqw 2.6cqw rgba(0,0,0,.28);
+    display: grid; place-items: center;
+    font-size: calc(6.4cqw * var(--t)); font-weight: 800;
+  }
+  .b-title .name {
+    font-size: calc(4.4cqw * var(--t)); font-weight: 700;
+    letter-spacing: -.02em; line-height: 1.15;
+  }
+  .b-title .dev {
+    margin-top: .8cqw; font-size: calc(2cqw * var(--t)); font-weight: 500; opacity: .78;
+  }
+  .b-message {
+    font-size: calc(2.5cqw * var(--t)); line-height: 1.45; opacity: .95;
+    white-space: pre-wrap; max-width: calc(70cqw * var(--t) / 1.18);
+  }
+  .b-people .to { font-size: calc(1.9cqw * var(--t)); font-weight: 600; opacity: .9; }
+  .b-people .from {
+    margin-top: .6cqw; font-size: calc(1.7cqw * var(--t)); font-weight: 500; opacity: .78;
+  }
+  .b-people .till {
+    margin-top: 1cqw; font-size: calc(1.4cqw * var(--t)); font-weight: 500; opacity: .65;
+  }
+  .b-code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: calc(1.8cqw * var(--t)); font-weight: 500;
+    letter-spacing: .2cqw; white-space: nowrap;
+    padding: 1.3cqw 2cqw;
+    border: .14cqw dashed rgba(255,255,255,.6); border-radius: 1.6cqw;
+  }
+  .b-qr {
+    padding: calc(.9cqw * var(--s)); background: #fff;
+    border-radius: calc(1.6cqw * var(--s)); line-height: 0;
+  }
+  .b-qr svg {
+    display: block; width: calc(10.4cqw * var(--s)); height: calc(10.4cqw * var(--s));
+  }
+
+  .fine { margin: 14px 0 0; font-size: 12px; opacity: .6; line-height: 1.5; }
+
+  .cta {
+    display: block; margin: 18px 0 0; padding: 16px;
+    border-radius: 16px; border: 0; cursor: pointer;
+    background: #fff; color: #16161a; font: inherit; font-weight: 700; font-size: 17px;
+    text-align: center; text-decoration: none;
+    box-shadow: 0 12px 28px rgba(0,0,0,.3);
+  }
+  .howto { margin-top: 14px; text-align: left; font-size: 13px; opacity: .7; }
+  .howto summary { cursor: pointer; opacity: .8; }
+  .code {
+    display: inline-block; margin-top: 10px; padding: 9px 12px;
+    border-radius: 10px; border: 1px dashed rgba(255,255,255,.5);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .08em;
+    user-select: all;
+  }
+  .copy {
+    margin-left: 8px; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,.4); background: none; color: #fff;
+    font: inherit; font-size: 13px; cursor: pointer;
+  }
+
+  /* ---------- back from the App Store ---------- */
+  .back { display: none; margin-top: 18px; padding: 16px; border-radius: 16px;
+          background: rgba(255,255,255,.12); text-align: left; }
+  .is-back .back { display: block; animation: rise .4s var(--ease) both; }
+  .back p { margin: 0 0 12px; font-size: 15px; }
+  .back .cta { margin: 0; }
+
+  .demo {
+    margin-top: 22px; font-size: 12px; opacity: .45;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-opening .band.v, .is-opening .band.h, .is-opening .knot, .is-opening .tile,
+    .is-opening .open, .is-opening .skip, .is-opening .lead, .is-opening .sub,
+    .is-open .reveal, .is-back .back { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="stage" id="stage">
+
+  <div class="closed" id="closed">
+    <p class="lead" id="lead">선물이 도착했어요</p>
+    <p class="sub" id="sub">탭해서 열어 보세요</p>
+
+    <button class="box" id="box" aria-label="선물 열기" style="font-size: min(240px, 62vw)">
+      <span class="tile"></span>
+      <span class="band v"></span>
+      <span class="band h"></span>
+      <span class="knot"><i></i><b></b><i></i></span>
+    </button>
+
+    <button class="open" id="openBtn" type="button">열어보기</button>
+    <div><button class="skip" id="skipBtn" type="button">그냥 바로 받기</button></div>
+  </div>
+
+  <div class="reveal" id="reveal">
+    <div class="card" id="card"></div>
+
+    <a class="cta" id="cta" href="#">App Store에서 받기</a>
+
+    <details class="howto" id="howto" hidden>
+      <summary>버튼이 열리지 않으면</summary>
+      <p>App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.</p>
+      <p><span class="code" id="code"></span><button class="copy" id="copyBtn" type="button">복사</button></p>
+    </details>
+
+    <div class="back" id="back">
+      <p id="backMsg">받으셨나요? 이제 앱에서 바로 쓸 수 있어요.</p>
+      <a class="cta" id="openApp" href="#">앱 열기</a>
+    </div>
+  </div>
+
+  <p class="demo" id="demo" hidden>미리보기입니다 — 실제 선물 링크에는 받는 사람의 내용이 담깁니다.</p>
+</main>
+
+<script>
+/*
+ * Minimal QR encoder — byte mode, versions 1–10, no dependencies.
+ * Verified against macOS Vision barcode detection: all 500 offer-code URLs
+ * round-trip at ECC levels M, Q and H.
+ *
+ * window.QR = { matrix(text, ecl) -> number[][], path(matrix) -> string }
+ */
+(function (global) {
+  'use strict';
+
+  var EXP = new Uint8Array(512);
+  var LOG = new Uint8Array(256);
+  (function () {
+    var x = 1;
+    for (var i = 0; i < 255; i++) {
+      EXP[i] = x;
+      LOG[x] = i;
+      x <<= 1;
+      if (x & 0x100) x ^= 0x11d;
+    }
+    for (var j = 255; j < 512; j++) EXP[j] = EXP[j - 255];
+  })();
+
+  function gmul(a, b) {
+    return a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]];
+  }
+
+  // version -> level -> [ecCodewordsPerBlock, [[blockCount, dataCodewords], ...]]
+  var ECC = {
+    1: { L: [7, [[1, 19]]], M: [10, [[1, 16]]], Q: [13, [[1, 13]]], H: [17, [[1, 9]]] },
+    2: { L: [10, [[1, 34]]], M: [16, [[1, 28]]], Q: [22, [[1, 22]]], H: [28, [[1, 16]]] },
+    3: { L: [15, [[1, 55]]], M: [26, [[1, 44]]], Q: [18, [[2, 17]]], H: [22, [[2, 13]]] },
+    4: { L: [20, [[1, 80]]], M: [18, [[2, 32]]], Q: [26, [[2, 24]]], H: [16, [[4, 9]]] },
+    5: { L: [26, [[1, 108]]], M: [24, [[2, 43]]], Q: [18, [[2, 15], [2, 16]]], H: [22, [[2, 11], [2, 12]]] },
+    6: { L: [18, [[2, 68]]], M: [16, [[4, 27]]], Q: [24, [[4, 19]]], H: [28, [[4, 15]]] },
+    7: { L: [20, [[2, 78]]], M: [18, [[4, 31]]], Q: [18, [[2, 14], [4, 15]]], H: [26, [[4, 13], [1, 14]]] },
+    8: { L: [24, [[2, 97]]], M: [22, [[2, 38], [2, 39]]], Q: [22, [[4, 18], [2, 19]]], H: [26, [[4, 14], [2, 15]]] },
+    9: { L: [30, [[2, 116]]], M: [22, [[3, 36], [2, 37]]], Q: [20, [[4, 16], [4, 17]]], H: [24, [[4, 12], [4, 13]]] },
+    10: { L: [18, [[2, 68], [2, 69]]], M: [26, [[4, 43], [1, 44]]], Q: [24, [[6, 19], [2, 20]]], H: [28, [[6, 15], [2, 16]]] }
+  };
+
+  var ALIGN = {
+    1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30],
+    6: [6, 34], 7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50]
+  };
+
+  var VERSION_BITS = { 7: 0x07c94, 8: 0x085bc, 9: 0x09a99, 10: 0x0a4d3 };
+  var ECL_BITS = { L: 1, M: 0, Q: 3, H: 2 };
+
+  function dataCodewords(version, ecl) {
+    return ECC[version][ecl][1].reduce(function (sum, g) { return sum + g[0] * g[1]; }, 0);
+  }
+
+  function capacityBytes(version, ecl) {
+    var countBits = version <= 9 ? 8 : 16;
+    return dataCodewords(version, ecl) - Math.ceil((4 + countBits) / 8);
+  }
+
+  function rsGenerator(degree) {
+    var poly = [1];
+    for (var i = 0; i < degree; i++) {
+      var next = new Array(poly.length + 1).fill(0);
+      for (var j = 0; j < poly.length; j++) {
+        next[j] ^= poly[j];
+        next[j + 1] ^= gmul(poly[j], EXP[i]);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+
+  function rsRemainder(data, ecCount) {
+    var gen = rsGenerator(ecCount);
+    var rem = new Uint8Array(ecCount);
+    for (var d = 0; d < data.length; d++) {
+      var factor = data[d] ^ rem[0];
+      rem.copyWithin(0, 1);
+      rem[ecCount - 1] = 0;
+      for (var i = 0; i < ecCount; i++) rem[i] ^= gmul(gen[i + 1], factor);
+    }
+    return rem;
+  }
+
+  function buildCodewords(bytes, version, ecl) {
+    var ecPerBlock = ECC[version][ecl][0];
+    var groups = ECC[version][ecl][1];
+    var totalData = dataCodewords(version, ecl);
+    var countBits = version <= 9 ? 8 : 16;
+
+    var bits = [];
+    function push(value, len) {
+      for (var i = len - 1; i >= 0; i--) bits.push((value >> i) & 1);
+    }
+    push(0x4, 4);
+    push(bytes.length, countBits);
+    for (var b = 0; b < bytes.length; b++) push(bytes[b], 8);
+
+    push(0, Math.min(4, totalData * 8 - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+
+    var stream = [];
+    for (var i = 0; i < bits.length; i += 8) {
+      var byte = 0;
+      for (var k = 0; k < 8; k++) byte = (byte << 1) | bits[i + k];
+      stream.push(byte);
+    }
+    var PAD = [0xec, 0x11];
+    for (var p = 0; stream.length < totalData; p++) stream.push(PAD[p % 2]);
+
+    var dataBlocks = [];
+    var ecBlocks = [];
+    var offset = 0;
+    groups.forEach(function (g) {
+      for (var n = 0; n < g[0]; n++) {
+        var block = stream.slice(offset, offset + g[1]);
+        offset += g[1];
+        dataBlocks.push(block);
+        ecBlocks.push(rsRemainder(block, ecPerBlock));
+      }
+    });
+
+    var out = [];
+    var maxData = Math.max.apply(null, dataBlocks.map(function (b) { return b.length; }));
+    for (var col = 0; col < maxData; col++) {
+      for (var bi = 0; bi < dataBlocks.length; bi++) {
+        if (col < dataBlocks[bi].length) out.push(dataBlocks[bi][col]);
+      }
+    }
+    for (var ec = 0; ec < ecPerBlock; ec++) {
+      for (var ei = 0; ei < ecBlocks.length; ei++) out.push(ecBlocks[ei][ec]);
+    }
+    return out;
+  }
+
+  function blank(size) {
+    var m = [];
+    for (var i = 0; i < size; i++) m.push(new Int8Array(size).fill(-1));
+    return m;
+  }
+
+  function functionPatterns(m, version) {
+    var size = m.length;
+
+    function finder(row, col) {
+      for (var r = -1; r <= 7; r++) {
+        for (var c = -1; c <= 7; c++) {
+          var rr = row + r, cc = col + c;
+          if (rr < 0 || rr >= size || cc < 0 || cc >= size) continue;
+          var ring = (r >= 0 && r <= 6 && (c === 0 || c === 6)) || (c >= 0 && c <= 6 && (r === 0 || r === 6));
+          var core = r >= 2 && r <= 4 && c >= 2 && c <= 4;
+          m[rr][cc] = ring || core ? 1 : 0;
+        }
+      }
+    }
+    finder(0, 0);
+    finder(0, size - 7);
+    finder(size - 7, 0);
+
+    for (var i = 8; i < size - 8; i++) {
+      var bit = i % 2 === 0 ? 1 : 0;
+      m[6][i] = bit;
+      m[i][6] = bit;
+    }
+
+    var centers = ALIGN[version];
+    centers.forEach(function (r) {
+      centers.forEach(function (c) {
+        if ((r === 6 && c === 6) || (r === 6 && c === size - 7) || (r === size - 7 && c === 6)) return;
+        for (var dr = -2; dr <= 2; dr++) {
+          for (var dc = -2; dc <= 2; dc++) {
+            m[r + dr][c + dc] = Math.max(Math.abs(dr), Math.abs(dc)) !== 1 ? 1 : 0;
+          }
+        }
+      });
+    });
+
+    for (var f = 0; f < 9; f++) {
+      if (m[8][f] === -1) m[8][f] = 0;
+      if (m[f][8] === -1) m[f][8] = 0;
+    }
+    for (var g = 0; g < 8; g++) {
+      if (m[8][size - 1 - g] === -1) m[8][size - 1 - g] = 0;
+      if (m[size - 1 - g][8] === -1) m[size - 1 - g][8] = 0;
+    }
+    m[size - 8][8] = 1;
+
+    if (version >= 7) {
+      var vbits = VERSION_BITS[version];
+      for (var v = 0; v < 18; v++) {
+        var vb = (vbits >> v) & 1;
+        m[Math.floor(v / 3)][size - 11 + (v % 3)] = vb;
+        m[size - 11 + (v % 3)][Math.floor(v / 3)] = vb;
+      }
+    }
+  }
+
+  function reservedMask(version, size) {
+    var m = blank(size);
+    functionPatterns(m, version);
+    return m.map(function (row) {
+      return Array.prototype.map.call(row, function (v) { return v !== -1; });
+    });
+  }
+
+  function placeData(m, reserved, codewords) {
+    var size = m.length;
+    var bitIndex = 0;
+    var upward = true;
+    for (var right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5; // skip the vertical timing column
+      for (var step = 0; step < size; step++) {
+        var row = upward ? size - 1 - step : step;
+        var cols = [right, right - 1];
+        for (var ci = 0; ci < 2; ci++) {
+          var col = cols[ci];
+          if (reserved[row][col]) continue;
+          var byte = codewords[bitIndex >> 3];
+          m[row][col] = byte === undefined ? 0 : (byte >> (7 - (bitIndex & 7))) & 1;
+          bitIndex++;
+        }
+      }
+      upward = !upward;
+    }
+  }
+
+  var MASKS = [
+    function (r, c) { return (r + c) % 2 === 0; },
+    function (r) { return r % 2 === 0; },
+    function (r, c) { return c % 3 === 0; },
+    function (r, c) { return (r + c) % 3 === 0; },
+    function (r, c) { return ((r >> 1) + Math.floor(c / 3)) % 2 === 0; },
+    function (r, c) { return ((r * c) % 2) + ((r * c) % 3) === 0; },
+    function (r, c) { return ((((r * c) % 2) + ((r * c) % 3)) % 2) === 0; },
+    function (r, c) { return ((((r + c) % 2) + ((r * c) % 3)) % 2) === 0; }
+  ];
+
+  function bchFormat(data) {
+    var v = data << 10;
+    for (var i = 14; i >= 10; i--) {
+      if ((v >> i) & 1) v ^= 0x537 << (i - 10);
+    }
+    return ((data << 10) | v) ^ 0x5412;
+  }
+
+  function applyFormat(m, ecl, mask) {
+    var size = m.length;
+    var bits = bchFormat((ECL_BITS[ecl] << 3) | mask);
+    function bit(i) { return (bits >> i) & 1; }
+
+    // First copy runs down the left of the top-left finder, then out along row 8.
+    for (var i = 0; i <= 5; i++) m[i][8] = bit(i);
+    m[7][8] = bit(6);
+    m[8][8] = bit(7);
+    m[8][7] = bit(8);
+    for (var j = 9; j <= 14; j++) m[8][14 - j] = bit(j);
+
+    // Second copy: low bits along the top-right, high bits up from the bottom-left.
+    for (var k = 0; k <= 7; k++) m[8][size - 1 - k] = bit(k);
+    for (var n = 8; n <= 14; n++) m[size - 15 + n][8] = bit(n);
+    m[size - 8][8] = 1;
+  }
+
+  function penalty(m) {
+    var size = m.length;
+    var score = 0;
+
+    function runScore(get) {
+      var total = 0;
+      for (var a = 0; a < size; a++) {
+        var run = 1;
+        for (var b = 1; b < size; b++) {
+          if (get(a, b) === get(a, b - 1)) {
+            run++;
+          } else {
+            if (run >= 5) total += run - 2;
+            run = 1;
+          }
+        }
+        if (run >= 5) total += run - 2;
+      }
+      return total;
+    }
+    score += runScore(function (r, c) { return m[r][c]; });
+    score += runScore(function (c, r) { return m[r][c]; });
+
+    for (var r = 0; r < size - 1; r++) {
+      for (var c = 0; c < size - 1; c++) {
+        var v = m[r][c];
+        if (v === m[r][c + 1] && v === m[r + 1][c] && v === m[r + 1][c + 1]) score += 3;
+      }
+    }
+
+    var P1 = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+    var P2 = [0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1];
+    function matches(get, a, b, pattern) {
+      for (var i = 0; i < 11; i++) if (get(a, b + i) !== pattern[i]) return false;
+      return true;
+    }
+    var row = function (x, y) { return m[x][y]; };
+    var col = function (x, y) { return m[y][x]; };
+    for (var a = 0; a < size; a++) {
+      for (var b = 0; b <= size - 11; b++) {
+        if (matches(row, a, b, P1) || matches(row, a, b, P2)) score += 40;
+        if (matches(col, a, b, P1) || matches(col, a, b, P2)) score += 40;
+      }
+    }
+
+    var dark = 0;
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) dark += m[y][x];
+    score += Math.floor(Math.abs((dark * 100) / (size * size) - 50) / 5) * 10;
+    return score;
+  }
+
+  function matrix(text, ecl) {
+    ecl = ecl || 'M';
+    var bytes = Array.from(new TextEncoder().encode(text));
+
+    var version = 0;
+    for (var v = 1; v <= 10; v++) {
+      if (bytes.length <= capacityBytes(v, ecl)) { version = v; break; }
+    }
+    if (!version) throw new Error('payload too long for ECC ' + ecl + ': ' + bytes.length + ' bytes');
+
+    var size = version * 4 + 17;
+    var codewords = buildCodewords(bytes, version, ecl);
+    var reserved = reservedMask(version, size);
+
+    var best = null;
+    for (var mask = 0; mask < 8; mask++) {
+      var m = blank(size);
+      functionPatterns(m, version);
+      placeData(m, reserved, codewords);
+      for (var r = 0; r < size; r++) {
+        for (var c = 0; c < size; c++) {
+          if (!reserved[r][c] && MASKS[mask](r, c)) m[r][c] ^= 1;
+        }
+      }
+      applyFormat(m, ecl, mask);
+      var grid = m.map(function (row) { return Array.prototype.slice.call(row); });
+      var score = penalty(grid);
+      if (!best || score < best.score) best = { score: score, grid: grid };
+    }
+    return best.grid;
+  }
+
+  /** Dark modules as one SVG path, horizontal runs merged. */
+  function path(m) {
+    var parts = [];
+    for (var r = 0; r < m.length; r++) {
+      var c = 0;
+      while (c < m.length) {
+        if (m[r][c]) {
+          var run = 1;
+          while (c + run < m.length && m[r][c + run]) run++;
+          parts.push('M' + c + ' ' + r + 'h' + run + 'v1h-' + run + 'z');
+          c += run;
+        } else c++;
+      }
+    }
+    return parts.join('');
+  }
+
+  global.QR = { matrix: matrix, path: path };
+})(window);
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $('stage');
+
+  /* ---------- payload ---------- */
+
+  /** base64url → UTF-8 text. The fragment carries Korean, so decode through bytes. */
+  function decode(raw) {
+    var s = raw.replace(/-/g, '+').replace(/_/g, '/');
+    s += '==='.slice((s.length + 3) % 4);
+    var bin = atob(s);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  var DEMO = {
+    n: '실수 100', d: 'devkoan', o: '1개월 무료',
+    m: '한 달 동안 마음껏 써 보세요.\n도움이 되면 좋겠어요.',
+    f: '현호', r: '지민', c: 'ABCDEFGHIJKL',
+    u: 'https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=ABCDEFGHIJKL',
+    p: 'https://apps.apple.com/kr/app/id6759643878',
+    e: '2026-08-26',
+    g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'],
+    q: true, k: true
+  };
+
+  var gift = DEMO, isDemo = true;
+  try {
+    var hash = location.hash.replace(/^#/, '');
+    if (hash) {
+      var parsed = JSON.parse(decode(hash));
+      if (parsed && typeof parsed === 'object') { gift = parsed; isDemo = false; }
+    }
+  } catch (e) {
+    // A mangled link shouldn't show a blank page — fall through to the demo and say so.
+  }
+  $('demo').hidden = !isDemo;
+
+  /* ---------- the card ---------- */
+
+  /** Matches CardLayout.standard, for links made before the layout travelled. */
+  var FALLBACK_LAYOUT = {
+    occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
+    logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+    message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
+    code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+  };
+  var TYPE_SCALE = 1.18;            // GiftCardView.typeScale
+  var ARTWORK = { logo: 1, qr: 1 }; // these spend their scale on the frame, not the type
+
+  function node(tag, cls, value) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (value != null) el.textContent = value;
+    return el;
+  }
+
+  function place(id, el) {
+    var l = (gift.l && gift.l[id]) || FALLBACK_LAYOUT[id];
+    if (!l) return;
+    el.classList.add('blk', 'b-' + id);
+    // Keep the composer's fractions around — the clamp below has to work from the
+    // original each time, or repeated passes would walk the block across the card.
+    el.dataset.x = l[0];
+    el.dataset.y = l[1];
+    if (l.length >= 5) { el.dataset.w = l[3]; el.dataset.h = l[4]; }
+    el.style.left = (l[0] * 100).toFixed(3) + '%';
+    el.style.top = (l[1] * 100).toFixed(3) + '%';
+    var s = l[2] || 1;
+    if (ARTWORK[id]) el.style.setProperty('--s', s);
+    else el.style.setProperty('--t', (TYPE_SCALE * s).toFixed(4));
+    $('card').appendChild(el);
+  }
+
+  /**
+   * Fit each block into the footprint the composer measured for it, then keep it on
+   * the card.
+   *
+   * The app draws in SF Rounded and SF Mono; the browser has neither, so the same
+   * words come out wider here and one block runs into the next — the code chip ends
+   * up under the QR. The link carries the box each block actually occupied, so we
+   * scale to that box and the arrangement holds. Without a measurement (older links)
+   * the block is left alone and only clamped.
+   */
+  function fitBlocks() {
+    var card = $('card');
+    var cw = card.clientWidth, ch = card.clientHeight;
+    if (!cw || !ch) return;
+    var unit = cw / 1000;   // card points → CSS pixels
+
+    [].forEach.call(card.querySelectorAll('.blk'), function (el) {
+      var target = parseFloat(el.dataset.w);
+
+      el.style.transform = '';
+      var k = 1;
+      if (target > 0 && el.offsetWidth > 0) {
+        // Only ever shrink: growing a block to fill a wider box would break the
+        // type scale the composer chose.
+        k = Math.min(1, (target * unit) / el.offsetWidth);
+        if (k < 0.999) {
+          el.style.transformOrigin = '0 0';
+          el.style.transform = 'scale(' + k.toFixed(4) + ')';
+        } else {
+          k = 1;
+        }
+      }
+
+      // scale() doesn't change offsetWidth, so the clamp works from the scaled size.
+      var w = el.offsetWidth * k;
+      var h = el.offsetHeight * k;
+      var x = parseFloat(el.dataset.x) * cw;
+      var y = parseFloat(el.dataset.y) * ch;
+      el.style.left = (Math.min(Math.max(x, 0), Math.max(0, cw - w)) / cw * 100).toFixed(3) + '%';
+      el.style.top = (Math.min(Math.max(y, 0), Math.max(0, ch - h)) / ch * 100).toFixed(3) + '%';
+    });
+  }
+
+  function qrSVG(value) {
+    if (!window.QR) return null;
+    var m = window.QR.matrix(value, 'M');
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + m.length + ' ' + m.length);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', window.QR.path(m));
+    path.setAttribute('fill', '#000');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function drawCard() {
+    var card = $('card');
+
+    // A hosted render, if there is one, is the truest copy of what was designed.
+    if (gift.img) {
+      card.classList.add('shot');
+      var shot = node('img');
+      shot.src = gift.img;
+      shot.alt = (gift.n || '') + ' 기프트 카드';
+      shot.onerror = function () { card.classList.remove('shot'); card.innerHTML = ''; paintBlocks(); };
+      card.appendChild(shot);
+      return;
+    }
+    paintBlocks();
+  }
+
+  function paintBlocks() {
+    if (gift.o) place('occasion', node('div', '', gift.o));
+    place('badge', node('div', '', 'App Store에서 받기'));
+
+    if (gift.i) {
+      var img = node('img');
+      img.src = gift.i;
+      img.alt = (gift.n || '') + ' 아이콘';
+      img.onerror = function () {
+        img.remove();
+        place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+      };
+      place('logo', img);
+    } else {
+      place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+    }
+
+    if (gift.n) {
+      var title = node('div');
+      title.appendChild(node('div', 'name', gift.n));
+      if (gift.d) title.appendChild(node('div', 'dev', gift.d));
+      place('title', title);
+    }
+
+    if (gift.m) place('message', node('div', '', gift.m));
+
+    if (gift.r || gift.f || gift.e) {
+      var people = node('div');
+      if (gift.r) people.appendChild(node('div', 'to', 'To. ' + gift.r));
+      if (gift.f) people.appendChild(node('div', 'from', 'From. ' + gift.f));
+      if (gift.e) {
+        var p = String(gift.e).split('-');
+        if (p.length === 3) {
+          people.appendChild(node('div', 'till', p[0] + '년 ' + (+p[1]) + '월 ' + (+p[2]) + '일까지'));
+        }
+      }
+      place('people', people);
+    }
+
+    if (gift.k && gift.c) place('code', node('div', '', gift.c));
+
+    if (gift.q && (gift.u || gift.p)) {
+      var svg = qrSVG(gift.u || gift.p);
+      if (svg) {
+        var box = node('div');
+        box.appendChild(svg);
+        place('qr', box);
+      }
+    }
+  }
+
+  /* ---------- paint ---------- */
+
+  if (Array.isArray(gift.g) && gift.g.length === 3) {
+    document.documentElement.style.setProperty('--g1', '#' + gift.g[0]);
+    document.documentElement.style.setProperty('--g2', '#' + gift.g[1]);
+    document.documentElement.style.setProperty('--g3', '#' + gift.g[2]);
+  }
+  if (Array.isArray(gift.b) && gift.b.length === 2) {
+    document.documentElement.style.setProperty('--b1', '#' + gift.b[0]);
+    document.documentElement.style.setProperty('--b2', '#' + gift.b[1]);
+  }
+
+  // The closed state names the people but never the app — that's what's inside.
+  var lead = gift.r ? gift.r + '님, 선물이 도착했어요' : '선물이 도착했어요';
+  if (gift.f) lead = (gift.r ? gift.r + '님께 ' : '') + gift.f + '님이 보냈어요';
+  $('lead').innerHTML = lead.replace(/(\S+님)/, '<b>$1</b>');
+
+  drawCard();
+
+  var redeem = gift.u || gift.p || '';
+  $('cta').href = redeem || '#';
+  $('openApp').href = gift.p || redeem || '#';
+
+  if (gift.c) {
+    $('howto').hidden = false;
+    $('code').textContent = gift.c;
+  }
+
+  /* ---------- opening ---------- */
+
+  var opened = false;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /// The card is hidden until it's unwrapped, and a hidden element measures zero —
+  /// so the clamp has to wait for it to be on screen, and run again when the width
+  /// changes, since every size on the card is relative to it.
+  function reveal() {
+    stage.classList.add('is-open');
+    fitBlocks();
+    if (window.ResizeObserver) {
+      new ResizeObserver(fitBlocks).observe($('card'));
+    } else {
+      window.addEventListener('resize', fitBlocks);
+    }
+  }
+
+  function open(instant) {
+    if (opened) return;
+    opened = true;
+    if (instant || reduce) {
+      reveal();
+      return;
+    }
+    stage.classList.add('is-opening');
+    // Long enough for the ribbon to leave and the tile to burst.
+    setTimeout(function () {
+      stage.classList.remove('is-opening');
+      reveal();
+    }, 950);
+  }
+
+  $('box').addEventListener('click', function () { open(false); });
+  $('openBtn').addEventListener('click', function () { open(false); });
+  $('skipBtn').addEventListener('click', function () { open(true); });
+
+  /* ---------- coming back from the App Store ---------- */
+
+  var went = false;
+  $('cta').addEventListener('click', function () { went = true; });
+  document.addEventListener('visibilitychange', function () {
+    if (went && document.visibilityState === 'visible') {
+      stage.classList.add('is-back');
+      if (gift.f) $('backMsg').textContent = gift.f + '님의 선물, 잘 받으셨나요? 이제 앱에서 바로 쓸 수 있어요.';
+    }
+  });
+
+  $('copyBtn').addEventListener('click', function () {
+    var done = function () { $('copyBtn').textContent = '복사했어요'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(gift.c).then(done, done);
+    else done();
+  });
+})();
+</script>
+</body>
+</html>
