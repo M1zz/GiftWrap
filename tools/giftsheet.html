@@ -19,13 +19,13 @@
     margin: 0;
     background: var(--bg);
     color: var(--ink);
-    font: 15px/1.55 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
   a { color: var(--accent); }
-  h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
-  h2 { font-size: 15px; margin: 0 0 12px; letter-spacing: -0.01em; }
-  .sub { color: var(--ink-2); font-size: 13px; }
+  h1 { font-size: 24px; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 16.5px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); font-size: 14px; }
 
   .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 80px; }
   header.top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -39,7 +39,7 @@
   }
   .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
   .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 12px; color: var(--ink-2); }
+  .field label { font-size: 13px; color: var(--ink-2); }
   input[type=text], input[type=number], select, textarea {
     font: inherit; padding: 7px 10px;
     border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit;
@@ -54,7 +54,7 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.primary:hover { filter: brightness(1.08); }
   button:disabled { opacity: .45; cursor: default; }
-  button.mini { padding: 4px 9px; font-size: 12px; }
+  button.mini { padding: 5px 10px; font-size: 13px; }
 
   .drop {
     border: 2px dashed var(--line); border-radius: var(--radius);
@@ -77,18 +77,18 @@
 
   .note {
     background: #fff8e6; border: 1px solid #f0dca8; border-radius: 10px;
-    padding: 13px 15px; font-size: 13.5px; line-height: 1.6; margin-bottom: 16px;
+    padding: 14px 16px; font-size: 14.5px; line-height: 1.6; margin-bottom: 16px;
   }
   .note b { font-weight: 600; }
   .note ol { margin: 8px 0 0; padding-left: 20px; }
   .note li { margin: 3px 0; }
   .warn { color: #a15c00; }
 
-  table.ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
   table.ledger th, table.ledger td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
   table.ledger th { color: var(--ink-2); font-weight: 500; }
   table.ledger td.code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  table.ledger input[type=text] { padding: 3px 7px; font-size: 13px; width: 100%; }
+  table.ledger input[type=text] { padding: 4px 8px; font-size: 14px; width: 100%; }
 
   .list { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
   .item {
@@ -97,10 +97,10 @@
   }
   .item:last-child { border-bottom: none; }
   .item.sent { background: #f2fbf5; }
-  .item .idx { width: 44px; color: var(--ink-2); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .item .code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; flex: 1; min-width: 140px; }
+  .item .idx { width: 48px; color: var(--ink-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .item .code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px; flex: 1; min-width: 140px; }
   .item .who { width: 130px; }
-  .item .who input { width: 100%; padding: 4px 8px; font-size: 13px; }
+  .item .who input { width: 100%; padding: 5px 9px; font-size: 14px; }
 
   .previewWrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
   .previewWrap canvas { max-width: 470px; width: 100%; height: auto; touch-action: none; outline: none; }
@@ -108,7 +108,7 @@
   .previewSide { flex: 1; min-width: 300px; }
   .editorbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; max-width: 470px; }
 
-  .pagecount { font-size: 13px; color: var(--ink-2); margin-left: auto; }
+  .pagecount { font-size: 14px; color: var(--ink-2); margin-left: auto; }
 
   /* ================= gift card ================= */
   /*
@@ -138,6 +138,9 @@
     display: flex;
     color: #fff;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    /* Type scale. JS writes the real value from TYPE_SCALE so the canvas preview
+       and the printed card grow together; 1 is only the fallback. */
+    --t: 1;
   }
   .card.guides {
     outline: 0.2mm dashed rgba(0,0,0,.34);
@@ -166,8 +169,9 @@
   /* Front faces are laid out from the shared drag layout, so each piece is
      absolutely placed at the fraction of the card the preview put it at. */
   .card .block { position: absolute; z-index: 3; }
-  .card .block.b-code { width: 47%; }
-  .card .block.b-fine { width: 66%; }
+  /* These two wrap their text, so their boxes grow with the type scale. */
+  .card .block.b-code { width: calc(47% * var(--t)); }
+  .card .block.b-fine { width: calc(66% * var(--t)); }
   .card .block.b-qr { width: 21.4%; }
   /* The block's own position supplies the spacing that flow margins used to. */
   .card .block .kicker,
@@ -184,31 +188,36 @@
   .card .left { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   .card .spacer { flex: 1; min-height: calc(var(--u) * 1mm); }
 
-  .card .brandrow { display: flex; gap: calc(var(--u) * 1.54mm); align-items: center; }
-  .card .brandrow img { width: calc(var(--u) * 6.33mm); height: calc(var(--u) * 6.33mm); border-radius: calc(var(--u) * 1.46mm); flex: none; }
-  .card .brand { font-weight: 700; font-size: calc(var(--u) * 2.83mm); letter-spacing: -0.02em; line-height: 1.1; }
+  /* The logo is its own block now, so it carries its own size. JS writes the scaled
+     width inline; these values are the unscaled fallback. */
+  .card .block.b-logo img {
+    display: block;
+    width: calc(var(--u) * 6.33mm); height: calc(var(--u) * 6.33mm);
+    border-radius: calc(var(--u) * 1.46mm);
+  }
+  .card .brand { font-weight: 700; font-size: calc(var(--u) * 2.83mm * var(--t)); letter-spacing: -0.02em; line-height: 1.1; }
 
   .card .kicker {
-    font-size: calc(var(--u) * 1.71mm); letter-spacing: .2em; opacity: .82; line-height: 1.2;
+    font-size: calc(var(--u) * 1.71mm * var(--t)); letter-spacing: .2em; opacity: .82; line-height: 1.2;
     text-transform: uppercase; margin-top: calc(var(--u) * 3.4mm);
   }
   .card .value {
-    font-size: calc(var(--u) * 5.82mm); font-weight: 800; letter-spacing: -0.03em;
+    font-size: calc(var(--u) * 5.82mm * var(--t)); font-weight: 800; letter-spacing: -0.03em;
     line-height: 1.05; margin-top: calc(var(--u) * 0.68mm);
   }
   .card .msg {
-    font-size: calc(var(--u) * 2.31mm); line-height: 1.407; opacity: .9;
+    font-size: calc(var(--u) * 2.31mm * var(--t)); line-height: 1.407; opacity: .9;
     margin-top: calc(var(--u) * 1.6mm); white-space: pre-wrap;
   }
-  .card .fromto { font-size: calc(var(--u) * 2.31mm); line-height: 1.407; opacity: .75; margin-top: 0; }
+  .card .fromto { font-size: calc(var(--u) * 2.31mm * var(--t)); line-height: 1.407; opacity: .75; margin-top: 0; }
 
-  .card .codelabel { font-size: calc(var(--u) * 1.37mm); letter-spacing: .19em; opacity: .6; line-height: 1.3; }
+  .card .codelabel { font-size: calc(var(--u) * 1.37mm * var(--t)); letter-spacing: .19em; opacity: .6; line-height: 1.3; }
   .card .code {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: calc(var(--u) * 2.57mm); letter-spacing: .05em; font-weight: 600;
+    font-size: calc(var(--u) * 2.57mm * var(--t)); letter-spacing: .05em; font-weight: 600;
     margin-top: calc(var(--u) * 0.55mm);
   }
-  .card .fine { font-size: calc(var(--u) * 1.37mm); line-height: 1.35; opacity: .55; margin-top: calc(var(--u) * 1.2mm); }
+  .card .fine { font-size: calc(var(--u) * 1.37mm * var(--t)); line-height: 1.35; opacity: .55; margin-top: calc(var(--u) * 1.2mm); }
 
   .card .right {
     width: max(14mm, calc(var(--u) * 21mm)); flex: none;
@@ -217,10 +226,10 @@
   }
   .card .qrbox { background: #fff; padding: calc(var(--u) * 1.2mm); border-radius: calc(var(--u) * 1.54mm); line-height: 0; width: 100%; }
   .card .qrbox svg { display: block; width: 100%; height: auto; }
-  .card .scan { font-size: calc(var(--u) * 1.37mm); opacity: .82; text-align: center; line-height: 1.3; }
+  .card .scan { font-size: calc(var(--u) * 1.37mm * var(--t)); opacity: .82; text-align: center; line-height: 1.3; }
   .card .serial {
     position: absolute; z-index: 3; right: calc(var(--u) * 3.6mm); bottom: calc(var(--u) * 3mm);
-    font-size: calc(var(--u) * 1.6mm); opacity: .45; font-variant-numeric: tabular-nums;
+    font-size: calc(var(--u) * 1.6mm * var(--t)); opacity: .45; font-variant-numeric: tabular-nums;
   }
 
   /* Ink-saving mono theme */
@@ -234,11 +243,11 @@
   .card.back .frame, .card.back .sheen { display: none; }
   .card.back .inner { padding-top: calc(var(--u) * 7.6mm); }
   .card.back .issuer {
-    font-size: calc(var(--u) * 1.9mm); font-weight: 600; opacity: .8;
+    font-size: calc(var(--u) * 1.9mm * var(--t)); font-weight: 600; opacity: .8;
     margin-bottom: calc(var(--u) * 2.2mm);
   }
-  .card.back .steps { font-size: calc(var(--u) * 1.85mm); line-height: 1.5; opacity: .82; }
-  .card.back .steps b { display: block; letter-spacing: .16em; font-size: calc(var(--u) * 1.7mm); opacity: .6; margin-bottom: calc(var(--u) * 0.7mm); font-weight: 600; }
+  .card.back .steps { font-size: calc(var(--u) * 1.85mm * var(--t)); line-height: 1.5; opacity: .82; }
+  .card.back .steps b { display: block; letter-spacing: .16em; font-size: calc(var(--u) * 1.7mm * var(--t)); opacity: .6; margin-bottom: calc(var(--u) * 0.7mm); font-weight: 600; }
   .card.back .codewell {
     margin-top: calc(var(--u) * 1.6mm);
     border: 0.25mm solid #d2d2d7; border-radius: calc(var(--u) * 1.2mm);
@@ -484,7 +493,7 @@
 
   // ---------- state ----------
   var codes = [];        // [{code, url, id}]
-  var app = { id: '', name: '', developer: '', icon: '' };
+  var app = { id: '', name: '', developer: '', icon: '', ctx: 'offercodes' };
   var iconImg = null;
   var current = 0;
   var ledger = loadLedger();
@@ -497,6 +506,23 @@
     try { localStorage.setItem('giftsheet.ledger', JSON.stringify(ledger)); } catch (e) {}
   }
 
+  // ---------- card typography ----------
+  /*
+   * One knob for every piece of text on the card, preview and print alike.
+   * The sizes this started from put the code near 7pt and the terms near 4pt on
+   * an 85.6mm card — fine on screen, a squint in the hand. Raising the scale
+   * moves them all together so the composition keeps its proportions; the
+   * default block positions below are budgeted for whatever value sits here.
+   */
+  var TYPE_SCALE = 1.18;
+
+  /**
+   * A canvas measurement at the card's type scale, times whatever size the block
+   * itself was given. Pass the block id so a resized text block grows as a piece —
+   * font, tracking, leading and box padding together.
+   */
+  function ts(px, id) { return Math.round(px * typeScaleOf(id)); }
+
   // ---------- card layout ----------
   /*
    * One layout drives both outputs. Positions are the top-left corner of each
@@ -504,41 +530,93 @@
    * 1000×631 canvas and on an 85.6×54 mm print card. The defaults reproduce the
    * composed design exactly — nothing moves until the user drags something.
    */
-  var BLOCK_IDS = ['brand', 'hero', 'note', 'code', 'fine', 'qr'];
-  var BLOCK_NAMES = { brand: '앱 이름', hero: '액면', note: '메시지', code: '코드', fine: '약관', qr: 'QR' };
-  var DEFAULT_LAYOUT = {
-    brand: { x: 0.0560, y: 0.0888 },
-    hero:  { x: 0.0560, y: 0.2916 },
-    note:  { x: 0.0560, y: 0.4786 },
-    code:  { x: 0.0560, y: 0.7242 },
-    fine:  { x: 0.0560, y: 0.8796 },
-    qr:    { x: 0.7300, y: 0.5246 }   // panel + caption ends on the bottom padding line
+  var BLOCK_IDS = ['logo', 'brand', 'hero', 'note', 'code', 'fine', 'qr'];
+  var BLOCK_NAMES = {
+    logo: '앱 로고', brand: '앱 이름', hero: '액면',
+    note: '메시지', code: '코드', fine: '약관', qr: 'QR'
   };
+  /* Every block carries its own size. The two artwork blocks spend it on their frame;
+     the rest spend it on their type. */
+  var ARTWORK = { logo: true, qr: true };
+  var SCALE_MIN = 0.4, SCALE_MAX = 2.5;
+  /*
+   * The vertical budget, on a 1000×631 card with 56px padding — content runs
+   * 56…575. At TYPE_SCALE 1.18 the blocks measure: logo 74, brand 47, hero 130,
+   * note 135 (3 lines), code 99, fine 24, qr 249. That is 508 of the 519
+   * available, so the gaps between them are deliberately even and tight. Change
+   * TYPE_SCALE and these have to be re-budgeted or the stack will collide.
+   */
+  var DEFAULT_LAYOUT = {
+    logo:  { x: 0.0560, y: 0.0888 },  //  56 …130
+    brand: { x: 0.1480, y: 0.1101 },  //  69.5…116.5 — centred against the logo
+    hero:  { x: 0.0560, y: 0.2330 },  // 147 …277
+    note:  { x: 0.0560, y: 0.4612 },  // 291 …426
+    code:  { x: 0.0560, y: 0.6973 },  // 440 …539
+    fine:  { x: 0.0560, y: 0.8732 },  // 551 …575, on the bottom padding line
+    qr:    { x: 0.7300, y: 0.5166 }   // 326 …575, panel + caption ends there too
+  };
+
+  /*
+   * Bumped whenever a change makes old saved positions wrong rather than merely
+   * different — the type scale is one, since positions are budgeted around the
+   * block heights it produces. A save from an earlier version is dropped for the
+   * current defaults instead of being left to collide.
+   */
+  var LAYOUT_VERSION = 3;
+  var layoutWasReset = false;
   var layout = loadLayout();
+
+  function normScale(v) { return (isFinite(v) && v > 0) ? clamp(v, SCALE_MIN, SCALE_MAX) : 1; }
+
+  /** The block's own size multiplier. */
+  function scaleOf(id) {
+    return layout[id] ? normScale(layout[id].s) : 1;
+  }
+
+  /**
+   * How much to multiply this block's type by. Artwork keeps its type at the card
+   * scale — the QR's caption should stay readable while the panel grows, and the
+   * canvas and print renderers have to agree on that.
+   */
+  function typeScaleOf(id) {
+    return TYPE_SCALE * (ARTWORK[id] ? 1 : scaleOf(id));
+  }
 
   function loadLayout() {
     var out = {};
     var saved = {};
     try { saved = JSON.parse(localStorage.getItem('giftsheet.layout') || '{}'); } catch (e) {}
+    if (saved.__v !== LAYOUT_VERSION) {
+      // Only worth announcing if they had actually placed something.
+      layoutWasReset = BLOCK_IDS.some(function (id) { return !!saved[id]; });
+      saved = {};
+    }
     BLOCK_IDS.forEach(function (id) {
       var p = saved[id];
+      var d = DEFAULT_LAYOUT[id];
       out[id] = (p && isFinite(p.x) && isFinite(p.y))
-        ? { x: Math.min(1, Math.max(0, p.x)), y: Math.min(1, Math.max(0, p.y)) }
-        : { x: DEFAULT_LAYOUT[id].x, y: DEFAULT_LAYOUT[id].y };
+        ? { x: clamp(p.x, 0, 1), y: clamp(p.y, 0, 1), s: normScale(p.s) }
+        : { x: d.x, y: d.y, s: 1 };
     });
     return out;
   }
   function saveLayout() {
-    try { localStorage.setItem('giftsheet.layout', JSON.stringify(layout)); } catch (e) {}
+    var out = { __v: LAYOUT_VERSION };
+    BLOCK_IDS.forEach(function (id) { out[id] = layout[id]; });
+    try { localStorage.setItem('giftsheet.layout', JSON.stringify(out)); } catch (e) {}
+    layoutWasReset = false;   // they've placed things themselves now
   }
   function resetLayout() {
-    BLOCK_IDS.forEach(function (id) { layout[id] = { x: DEFAULT_LAYOUT[id].x, y: DEFAULT_LAYOUT[id].y }; });
+    BLOCK_IDS.forEach(function (id) {
+      layout[id] = { x: DEFAULT_LAYOUT[id].x, y: DEFAULT_LAYOUT[id].y, s: 1 };
+    });
     saveLayout();
   }
   function layoutIsDefault() {
     return BLOCK_IDS.every(function (id) {
       return Math.abs(layout[id].x - DEFAULT_LAYOUT[id].x) < 1e-6 &&
-             Math.abs(layout[id].y - DEFAULT_LAYOUT[id].y) < 1e-6;
+             Math.abs(layout[id].y - DEFAULT_LAYOUT[id].y) < 1e-6 &&
+             Math.abs(scaleOf(id) - 1) < 1e-6;
     });
   }
 
@@ -572,7 +650,8 @@
     if (entry.url) return entry.url;
     var id = app.id || entry.id;
     if (!id) return '';
-    return 'https://apps.apple.com/redeem?ctx=offercodes&id=' + id + '&code=' + entry.code;
+    return 'https://apps.apple.com/redeem?ctx=' + (app.ctx || 'offercodes') +
+      '&id=' + id + '&code=' + entry.code;
   }
 
   function ingest(text, label) {
@@ -590,8 +669,9 @@
     $('count').max = parsed.length;
     $('from').max = parsed.length;
 
+    // Hand over the whole URL when the CSV carries one — it may name the ctx too.
     var found = parsed.find(function (c) { return c.id; });
-    if (found) lookupFrom(found.id, true);
+    if (found) lookupFrom(found.url || found.id, true);
     renderSendList();
     renderLedger();
     renderCard();
@@ -613,9 +693,21 @@
     return m ? m[1] : '';
   }
 
+  /**
+   * A redeem link says which kind of code it carries — keep it instead of assuming
+   * offer codes. Returns '' when the input doesn't say, so a bare ID can't clobber
+   * a ctx we already learned.
+   */
+  function extractCtx(input) {
+    var m = String(input || '').match(/[?&]ctx=(offercodes|apps)\b/i);
+    return m ? m[1].toLowerCase() : '';
+  }
+
   /** @param quiet suppress the "no ID here" notice while the user is still typing */
   function lookupFrom(raw, quiet) {
     var id = extractAppId(raw);
+    var ctx = extractCtx(raw);
+    if (ctx) app.ctx = ctx;
     if (!id) {
       if (!quiet && String(raw || '').trim()) {
         $('appName').textContent = '이 값에서는 Apple ID를 찾지 못했습니다';
@@ -734,6 +826,7 @@
     card.style.width = opts.w + 'mm';
     card.style.height = opts.h + 'mm';
     card.style.setProperty('--u', opts.u);
+    card.style.setProperty('--t', TYPE_SCALE);
 
     if (face === 'back') {
       var band = el('band');
@@ -762,18 +855,26 @@
         // Canvas and CSS measure text differently, so a block placed near the
         // right edge in the preview could still spill here. Wrap instead.
         holder.style.maxWidth = (100 - pos.x * 100).toFixed(3) + '%';
+        // The QR panel is the one block sized as a share of the card, so the resize
+        // handle has to write through to the print width too.
+        // Each block gets its own type multiplier, so the printed card scales
+        // exactly what the preview scaled.
+        holder.style.setProperty('--t', typeScaleOf(id).toFixed(4));
+        if (id === 'qr') holder.style.width = (21.4 * scaleOf('qr')).toFixed(3) + '%';
         holder.appendChild(node);
         card.appendChild(holder);
       };
 
-      var brandrow = el('brandrow');
       if (opts.showIcon && app.icon) {
         var bimg = document.createElement('img');
         bimg.src = app.icon;
-        brandrow.appendChild(bimg);
+        var side = 'calc(var(--u) * ' + (6.33 * scaleOf('logo')).toFixed(3) + 'mm)';
+        bimg.style.width = side;
+        bimg.style.height = side;
+        bimg.style.borderRadius = 'calc(var(--u) * ' + (1.46 * scaleOf('logo')).toFixed(3) + 'mm)';
+        place('logo', bimg);
       }
-      brandrow.appendChild(el('brand', app.name || 'App Store'));
-      place('brand', brandrow);
+      place('brand', el('brand', app.name || 'App Store'));
 
       var heroWrap = document.createDocumentFragment();
       heroWrap.appendChild(el('kicker', '기프트 카드'));
@@ -1052,15 +1153,24 @@
     updateShareText();
   }
 
-  var FONT = {
-    brand: '700 33px "Apple SD Gothic Neo", -apple-system, sans-serif',
-    kicker: '600 20px "Apple SD Gothic Neo", -apple-system, sans-serif',
-    value: '800 68px "Apple SD Gothic Neo", -apple-system, sans-serif',
-    note: '500 27px "Apple SD Gothic Neo", -apple-system, sans-serif',
-    codeLabel: '600 16px "Apple SD Gothic Neo", -apple-system, sans-serif',
-    code: '600 30px ui-monospace, "SF Mono", Menlo, monospace',
-    fine: '400 16px "Apple SD Gothic Neo", -apple-system, sans-serif'
+  var SANS = '"Apple SD Gothic Neo", -apple-system, sans-serif';
+  var MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
+  /* weight, size at 100%, family. Sizes are multiplied by the owning block's scale. */
+  var FONT_SPEC = {
+    brand:     ['700', 33, SANS],
+    kicker:    ['600', 20, SANS],
+    value:     ['800', 68, SANS],
+    note:      ['500', 27, SANS],
+    codeLabel: ['600', 16, SANS],
+    code:      ['600', 30, MONO],
+    fine:      ['400', 16, SANS]
   };
+
+  /** A canvas font string for one role, sized for the block that draws it. */
+  function font(role, id) {
+    var spec = FONT_SPEC[role];
+    return spec[0] + ' ' + ts(spec[1], id) + 'px ' + spec[2];
+  }
 
   function measureTracked(ctx, text, spacing) {
     if ('letterSpacing' in ctx) {
@@ -1089,59 +1199,74 @@
     var name = app.name || 'App Store';
     var hasIcon = !!iconImg;
 
-    ctx.font = FONT.brand;
+    if (hasIcon) {
+      var logoS = scaleOf('logo');
+      var L = 74 * logoS;
+      blocks.push({
+        id: 'logo',
+        w: L,
+        h: L,
+        draw: function (c) {
+          c.save();
+          roundRect(c, 0, 0, L, L, 17 * logoS);
+          c.clip();
+          c.drawImage(iconImg, 0, 0, L, L);
+          c.restore();
+        }
+      });
+    }
+
+    ctx.font = font('brand', 'brand');
     blocks.push({
       id: 'brand',
-      w: (hasIcon ? 92 : 0) + ctx.measureText(name).width,
-      h: 74,
+      w: ctx.measureText(name).width,
+      h: ts(40, 'brand'),
       draw: function (c) {
-        if (hasIcon) {
-          c.save(); roundRect(c, 0, 0, 74, 74, 17); c.clip();
-          c.drawImage(iconImg, 0, 0, 74, 74); c.restore();
-        }
         c.fillStyle = ink;
-        c.font = FONT.brand;
-        c.fillText(name, hasIcon ? 92 : 0, 20);
+        c.font = font('brand', 'brand');
+        c.fillText(name, 0, 0);
       }
     });
 
-    ctx.font = FONT.kicker;
-    var kickerW = measureTracked(ctx, '기프트 카드', 4);
-    ctx.font = FONT.value;
+    ctx.font = font('kicker', 'hero');
+    var kickerTrack = ts(4, 'hero');
+    var kickerW = measureTracked(ctx, '기프트 카드', kickerTrack);
+    ctx.font = font('value', 'hero');
     var valueW = s.value ? ctx.measureText(s.value).width : 0;
     blocks.push({
       id: 'hero',
       w: Math.max(kickerW, valueW),
-      h: s.value ? 110 : 26,
+      h: s.value ? ts(110, 'hero') : ts(26, 'hero'),
       draw: function (c) {
         c.fillStyle = ink;
         c.globalAlpha = 0.82;
-        c.font = FONT.kicker;
-        tracked(c, '기프트 카드', 0, 0, 4);
+        c.font = font('kicker', 'hero');
+        tracked(c, '기프트 카드', 0, 0, kickerTrack);
         c.globalAlpha = 1;
-        if (s.value) { c.font = FONT.value; c.fillText(s.value, 0, 32); }
+        if (s.value) { c.font = font('value', 'hero'); c.fillText(s.value, 0, ts(32, 'hero')); }
       }
     });
 
     var recipient = $('recipient').value.trim();
-    ctx.font = FONT.note;
+    ctx.font = font('note', 'note');
     var noteLines = [];
     if (recipient) noteLines.push({ text: 'to. ' + recipient, dim: 0.9 });
     if (s.message) wrapLines(ctx, s.message, 560).forEach(function (l) { noteLines.push({ text: l, dim: 0.9 }); });
     if (s.sender) noteLines.push({ text: 'from. ' + s.sender, dim: 0.75 });
     if (noteLines.length) {
       var noteW = 0;
+      var noteLead = ts(38, 'note');
       noteLines.forEach(function (l) { noteW = Math.max(noteW, ctx.measureText(l.text).width); });
       blocks.push({
         id: 'note',
         w: noteW,
-        h: noteLines.length * 38,
+        h: noteLines.length * noteLead,
         draw: function (c) {
           c.fillStyle = ink;
-          c.font = FONT.note;
+          c.font = font('note', 'note');
           noteLines.forEach(function (l, i) {
             c.globalAlpha = l.dim;
-            c.fillText(l.text, 0, i * 38);
+            c.fillText(l.text, 0, i * noteLead);
           });
           c.globalAlpha = 1;
         }
@@ -1149,51 +1274,56 @@
     }
 
     if (entry) {
+      var codeW = ts(470, 'code'), codeH = ts(84, 'code'), codePad = ts(22, 'code');
       blocks.push({
         id: 'code',
-        w: 470,
-        h: 84,
+        w: codeW,
+        h: codeH,
         draw: function (c) {
           c.globalAlpha = mono ? 1 : 0.18;
           c.fillStyle = mono ? '#f5f5f7' : '#fff';
-          roundRect(c, 0, 0, 470, 84, 20);
+          roundRect(c, 0, 0, codeW, codeH, ts(20, 'code'));
           c.fill();
           if (mono) { c.strokeStyle = '#d2d2d7'; c.lineWidth = 2; c.stroke(); }
           c.globalAlpha = 1;
           c.fillStyle = ink;
           c.globalAlpha = 0.6;
-          c.font = FONT.codeLabel;
-          tracked(c, 'CODE', 22, 14, 3);
+          c.font = font('codeLabel', 'code');
+          tracked(c, 'CODE', codePad, ts(14, 'code'), ts(3, 'code'));
           c.globalAlpha = 1;
-          c.font = FONT.code;
-          c.fillText(groupCode(entry.code), 22, 38);
+          c.font = font('code', 'code');
+          c.fillText(groupCode(entry.code), codePad, ts(38, 'code'));
         }
       });
 
       var url = redeemURL(entry);
+      var qrS = scaleOf('qr');
+      var Q = 214 * qrS;          // the white panel; the caption below it stays legible
+      var quiet = 14 * qrS;       // quiet zone — scales with the panel so the QR keeps its margin
+      var capH = ts(30, 'qr');          // caption band, sized by the type scale not the panel
       blocks.push({
         id: 'qr',
-        w: 214,
-        h: 214 + 30,   // panel plus the caption the printed card carries
+        w: Q,
+        h: Q + capH,   // panel plus the caption the printed card carries
         draw: function (c) {
           c.fillStyle = '#fff';
-          roundRect(c, 0, 0, 214, 214, 18);
+          roundRect(c, 0, 0, Q, Q, 18 * qrS);
           c.fill();
           c.fillStyle = ink;
           c.globalAlpha = 0.82;
-          c.font = FONT.fine;
+          c.font = font('fine', 'qr');
           c.textAlign = 'center';
-          c.fillText('스캔해서 받기', 107, 222);
+          c.fillText('스캔해서 받기', Q / 2, Q + ts(8, 'qr'));
           c.textAlign = 'left';
           c.globalAlpha = 1;
           if (!url) return;
           var m = window.QR.matrix(url, 'M');
           var n = m.length;
-          var cell = (214 - 28) / n;
+          var cell = (Q - quiet * 2) / n;
           c.fillStyle = '#000';
           for (var r = 0; r < n; r++) {
             for (var col = 0; col < n; col++) {
-              if (m[r][col]) c.fillRect(14 + col * cell, 14 + r * cell, Math.ceil(cell), Math.ceil(cell));
+              if (m[r][col]) c.fillRect(quiet + col * cell, quiet + r * cell, Math.ceil(cell), Math.ceil(cell));
             }
           }
         }
@@ -1205,15 +1335,15 @@
     if (entry && s.terms) fine.push(s.terms);
     if (fine.length) {
       var fineText = fine.join(' · ');
-      ctx.font = FONT.fine;
+      ctx.font = font('fine', 'fine');
       blocks.push({
         id: 'fine',
         w: ctx.measureText(fineText).width,
-        h: 20,
+        h: ts(20, 'fine'),
         draw: function (c) {
           c.fillStyle = ink;
           c.globalAlpha = 0.55;
-          c.font = FONT.fine;
+          c.font = font('fine', 'fine');
           c.fillText(fineText, 0, 0);
           c.globalAlpha = 1;
         }
@@ -1226,13 +1356,46 @@
   // ---------- drag-to-place editor ----------
   var CARD = { x: 0, y: 0, w: 1000, h: 631 };
   var hitBlocks = [];
-  var editor = { hover: null, sel: null, drag: null, guides: [] };
+  var editor = { hover: null, sel: null, drag: null, resize: null, guides: [] };
+  var HANDLE = 13;   // the resize grip on the selection box of a scalable block
 
   function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
   function findBlock(id) {
     for (var i = 0; i < hitBlocks.length; i++) if (hitBlocks[i].id === id) return hitBlocks[i];
     return null;
+  }
+
+  /** Bottom-right grip of the selection box, or null when the block can't be resized. */
+  function handleRect(b) {
+    if (!b) return null;
+    var r = b.rect, m = 8;
+    return { x: r.x + r.w + m - HANDLE / 2, y: r.y + r.h + m - HANDLE / 2, w: HANDLE, h: HANDLE };
+  }
+
+  function hitsHandle(p, b) {
+    var h = handleRect(b);
+    if (!h) return false;
+    var slack = 5;
+    return p.x >= h.x - slack && p.x <= h.x + h.w + slack &&
+           p.y >= h.y - slack && p.y <= h.y + h.h + slack;
+  }
+
+  function setScale(id, s) {
+    layout[id].s = clamp(s, SCALE_MIN, SCALE_MAX);
+  }
+
+  /** A block that grew past an edge would be unreachable — pull it back onto the card. */
+  function keepInside(id) {
+    var b = findBlock(id);
+    if (!b) return false;
+    var x = b.rect.x - CARD.x, y = b.rect.y - CARD.y;
+    var nx = clamp(x, 0, Math.max(0, CARD.w - b.rect.w));
+    var ny = clamp(y, 0, Math.max(0, CARD.h - b.rect.h));
+    if (Math.abs(nx - x) < 1e-6 && Math.abs(ny - y) < 1e-6) return false;
+    layout[id].x = nx / CARD.w;
+    layout[id].y = ny / CARD.h;
+    return true;
   }
 
   function drawEditorOverlay(ctx) {
@@ -1260,7 +1423,16 @@
       roundRect(ctx, r.x - m, r.y - m, r.w + m * 2, r.h + m * 2, 10);
       ctx.stroke();
       if (strong) {
-        var label = BLOCK_NAMES[b.id] || b.id;
+        var grip = handleRect(b);
+        if (grip) {
+          ctx.fillStyle = '#fff';
+          ctx.strokeStyle = 'rgba(0,113,227,1)';
+          ctx.lineWidth = 2;
+          roundRect(ctx, grip.x, grip.y, grip.w, grip.h, 3);
+          ctx.fill();
+          ctx.stroke();
+        }
+        var label = (BLOCK_NAMES[b.id] || b.id) + '  ' + Math.round(scaleOf(b.id) * 100) + '%';
         ctx.font = '600 15px "Apple SD Gothic Neo", -apple-system, sans-serif';
         var tw = ctx.measureText(label).width;
         var lx = r.x - m, ly = r.y - m - 24;
@@ -1328,14 +1500,19 @@
       x = clamp(sn.x, 0, CARD.w - w);
       y = clamp(sn.y, 0, CARD.h - h);
     } else editor.guides = [];
-    layout[id] = { x: x / CARD.w, y: y / CARD.h };
+    // Write the fields, don't replace the entry — a fresh object would drop the scale
+    // and silently reset a resized block to 100% the moment it was nudged.
+    layout[id].x = x / CARD.w;
+    layout[id].y = y / CARD.h;
   }
 
   function updateEditorHint() {
     var hint = $('editorHint');
     if (editor.sel) {
       hint.textContent = (BLOCK_NAMES[editor.sel] || editor.sel) +
-        ' 선택됨 — 끌어서 옮기거나 방향키로 미세 조정 (Shift: 10칸)';
+        ' 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절';
+    } else if (layoutWasReset) {
+      hint.textContent = '글자 크기가 커져서 저장해 둔 배치를 기본값으로 되돌렸습니다. 다시 옮기면 저장됩니다.';
     } else if (!layoutIsDefault()) {
       hint.textContent = '배치를 바꿨습니다. 인쇄 카드에도 그대로 적용됩니다.';
     } else {
@@ -1361,6 +1538,20 @@
     canvas.addEventListener('pointerdown', function (e) {
       var p = toCanvasPoint(e);
       if (!p) return;
+
+      // The grip sits outside the block's own box, so it has to be tested first.
+      var sel = editor.sel && findBlock(editor.sel);
+      if (sel && hitsHandle(p, sel)) {
+        editor.resize = {
+          id: sel.id,
+          baseW: sel.rect.w / scaleOf(sel.id),   // width at 100%, to turn a drag into a scale
+          ox: sel.rect.x, oy: sel.rect.y
+        };
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+        return;
+      }
+
       var hit = blockAt(p);
       editor.sel = hit ? hit.id : null;
       if (hit) {
@@ -1379,10 +1570,25 @@
     canvas.addEventListener('pointermove', function (e) {
       var p = toCanvasPoint(e);
       if (!p) return;
+      if (editor.resize) {
+        var z = editor.resize;
+        var want = (p.x - z.ox) / z.baseW;
+        if (!e.altKey) want = Math.round(want * 20) / 20;   // 5% steps, Alt to go free
+        setScale(z.id, want);
+        renderCard();
+        if (keepInside(z.id)) renderCard();
+        return;
+      }
       if (editor.drag) {
         var d = editor.drag;
         moveBlock(d.id, p.x - d.dx - CARD.x, p.y - d.dy - CARD.y, d.w, d.h, !e.altKey);
         renderCard();
+        return;
+      }
+      var selected = editor.sel && findBlock(editor.sel);
+      if (selected && hitsHandle(p, selected)) {
+        canvas.style.cursor = 'nwse-resize';
+        if (editor.hover !== selected.id) { editor.hover = selected.id; renderCard(); }
         return;
       }
       var hit = blockAt(p);
@@ -1397,8 +1603,9 @@
     });
 
     function endDrag() {
-      if (!editor.drag) return;
+      if (!editor.drag && !editor.resize) return;
       editor.drag = null;
+      editor.resize = null;
       editor.guides = [];
       saveLayout();
       updateEditorHint();
@@ -1410,6 +1617,18 @@
     canvas.addEventListener('keydown', function (e) {
       var STEPS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (e.key === 'Escape') { editor.sel = null; updateEditorHint(); renderCard(); return; }
+
+      var ZOOM = { '+': 1, '=': 1, '-': -1, '_': -1 };
+      if (editor.sel && ZOOM[e.key]) {
+        e.preventDefault();
+        setScale(editor.sel, scaleOf(editor.sel) + ZOOM[e.key] * (e.shiftKey ? 0.2 : 0.05));
+        renderCard();
+        if (keepInside(editor.sel)) renderCard();
+        saveLayout();
+        updateEditorHint();
+        return;
+      }
+
       var step = STEPS[e.key];
       if (!step || !editor.sel) return;
       var b = findBlock(editor.sel);
@@ -1423,13 +1642,70 @@
     });
   }
 
+  // ---------- gift page link ----------
+  /*
+   * The same wrapped link the macOS app builds: web/gift.html plus a base64url
+   * payload in the fragment. The fragment never reaches the server, so the code and
+   * the recipient's name stay out of access logs.
+   *
+   * The card arrangement is not sent. This tool composes a printed CR80 card with a
+   * different set of blocks than the app's, so there is nothing to map onto; the page
+   * falls back to its default layout and shows the same content.
+   */
+  var GIFT_PAGE = 'https://m1zz.github.io/GiftWrap/gift.html';
+
+  function b64url(text) {
+    var bytes = new TextEncoder().encode(text);
+    var bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function giftLink(entry) {
+    var url = redeemURL(entry);
+    if (!url) return '';
+    var s = settings();
+    var theme = THEMES[s.theme] || {};
+    var strip = function (h) { return String(h).replace('#', ''); };
+
+    var payload = { v: 1, u: url, c: entry.code, q: true, k: true };
+    if (app.name) payload.n = app.name;
+    if (app.developer) payload.d = app.developer;
+    if (app.icon) payload.i = app.icon;
+    if (app.id) payload.p = 'https://apps.apple.com/app/id' + app.id;
+    if (s.value) payload.o = s.value;
+    if (s.message) payload.m = s.message;
+    if (s.sender) payload.f = s.sender;
+    var to = $('recipient').value.trim();
+    if (to) payload.r = to;
+    if (theme.stops) payload.g = theme.stops.map(strip);
+    if (theme.blooms) payload.b = theme.blooms.map(strip);
+
+    return GIFT_PAGE + '#' + b64url(JSON.stringify(payload));
+  }
+
   function updateShareText() {
     var entry = codes[current];
     if (!entry) { $('shareText').value = ''; return; }
     var s = settings();
     var recipient = $('recipient').value.trim();
-    var name = app.name || '앱';
+    var wrapped = giftLink(entry);
     var lines = [];
+
+    if (wrapped) {
+      // The page unwraps to the app, the code and the redeem button — naming them
+      // here would give away what it is about to open.
+      if (recipient) lines.push(recipient + '님께');
+      lines.push('');
+      lines.push('🎁 선물이 도착했어요');
+      lines.push(wrapped);
+      if (s.expiry) { lines.push(''); lines.push(s.expiry); }
+      if (s.sender) { lines.push(''); lines.push('— ' + s.sender); }
+      $('shareText').value = lines.join('\n');
+      return;
+    }
+
+    var name = app.name || '앱';
     lines.push('🎁 ' + (recipient ? recipient + '님, ' : '') + '‘' + name + '’ 기프트 카드가 도착했어요' +
       (s.value ? ' — ' + s.value : ''));
     if (s.message) lines.push(s.message);
