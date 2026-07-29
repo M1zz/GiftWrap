@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 
 /// Builds the URLs Apple accepts for one-tap redemption.
 ///
@@ -153,10 +152,16 @@ enum RedeemLinkBuilder {
 /// Builds the URL for `web/gift.html` — the page that wraps the gift, plays the
 /// unwrapping, and only then hands over the redeem button.
 ///
-/// Everything the page needs rides in the URL **fragment**, not the query string.
-/// A fragment is never sent to the server, so the redeem code and the recipient's
-/// name stay out of access logs, referrers and any proxy in between. It also means
-/// the page itself stays a static file: one upload serves every gift.
+/// Everything the page needs rides in the URL, which keeps the page a static file:
+/// one upload serves every gift.
+///
+/// It used to ride in the **fragment**, which never reaches the server — the redeem
+/// code and the recipient's name stayed out of the host's logs. Messengers took that
+/// away: some linkify only up to the `#`, and since the fragment *is* the gift, the
+/// recipient tapped a link with nothing in it and got the sample card. A gift that
+/// doesn't arrive is worse than one that arrives visibly, so the payload sits in
+/// `?d=` and GitHub Pages can see it. The page sends `no-referrer` so it goes no
+/// further than the host already serving it.
 enum GiftLinkBuilder {
 
     /// Where the page is served from. A constant rather than a setting: it's the copy
@@ -166,6 +171,16 @@ enum GiftLinkBuilder {
     static let pageURL = "https://m1zz.github.io/GiftWrap/gift.html"
 
     /// Short keys — this ends up in a chat message, so the URL shouldn't be a wall.
+    ///
+    /// The block arrangement (~260 bytes) deliberately doesn't travel: the page draws
+    /// its own standard layout, the one the composer starts from. A card whose blocks
+    /// were dragged around arrives in the standard arrangement; the PNG and the printed
+    /// sheet still carry the custom placement.
+    ///
+    /// The icon URL does travel, spelled out like the store links beside it. The page
+    /// can look it up from the Apple ID instead — and still does when `i` is missing —
+    /// but a link that states its own icon draws it on the first paint, with nothing to
+    /// go wrong between the recipient and Apple's lookup endpoint.
     struct Payload: Codable, Equatable {
         var v = 1
         var n: String?          // app name
@@ -183,12 +198,6 @@ enum GiftLinkBuilder {
         var b: [String]?        // bloom colours
         var q: Bool?            // draw the QR block
         var k: Bool?            // draw the code chip on the card
-        /// Block id → [x, y, scale, width, height]. The arrangement from the composer,
-        /// so the page draws the card that was designed rather than one of its own.
-        /// Width and height are the footprint the block actually took in the preview,
-        /// in canvas points — the page renders in different fonts and would otherwise
-        /// run one block into the next. They're omitted when nothing measured it.
-        var l: [String: [Double]]?
         /// A rendered card image, if one is hosted somewhere. The page prefers it over
         /// redrawing. Left nil by default: the PNG is too big for a link, and putting
         /// it on a public URL would leak the recipient's name and message — the very
@@ -196,11 +205,7 @@ enum GiftLinkBuilder {
         var img: String?
     }
 
-    static func payload(
-        for draft: GiftDraft,
-        layout: CardLayout = .standard,
-        sizes: [String: CGSize] = [:]
-    ) -> Payload {
+    static func payload(for draft: GiftDraft) -> Payload {
         var payload = Payload()
         payload.n = draft.app?.name
         payload.d = nonEmpty(draft.app?.developer)
@@ -218,49 +223,26 @@ enum GiftLinkBuilder {
         payload.q = draft.showQRCode && draft.redeemURL != nil
         payload.k = draft.showCodeOnCard && draft.kind.requiresCode && !draft.trimmedCode.isEmpty
 
-        // Rounded hard — four decimals is finer than a pixel on a 1000pt card, and it
-        // keeps the link from doubling in length.
-        var blocks: [String: [Double]] = [:]
-        for block in CardBlock.allCases {
-            let placement = layout[block]
-            var values = [round(placement.x), round(placement.y), round(placement.scale)]
-            if let size = sizes[block.rawValue], size.width > 0, size.height > 0 {
-                values.append(contentsOf: [
-                    round(Double(size.width)), round(Double(size.height))
-                ])
-            }
-            blocks[block.rawValue] = values
-        }
-        payload.l = blocks
-
         if let expiry = draft.expiry, draft.kind.hasExpiry {
             payload.e = isoDay.string(from: expiry)
         }
         return payload
     }
 
-    private static func round(_ value: Double) -> Double {
-        (value * 10_000).rounded() / 10_000
-    }
-
-    /// `<pageURL>#<base64url payload>`, or nil until an app has been resolved.
-    static func url(
-        for draft: GiftDraft,
-        base: String = GiftLinkBuilder.pageURL,
-        layout: CardLayout = .standard,
-        sizes: [String: CGSize] = [:]
-    ) -> URL? {
+    /// `<pageURL>?d=<base64url payload>`, or nil until an app has been resolved.
+    static func url(for draft: GiftDraft, base: String = GiftLinkBuilder.pageURL) -> URL? {
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, draft.app != nil else { return nil }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = .withoutEscapingSlashes
-        guard let data = try? encoder.encode(payload(for: draft, layout: layout, sizes: sizes))
-        else { return nil }
+        guard let data = try? encoder.encode(payload(for: draft)) else { return nil }
 
-        // Strip any fragment the base already carries, then append our own.
-        let stem = trimmed.split(separator: "#", maxSplits: 1).first.map(String.init) ?? trimmed
-        return URL(string: stem + "#" + base64url(data))
+        // Strip any query or fragment the base already carries, then append our own.
+        // base64url's alphabet is A–Z a–z 0–9 - _, all legal unescaped in a query
+        // value, so the link stays free of % escapes and stays readable.
+        let stem = trimmed.split(whereSeparator: { $0 == "#" || $0 == "?" }).first.map(String.init) ?? trimmed
+        return URL(string: stem + "?d=" + base64url(data))
     }
 
     static func base64url(_ data: Data) -> String {

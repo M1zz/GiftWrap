@@ -138,6 +138,29 @@ extension CardLayout {
         return nil
     }
 
+    /// Pairs of blocks whose boxes run into each other.
+    ///
+    /// Growing a block is the easy way into this: the app icon at 145% reaches 220pt
+    /// down from its corner and lands on the message, which draws later and so covers
+    /// it. Nothing in the card itself objects, and the PNG bakes it in — so the editor
+    /// asks here and says something.
+    ///
+    /// `slack` forgives blocks that merely touch: text boxes carry a little leading
+    /// past their glyphs, and a 2pt kiss isn't what anyone means by overlapping.
+    func collisions(sizes: [String: CGSize], slack: CGFloat = 3) -> [(CardBlock, CardBlock)] {
+        var found: [(CardBlock, CardBlock)] = []
+        let blocks = CardBlock.allCases
+        for (index, a) in blocks.enumerated() {
+            guard let ra = rect(a, sizes: sizes) else { continue }
+            for b in blocks.dropFirst(index + 1) {
+                guard let rb = rect(b, sizes: sizes) else { continue }
+                let hit = ra.insetBy(dx: slack, dy: slack).intersection(rb.insetBy(dx: slack, dy: slack))
+                if !hit.isNull, hit.width > 0, hit.height > 0 { found.append((a, b)) }
+            }
+        }
+        return found
+    }
+
     /// Keeps a block on the card — one dragged or grown past an edge would be
     /// unreachable.
     static func clamped(_ origin: CGPoint, size: CGSize) -> CGPoint {

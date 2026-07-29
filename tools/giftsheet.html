@@ -1645,12 +1645,12 @@
   // ---------- gift page link ----------
   /*
    * The same wrapped link the macOS app builds: web/gift.html plus a base64url
-   * payload in the fragment. The fragment never reaches the server, so the code and
-   * the recipient's name stay out of access logs.
+   * payload in `?d=`. It was in the fragment, which the host never sees, until
+   * messengers started linkifying only up to the '#' and dropping the gift with it.
    *
-   * The card arrangement is not sent. This tool composes a printed CR80 card with a
-   * different set of blocks than the app's, so there is nothing to map onto; the page
-   * falls back to its default layout and shows the same content.
+   * The card arrangement is not sent — same as the app. This tool composes a printed
+   * CR80 card with a different set of blocks anyway, so there is nothing to map onto;
+   * the page draws its own layout and shows the same content.
    */
   var GIFT_PAGE = 'https://m1zz.github.io/GiftWrap/gift.html';
 
@@ -1681,7 +1681,7 @@
     if (theme.stops) payload.g = theme.stops.map(strip);
     if (theme.blooms) payload.b = theme.blooms.map(strip);
 
-    return GIFT_PAGE + '#' + b64url(JSON.stringify(payload));
+    return GIFT_PAGE + '?d=' + b64url(JSON.stringify(payload));
   }
 
   function updateShareText() {

@@ -30,10 +30,6 @@ final class ComposerModel: ObservableObject {
     @Published var layout: CardLayout = .load()
     @Published var selectedBlock: CardBlock?
 
-    /// How big each block drew in the preview, in canvas points. Handed to the gift
-    /// link so the web page can reserve the same footprint under different fonts.
-    @Published var blockSizes: [String: CGSize] = [:]
-
     func resetLayout() {
         layout = .standard
         layout.save()
@@ -45,7 +41,7 @@ final class ComposerModel: ObservableObject {
 
     /// The wrapped link. Nil only while no app has been resolved — at which point
     /// there's no redeem link either, so nothing is shareable yet.
-    var giftPageURL: URL? { GiftLinkBuilder.url(for: draft, layout: layout, sizes: blockSizes) }
+    var giftPageURL: URL? { GiftLinkBuilder.url(for: draft) }
 
     /// What goes in the message. The bare redeem URL is the fallback for a draft that
     /// somehow has a link but no page URL; in practice the two appear together.
@@ -137,7 +133,7 @@ final class ComposerModel: ObservableObject {
     func copyLink() {
         guard !link.isEmpty else { return }
         GiftExporter.copy(text: link)
-        status = "링크를 복사했습니다."
+        status = "프로모션 링크를 복사했습니다 — App Store로 바로 갑니다."
     }
 
     func copyMessage() {
@@ -160,7 +156,7 @@ final class ComposerModel: ObservableObject {
     func copyGiftLink() {
         guard let url = giftPageURL else { return }
         GiftExporter.copy(text: url.absoluteString)
-        status = "선물 링크를 복사했습니다."
+        status = "선물 페이지 링크를 복사했습니다 — 카드부터 열립니다."
     }
 
     func openGiftLink() {
@@ -262,10 +258,8 @@ final class ComposerModel: ObservableObject {
             if !entry.recipient.isEmpty { copy.recipient = entry.recipient }
             guard let url = copy.redeemURL else { continue }
 
-            // The wrapped link, same as the single-gift path. Block sizes come from the
-            // composed preview: the codes are all the same length, so the only piece
-            // that differs per recipient is their name, by a few points.
-            let giftURL = GiftLinkBuilder.url(for: copy, layout: layout, sizes: blockSizes)
+            // The wrapped link, same as the single-gift path.
+            let giftURL = GiftLinkBuilder.url(for: copy)
             let sendLink = giftURL?.absoluteString ?? url.absoluteString
 
             let stem = GiftExporter.fileStem(for: copy)

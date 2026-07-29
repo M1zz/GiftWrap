@@ -37,8 +37,7 @@ struct ComposerView: View {
                     draft: model.draft,
                     artwork: model.artwork,
                     layout: $model.layout,
-                    selection: $model.selectedBlock,
-                    onMeasure: { model.blockSizes = $0 }
+                    selection: $model.selectedBlock
                 )
                 .padding(28)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -229,14 +228,12 @@ struct ComposerView: View {
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    // The two redeem-link actions belong next to the link itself, not
-                    // in a menu away from the thing they act on.
-                    Button("복사") { model.copyLink() }
-                        .controlSize(.small)
                     Button("열기") { model.openLink() }
                         .controlSize(.small)
                 }
             }
+
+            copySection
 
             // Sending. Every way to hand the gift over, in one row and none of it hidden.
             HStack(spacing: 8) {
@@ -247,7 +244,6 @@ struct ComposerView: View {
                 }
                 .frame(width: 96, height: 28)
 
-                Button("선물 링크 복사") { model.copyGiftLink() }
                 Button("문구 복사") { model.copyMessage() }
                 Button("이미지 복사") { model.copyCardImage() }
                 Spacer()
@@ -274,6 +270,117 @@ struct ComposerView: View {
         }
         .padding(16)
         .background(.bar)
+    }
+
+    /// Two different links can end up on the clipboard, so neither button says just
+    /// "복사" — each names the link it copies, and both sit under one heading where
+    /// they can't be missed.
+    private var copySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("링크 복사", systemImage: "link")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                CopyLinkButton(
+                    title: "선물 페이지 링크 복사",
+                    subtitle: "카드가 먼저 열리는 선물 페이지",
+                    systemImage: "gift",
+                    isProminent: true
+                ) { model.copyGiftLink() }
+                .disabled(model.giftPageURL == nil)
+
+                CopyLinkButton(
+                    title: "프로모션 링크만 복사",
+                    subtitle: "App Store로 바로 가는 원본 링크",
+                    systemImage: "arrow.up.right.square",
+                    isProminent: false
+                ) { model.copyLink() }
+                .disabled(model.link.isEmpty)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.accentColor.opacity(0.07))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.22), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Copy buttons
+
+/// A copy action big enough to read at a glance: what it copies on the first line,
+/// what that link actually does on the second.
+@MainActor
+private struct CopyLinkButton: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let isProminent: Bool
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 18)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .opacity(0.75)
+                }
+                .lineLimit(1)
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(0.7)
+            }
+            .foregroundStyle(isProminent ? AnyShapeStyle(.white) : AnyShapeStyle(Color.primary))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(
+                        isProminent ? Color.clear : Color.primary.opacity(0.18),
+                        lineWidth: 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .opacity(isEnabled ? 1 : 0.4)
+        .onHover { isHovering = isEnabled && $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovering)
+        .help("\(title) — \(subtitle)")
+    }
+
+    private var background: some View {
+        Group {
+            if isProminent {
+                Color.accentColor
+            } else {
+                Color.primary.opacity(0.06)
+            }
+        }
+        .brightness(isHovering ? (isProminent ? 0.06 : 0.0) : 0)
+        .overlay(isHovering && !isProminent ? Color.primary.opacity(0.05) : Color.clear)
     }
 }
 

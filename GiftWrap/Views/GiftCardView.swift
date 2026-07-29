@@ -267,10 +267,8 @@ struct EditableCardPreview: View {
     @Binding var layout: CardLayout
     @Binding var selection: CardBlock?
 
-    /// Published outwards so the gift link can carry the footprint each block actually
-    /// took. The web page draws with different fonts and would otherwise overlap.
-    var onMeasure: (([String: CGSize]) -> Void)?
-
+    /// What each block measured, for hit-testing and snapping. It stays inside the
+    /// editor now — the gift link no longer carries block footprints.
     @State private var sizes: [String: CGSize] = [:]
     @State private var hover: CardBlock?
     @State private var drag: DragState?
@@ -333,8 +331,8 @@ struct EditableCardPreview: View {
             .onKeyPress { press in handle(press) }
             .onPreferenceChange(BlockSizeKey.self) { measured in
                 sizes = measured
-                onMeasure?(measured)
             }
+            .overlay(alignment: .bottom) { collisionBanner }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -357,6 +355,13 @@ struct EditableCardPreview: View {
                 .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
             }
 
+            // Overlap first, so a selected block still gets the accent outline on top.
+            ForEach(collidingBlocks, id: \.self) { block in
+                if let box = viewRect(block, scale: scale) {
+                    warningOutline(box)
+                }
+            }
+
             if let hover, hover != selection, let box = viewRect(hover, scale: scale) {
                 outline(box, strong: false)
             }
@@ -367,6 +372,70 @@ struct EditableCardPreview: View {
             }
         }
         .allowsHitTesting(false)
+    }
+
+    /// Says which two blocks are on top of each other, and offers the one move that
+    /// undoes it. It sits on the card rather than in the toolbar because that's where
+    /// the orange boxes are.
+    @ViewBuilder
+    private var collisionBanner: some View {
+        let pairs = layout.collisions(sizes: sizes)
+        if let (a, b) = pairs.first {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+
+                Text(
+                    pairs.count > 1
+                        ? "\(a.label)과 \(b.label)를 비롯해 \(pairs.count)곳이 겹칩니다"
+                        : "\(a.label)과 \(b.label)가 겹칩니다"
+                )
+                .font(.system(size: 12, weight: .medium))
+
+                Text("내보내는 이미지에도 그대로 나갑니다")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                Button("겹친 것만 되돌리기") { resetColliding() }
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.orange.opacity(0.5), lineWidth: 1))
+            .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+            .padding(.bottom, 10)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    /// Puts just the offending blocks back where they started, leaving the rest of the
+    /// arrangement alone — "배치 초기화" throws away everything, which is too much when
+    /// one enlarged icon is the problem.
+    private func resetColliding() {
+        for block in collidingBlocks {
+            layout[block] = CardLayout.standard[block]
+        }
+        layout.save()
+    }
+
+    /// Blocks currently running into another one, in card order.
+    private var collidingBlocks: [CardBlock] {
+        var hit: Set<CardBlock> = []
+        for (a, b) in layout.collisions(sizes: sizes) { hit.insert(a); hit.insert(b) }
+        return CardBlock.allCases.filter(hit.contains)
+    }
+
+    /// What the message-over-the-icon case looks like before you export it.
+    private func warningOutline(_ box: CGRect) -> some View {
+        RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .stroke(Color.orange, style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.orange.opacity(0.14))
+            )
+            .frame(width: box.width, height: box.height)
+            .offset(x: box.minX, y: box.minY)
     }
 
     private func outline(_ box: CGRect, strong: Bool) -> some View {
