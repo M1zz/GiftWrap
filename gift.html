@@ -4,13 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<!--
+  The gift rides in the query string, which means it is also in this page's own URL.
+  Without this, that URL would be handed to Apple and to the icon's CDN as a Referer
+  on the way out — so the payload would leak past the host that already has it.
+-->
+<meta name="referrer" content="no-referrer">
 <title>선물이 도착했어요</title>
 <style>
   /*
-   * One page, many gifts. Everything it shows arrives in the URL fragment, so the
-   * file is static and can sit on any host. The fragment never reaches the server,
-   * which is why the redeem code and the recipient's name live there rather than in
-   * a query string.
+   * One page, many gifts. Everything it shows arrives in the URL, so the file is
+   * static and can sit on any host.
+   *
+   * It used to arrive in the fragment, which never reaches the server — the redeem
+   * code and the recipient's name stayed out of the host's logs. Messengers broke
+   * that: some linkify only up to the '#', and the fragment IS the gift, so the
+   * recipient would tap a link that had lost everything in it. A gift that doesn't
+   * arrive beats a gift that arrives privately, so the payload moved to `?d=` and
+   * the host can see it. Fragments are still read, for links already sent.
    */
   :root {
     --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;   /* gradient stops, overwritten by the payload */
@@ -704,19 +715,32 @@
     q: true, k: true
   };
 
+  /**
+   * The payload, from `?d=` first and the fragment second.
+   *
+   * New links use the query string. The fragment is still read so that every link
+   * sent before the move keeps working — those are out in chat histories and can't
+   * be reissued.
+   */
+  function payloadFromURL() {
+    var d = new URLSearchParams(location.search).get('d');
+    if (d) return d;
+    return location.hash.replace(/^#/, '');
+  }
+
   var gift = DEMO, why = '';
-  var hash = location.hash.replace(/^#/, '');
-  if (!hash) {
+  var raw = payloadFromURL();
+  if (!raw) {
     why = '주소 뒤에 선물 내용이 없어서, 페이지가 어떻게 보이는지 알려 주는 예시를 대신 띄웠습니다. ' +
           '아래 이름과 아이콘은 실제 선물의 것이 아닙니다.';
   } else {
     try {
-      var parsed = JSON.parse(decode(hash));
+      var parsed = JSON.parse(decode(raw));
       if (parsed && typeof parsed === 'object') gift = parsed;
       else why = '선물 내용을 읽지 못했습니다.';
     } catch (e) {
       // A mangled link shouldn't show a blank page — say what happened and show the sample.
-      why = '선물 내용이 깨져 있습니다. 링크가 중간에 잘렸을 수 있으니 (# 뒤가 길어서) ' +
+      why = '선물 내용이 깨져 있습니다. 링크가 중간에 잘렸을 수 있으니 ' +
             '보낸 사람에게 다시 받아 보세요.';
     }
   }
@@ -727,7 +751,12 @@
 
   /* ---------- the card ---------- */
 
-  /** Matches CardLayout.standard, for links made before the layout travelled. */
+  /**
+   * Matches CardLayout.standard — the arrangement the composer starts from, and the
+   * one this page draws. A custom arrangement no longer rides in the link (it was
+   * ~260 bytes), so `gift.l` only appears on links made before that changed; when it
+   * does, it still wins.
+   */
   var FALLBACK_LAYOUT = {
     occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
     logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
@@ -767,9 +796,9 @@
    *
    * The app draws in SF Rounded and SF Mono; the browser has neither, so the same
    * words come out wider here and one block runs into the next — the code chip ends
-   * up under the QR. The link carries the box each block actually occupied, so we
-   * scale to that box and the arrangement holds. Without a measurement (older links)
-   * the block is left alone and only clamped.
+   * up under the QR. Links made while the composer sent its measurements carry the box
+   * each block occupied, and those scale to fit. Everything else is left at its own
+   * size and only clamped, with `separate()` below catching the overlap.
    */
   function fitBlocks() {
     var card = $('card');
@@ -810,11 +839,9 @@
   /**
    * Last resort against one block sitting on top of another.
    *
-   * With the composer's measurements the blocks already land where they were placed,
-   * so this finds nothing. It matters for a link made before those were sent, or if
-   * they were missing: the wider web text can push the code chip under the QR, and a
-   * recipient should never see that. The block on the left gives way, since the one
-   * on the right is where the eye is going.
+   * This is the working guard now that measurements don't travel: the wider web text
+   * can push the code chip under the QR, and a recipient should never see that. The
+   * block on the left gives way, since the one on the right is where the eye is going.
    */
   function separate() {
     var blocks = [].slice.call($('card').querySelectorAll('.blk'));
@@ -867,22 +894,73 @@
     paintBlocks();
   }
 
-  function paintBlocks() {
-    if (gift.o) place('occasion', node('div', '', gift.o));
-    place('badge', node('div', '', 'App Store에서 받기'));
+  /** The Apple ID, read back out of whichever link carries it. */
+  function appleID() {
+    var m = /(?:\/id|[?&]id=)(\d{5,})/.exec((gift.u || '') + ' ' + (gift.p || ''));
+    return m ? m[1] : null;
+  }
 
+  /**
+   * The icon.
+   *
+   * Normally the link states it (`i`), same as it states the store links, and it draws
+   * on the first paint. Older links and any payload that left it out fall back to
+   * asking Apple for it by app ID: the monogram goes up first and the icon replaces it
+   * when the lookup answers. If it never does — offline, blocked, an app that's been
+   * pulled — the monogram is what stays.
+   */
+  function placeLogo() {
     if (gift.i) {
       var img = node('img');
       img.src = gift.i;
       img.alt = (gift.n || '') + ' 아이콘';
       img.onerror = function () {
         img.remove();
-        place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+        lookupLogo(node('div', '', (gift.n || '?').trim().charAt(0)));
       };
       place('logo', img);
-    } else {
-      place('logo', node('div', '', (gift.n || '?').trim().charAt(0)));
+      return;
     }
+    lookupLogo(null);
+  }
+
+  /** Monogram now, real icon if Apple's lookup can name one. */
+  function lookupLogo(existing) {
+    var mono = existing || node('div', '', (gift.n || '?').trim().charAt(0));
+    place('logo', mono);
+
+    var id = appleID();
+    if (!id) return;
+
+    fetch('https://itunes.apple.com/lookup?id=' + id)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var app = data && data.results && data.results[0];
+        var src = app && (app.artworkUrl512 || app.artworkUrl100);
+        if (!src) return;
+
+        // Swap only once it has actually decoded, so the card never flashes a broken
+        // image frame between the monogram and the icon.
+        var img = node('img');
+        img.alt = (gift.n || '') + ' 아이콘';
+        img.onload = function () {
+          mono.replaceWith(img);
+          img.classList.add('blk', 'b-logo');
+          img.style.cssText = mono.style.cssText;
+          img.dataset.x = mono.dataset.x;
+          img.dataset.y = mono.dataset.y;
+          fitBlocks();
+        };
+        img.src = src;
+      })
+      .catch(function () { /* monogram stays */ });
+  }
+
+  function paintBlocks() {
+    if (gift.o) place('occasion', node('div', '', gift.o));
+    place('badge', node('div', '', 'App Store에서 받기'));
+
+    placeLogo();
 
     if (gift.n) {
       var title = node('div');
