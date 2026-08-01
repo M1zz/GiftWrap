@@ -653,7 +653,7 @@
         occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
         logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
         message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
-        code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+        code:     [0.4800, 0.7460], qr:     [0.8060, 0.6984]
       }
     },
     centered: {
@@ -664,7 +664,7 @@
       layout: {
         occasion: [0.4550, 0.0889], badge: [0.7670, 0.0762],
         logo:     [0.4240, 0.1524], title: [0.1800, 0.4159],
-        message:  [0.2000, 0.5968], code:  [0.4000, 0.7587],
+        message:  [0.2000, 0.5968], code:  [0.3480, 0.7587],
         people:   [0.0560, 0.7778], qr:    [0.8220, 0.7175]
       }
     },
@@ -676,7 +676,7 @@
         occasion: [0.0560, 0.0889], badge: [0.4600, 0.0762],
         logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
         message:  [0.0560, 0.5238], people: [0.0560, 0.7619],
-        qr:       [0.7890, 0.2857], code:  [0.7500, 0.5238]
+        qr:       [0.7890, 0.2857], code:  [0.7210, 0.5900, 0.85]
       }
     },
     poster: {
@@ -689,7 +689,7 @@
         logo:     [0.0560, 0.0889, 0.55], badge: [0.7670, 0.0984],
         occasion: [0.0560, 0.2540], title: [0.0560, 0.4603],
         message:  [0.0560, 0.6270], people: [0.0560, 0.7778],
-        code:     [0.5600, 0.7460], qr:    [0.8060, 0.6984]
+        code:     [0.4800, 0.7460], qr:    [0.8060, 0.6984]
       }
     },
     minimal: {
@@ -700,7 +700,7 @@
         occasion: [0.0900, 0.1429], badge: [0.7500, 0.0952],
         logo:     [0.0900, 0.2222, 0.75], title: [0.0900, 0.4381],
         message:  [0.0900, 0.6111], people: [0.0900, 0.7619],
-        code:     [0.5600, 0.7460], qr:    [0.8100, 0.6984]
+        code:     [0.4900, 0.7460], qr:    [0.8100, 0.6984]
       }
     }
   };
@@ -1048,14 +1048,34 @@
 
   function st() { return STYLES[draft.style]; }
 
-  /** A font size at the card scale × the style's scale × the block's own scale. */
+  /*
+   * The fit pass.
+   *
+   * `fit` holds a per-block multiplier that the layout knows nothing about: the user's
+   * own scale says how big they want a block, and this says how big it can actually be
+   * without landing on something else. It is recomputed from scratch on every draw and
+   * never saved — a card that fits stays exactly as composed.
+   *
+   * It exists because block sizes come from content, not from the layout. An App Store
+   * offer code is eighteen characters, and eighteen characters of monospace is half as
+   * wide again as the twelve the placements were first budgeted around; a long message
+   * runs to three lines where two were allowed for. Warning about that after the fact
+   * is no good when the card has already been sent.
+   */
+  var fit = {};
+  function fitOf(id) { return fit[id] || 1; }
+
+  /** The size a block is actually drawn at: what was asked for, times what fits. */
+  function eff(id) { return scaleOf(id) * fitOf(id); }
+
+  /** A font size at the card scale × the style's scale × the block's effective scale. */
   function fs(base, id) {
     var s = st();
     var emphasis = id === 'occasion' ? s.headlineScale : 1;
-    return Math.round(base * TYPE_SCALE * s.typeScale * emphasis * scaleOf(id));
+    return Math.round(base * TYPE_SCALE * s.typeScale * emphasis * eff(id));
   }
   /** Spacing that hangs off the type, so a resized block grows as a piece. */
-  function sp(base, id) { return base * scaleOf(id); }
+  function sp(base, id) { return base * eff(id); }
 
   function roundRect(c, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
@@ -1149,7 +1169,7 @@
     // ---- occasion
     var occText = (draft.occasion.trim() || W.defaultOccasion).toUpperCase();
     var occFont = '700 ' + fs(15, 'occasion') + 'px ' + SANS;
-    var occTrack = 4.5 * scaleOf('occasion') * (draft.style === 'poster' ? 0.30 : 1);
+    var occTrack = 4.5 * eff('occasion') * (draft.style === 'poster' ? 0.30 : 1);
     c.font = occFont;
     var occLines = s.headlineMaxWidth
       ? wrapText(c, occText, s.headlineMaxWidth, 2)
@@ -1182,8 +1202,8 @@
     });
 
     // ---- logo
-    var side = 152 * scaleOf('logo');
-    var radius = 34 * scaleOf('logo');
+    var side = 152 * eff('logo');
+    var radius = 34 * eff('logo');
     push('logo', side, side, function (g) {
       g.save();
       roundRect(g, 0, 0, side, side, radius);
@@ -1211,7 +1231,7 @@
     var devFont = '500 ' + fs(20, 'title') + 'px ' + SANS;
     var nameText = draft.app ? draft.app.name : W.placeholderApp;
     var devText = draft.app ? (draft.app.developer || '') : W.placeholderDev;
-    var titleBoxW = s.titleMaxWidth * scaleOf('title');
+    var titleBoxW = s.titleMaxWidth * eff('title');
     c.font = nameFont;
     var nameLines = wrapText(c, nameText, titleBoxW, 2);
     var nameLead = fs(44, 'title') * 1.15;
@@ -1232,7 +1252,7 @@
     // ---- message
     if (draft.message.trim()) {
       var msgFont = '400 ' + fs(25, 'message') + 'px ' + SANS;
-      var msgBoxW = s.messageMaxWidth * scaleOf('message');
+      var msgBoxW = s.messageMaxWidth * eff('message');
       c.font = msgFont;
       var msgLines = wrapText(c, draft.message.trim(), msgBoxW, 3);
       var msgLead = fs(25, 'message') * 1.28 + sp(7, 'message');
@@ -1297,12 +1317,12 @@
     // ---- qr
     var url = redeemURL();
     if (draft.showQR && url && window.QR) {
-      var q = 104 * scaleOf('qr');
-      var pad = 9 * scaleOf('qr');
+      var q = 104 * eff('qr');
+      var pad = 9 * eff('qr');
       var box = q + pad * 2;
       push('qr', box, box, function (g) {
         g.fillStyle = '#fff';
-        roundRect(g, 0, 0, box, box, 16 * scaleOf('qr'));
+        roundRect(g, 0, 0, box, box, 16 * eff('qr'));
         g.fill();
         var m = window.QR.matrix(url, 'M');
         var n = m.length;
@@ -1316,6 +1336,73 @@
       });
     }
 
+    return blocks;
+  }
+
+  /**
+   * Are two boxes too close? Not bare overlap — a gutter, because a code chip whose
+   * border just touches the QR panel reads as a mistake even though strictly nothing
+   * is on top of anything. 8 of 1000 card units is about a millimetre in the hand.
+   */
+  var GUTTER = 8;
+  function hits(a, b) {
+    return a.x - GUTTER < b.x + b.w && b.x - GUTTER < a.x + a.w &&
+           a.y - GUTTER < b.y + b.h && b.y - GUTTER < a.y + a.h;
+  }
+
+  /**
+   * The block that should give way, or null when the card is already clear.
+   *
+   * Artwork holds its size — a QR shrunk to fit is a QR that may not scan, and a
+   * shrunken icon just looks like a mistake. Between two pieces of text the earlier
+   * one yields, because the blocks low and right are the utilities (the code, the
+   * dates) that are anchored there on purpose, while the message above them is the
+   * part that can afford to be a little smaller.
+   */
+  function firstConflict(blocks) {
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (b.x + b.w > CANVAS.w + 1 || b.y + b.h > CANVAS.h + 1) return b.id;
+    }
+    for (var m = 0; m < blocks.length; m++) {
+      for (var n = m + 1; n < blocks.length; n++) {
+        var a = blocks[m], c2 = blocks[n];
+        if (!hits(a, c2)) continue;
+        var aArt = !!ARTWORK[a.id], cArt = !!ARTWORK[c2.id];
+        // Preferred yielder first, the other as a fallback: shrinking cannot move a
+        // block, so when one starts inside another there is nothing the preferred one
+        // can give up. Rather than grind it down to nothing, let the other — even
+        // artwork — take a little.
+        var order = aArt !== cArt ? (aArt ? [c2, a] : [a, c2])
+                  : (a.y !== c2.y ? (a.y < c2.y ? [a, c2] : [c2, a])
+                                  : (a.x <= c2.x ? [a, c2] : [c2, a]));
+        for (var q = 0; q < order.length; q++) {
+          var id = order[q].id;
+          if (fitOf(id) - 0.04 >= (ARTWORK[id] ? 0.75 : 0.5)) return id;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Measures the card, and shrinks whatever doesn't fit until nothing overlaps.
+   *
+   * Runs on every draw, so the preview, the PNG and the batch all get the same
+   * treatment — a card can't be sent with its code sitting under its QR. Blocks that
+   * already fit are left at exactly the size they were composed at.
+   */
+  function buildFittedBlocks(c) {
+    fit = {};
+    var blocks = buildBlocks(c);
+    for (var pass = 0; pass < 40; pass++) {
+      // firstConflict only nominates a block that still has room to give; when nothing
+      // does, it returns null and the editor's warning takes over.
+      var who = firstConflict(blocks);
+      if (!who) break;
+      fit[who] = fitOf(who) - 0.04;
+      blocks = buildBlocks(c);
+    }
     return blocks;
   }
 
@@ -1388,7 +1475,7 @@
       c.lineCap = 'butt';
     }
 
-    var blocks = buildBlocks(c);
+    var blocks = buildFittedBlocks(c);
     blocks.forEach(function (b) {
       c.save();
       c.translate(b.x, b.y);
@@ -1655,7 +1742,7 @@
       if (!p) return;
       var sel = editor.sel && findBlock(editor.sel);
       if (sel && hitsHandle(p, sel)) {
-        editor.resize = { id: sel.id, baseW: sel.rect.w / scaleOf(sel.id), ox: sel.rect.x };
+        editor.resize = { id: sel.id, baseW: sel.rect.w / eff(sel.id), ox: sel.rect.x };
         try { cv.setPointerCapture(e.pointerId); } catch (err) {}
         e.preventDefault();
         return;
