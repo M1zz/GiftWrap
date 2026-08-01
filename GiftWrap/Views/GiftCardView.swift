@@ -310,17 +310,39 @@ struct GiftCardView: View {
         }
     }
 
+    /**
+     * How much the code chip has to give back to fit beside the QR.
+     *
+     * Monospace is the one thing on this card whose width can be worked out rather
+     * than measured — every glyph is the same advance — so the chip can be sized
+     * against `codeMaxWidth` before it is drawn, instead of being found to overlap
+     * afterwards. 0.6em is SF Mono's advance.
+     */
+    private var codeFitScale: CGFloat {
+        let code = draft.trimmedCode
+        guard !code.isEmpty else { return 1 }
+        let size = t(18, .code)
+        let scale = placement.scale(.code)
+        let width = CGFloat(code.count) * size * 0.6
+            + CGFloat(max(0, code.count - 1)) * 2 * scale
+            + 20 * scale * 2
+        let limit = style.codeMaxWidth * scale
+        guard width > limit, width > 0 else { return 1 }
+        return max(0.55, limit / width)
+    }
+
     @ViewBuilder
     private var codeView: some View {
         if draft.showCodeOnCard, draft.kind.requiresCode, !draft.trimmedCode.isEmpty {
+            let fit = codeFitScale
             Text(draft.trimmedCode)
-                .font(.system(size: t(18, .code), weight: .medium, design: .monospaced))
-                .tracking(2 * placement.scale(.code))
+                .font(.system(size: t(18, .code) * fit, weight: .medium, design: .monospaced))
+                .tracking(2 * placement.scale(.code) * fit)
                 .foregroundStyle(theme.ink)
-                .padding(.horizontal, 20 * placement.scale(.code))
-                .padding(.vertical, 13 * placement.scale(.code))
+                .padding(.horizontal, 20 * placement.scale(.code) * fit)
+                .padding(.vertical, 13 * placement.scale(.code) * fit)
                 .background(
-                    RoundedRectangle(cornerRadius: 16 * placement.scale(.code), style: .continuous)
+                    RoundedRectangle(cornerRadius: 16 * placement.scale(.code) * fit, style: .continuous)
                         .stroke(style: StrokeStyle(lineWidth: 1.4, dash: [6, 5]))
                         .foregroundStyle(theme.ink.opacity(0.6))
                 )

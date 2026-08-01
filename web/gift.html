@@ -59,9 +59,11 @@
   }
   /* A flex item defaults to min-width:auto, which lets the card's intrinsic width
      push it past the screen. Pin it to 0 so max-width actually wins. */
+  /* 520 rather than 420: the card carries a code and a QR that have to be read and
+     scanned, and everything on it scales with this width. */
   .stage {
     position: relative; z-index: 1;
-    width: 100%; max-width: 420px; min-width: 0;
+    width: 100%; max-width: 520px; min-width: 0;
     text-align: center;
   }
   /* .card sets its own display, which would beat the UA rule for [hidden]. */
@@ -336,8 +338,10 @@
     padding: calc(.9cqw * var(--s)); background: #fff;
     border-radius: calc(1.6cqw * var(--s)); line-height: 0;
   }
+  /* Bigger than the composer draws it: this is the one that actually gets pointed at
+     with a camera, and on a phone-width card the old size was about 36 points across. */
   .b-qr svg {
-    display: block; width: calc(10.4cqw * var(--s)); height: calc(10.4cqw * var(--s));
+    display: block; width: calc(13cqw * var(--s)); height: calc(13cqw * var(--s));
   }
 
   .fine { margin: 14px 0 0; font-size: 12px; opacity: .6; line-height: 1.5; }
@@ -999,35 +1003,42 @@
       occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
       logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
       message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
-      code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+      code:     [0.4800, 0.7460], qr:     [0.8060, 0.6984]
     },
     centered: {
       occasion: [0.4550, 0.0889], badge: [0.7670, 0.0762],
       logo:     [0.4240, 0.1524], title: [0.1800, 0.4159],
-      message:  [0.2000, 0.5968], code:  [0.4000, 0.7587],
+      message:  [0.2000, 0.5968], code:  [0.3480, 0.7587],
       people:   [0.0560, 0.7778], qr:    [0.8220, 0.7175]
     },
     ticket: {
       occasion: [0.0560, 0.0889], badge: [0.4600, 0.0762],
       logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
       message:  [0.0560, 0.5238], people: [0.0560, 0.7619],
-      qr:       [0.7890, 0.2857], code:  [0.7500, 0.5238]
+      qr:       [0.7890, 0.2857], code:  [0.7210, 0.5900, 0.85]
     },
     poster: {
       logo:     [0.0560, 0.0889, 0.55], badge: [0.7670, 0.0984],
       occasion: [0.0560, 0.2540], title: [0.0560, 0.4603],
       message:  [0.0560, 0.6270], people: [0.0560, 0.7778],
-      code:     [0.5600, 0.7460], qr:    [0.8060, 0.6984]
+      code:     [0.4800, 0.7460], qr:    [0.8060, 0.6984]
     },
     minimal: {
       occasion: [0.0900, 0.1429], badge: [0.7500, 0.0952],
       logo:     [0.0900, 0.2222, 0.75], title: [0.0900, 0.4381],
       message:  [0.0900, 0.6111], people: [0.0900, 0.7619],
-      code:     [0.5600, 0.7460], qr:    [0.8100, 0.6984]
+      code:     [0.4900, 0.7460], qr:    [0.8100, 0.6984]
     }
   };
 
   var TYPE_SCALE = 1.18;            // GiftCardView.typeScale
+  /**
+   * The recipient's card is read at arm's length on a phone, where it is about 350
+   * points wide — at the composer's scale the code came out near 7px, which is a card
+   * you squint at rather than read. This is the one place the card is deliberately set
+   * larger than the composer draws it; the fit pass below is what makes that safe.
+   */
+  var CARD_TYPE_BOOST = 1.32;
   /** CardStyle.typeScale — a whole-card multiplier on top of TYPE_SCALE. */
   var STYLE_TYPE_SCALE = { classic: 1, centered: 1, ticket: 1, poster: 1, minimal: 0.88 };
   var ARTWORK = { logo: 1, qr: 1 }; // these spend their scale on the frame, not the type
@@ -1053,86 +1064,105 @@
     // original each time, or repeated passes would walk the block across the card.
     el.dataset.x = l[0];
     el.dataset.y = l[1];
-    if (l.length >= 5) { el.dataset.w = l[3]; el.dataset.h = l[4]; }
     el.style.left = (l[0] * 100).toFixed(3) + '%';
     el.style.top = (l[1] * 100).toFixed(3) + '%';
     var s = l[2] || 1;
-    if (ARTWORK[id]) el.style.setProperty('--s', s);
-    else el.style.setProperty('--t', (TYPE_SCALE * STYLE_TYPE_SCALE[style] * s).toFixed(4));
+    // The base size, kept so the fit pass below can scale it down and put it back.
+    el.dataset.artwork = ARTWORK[id] ? '1' : '';
+    el.dataset.base = ARTWORK[id] ? s : (TYPE_SCALE * CARD_TYPE_BOOST * STYLE_TYPE_SCALE[style] * s);
+    el.dataset.fit = '1';
+    applyFit(el);
     $('card').appendChild(el);
   }
 
+  /** Writes a block's size from its base × how much of it fits. */
+  function applyFit(el) {
+    var value = parseFloat(el.dataset.base) * parseFloat(el.dataset.fit);
+    el.style.setProperty(el.dataset.artwork ? '--s' : '--t', value.toFixed(4));
+  }
+
   /**
-   * Fit each block into the footprint the composer measured for it, then keep it on
-   * the card.
+   * Shrinks whatever doesn't fit until nothing on the card overlaps.
    *
-   * The app draws in SF Rounded and SF Mono; the browser has neither, so the same
-   * words come out wider here and one block runs into the next — the code chip ends
-   * up under the QR. Links made while the composer sent its measurements carry the box
-   * each block occupied, and those scale to fit. Everything else is left at its own
-   * size and only clamped, with `separate()` below catching the overlap.
+   * Block sizes come from content, not from the layout that placed them: an offer code
+   * is eighteen characters, a message may run to three lines, and this page draws in
+   * whatever fonts the phone has rather than the composer's SF Rounded. Any of those
+   * can push one block into the next, and the recipient is the last person who should
+   * be shown that.
+   *
+   * Artwork holds its size — a shrunken QR may not scan. Between two pieces of text
+   * the earlier one yields, because what sits low and right is the code and the dates,
+   * anchored there deliberately.
    */
   function fitBlocks() {
     var card = $('card');
     var cw = card.clientWidth, ch = card.clientHeight;
     if (!cw || !ch) return;
-    var unit = cw / 1000;   // card points → CSS pixels
+    var blocks = [].slice.call(card.querySelectorAll('.blk'));
+    if (!blocks.length) return;
 
-    [].forEach.call(card.querySelectorAll('.blk'), function (el) {
-      var target = parseFloat(el.dataset.w);
-
-      el.style.transform = '';
-      var k = 1;
-      if (target > 0 && el.offsetWidth > 0) {
-        // Only ever shrink: growing a block to fill a wider box would break the
-        // type scale the composer chose.
-        k = Math.min(1, (target * unit) / el.offsetWidth);
-        if (k < 0.999) {
-          el.style.transformOrigin = '0 0';
-          el.style.transform = 'scale(' + k.toFixed(4) + ')';
-        } else {
-          k = 1;
-        }
-      }
-
-      // scale() doesn't change offsetWidth, so the clamp works from the scaled size.
-      var w = el.offsetWidth * k;
-      var h = el.offsetHeight * k;
-      var x = parseFloat(el.dataset.x) * cw;
-      var y = parseFloat(el.dataset.y) * ch;
-      el.style.left = (Math.min(Math.max(x, 0), Math.max(0, cw - w)) / cw * 100).toFixed(3) + '%';
-      el.style.top = (Math.min(Math.max(y, 0), Math.max(0, ch - h)) / ch * 100).toFixed(3) + '%';
-      el._k = k;
+    blocks.forEach(function (el) {
+      el.dataset.fit = '1';
+      applyFit(el);
+      el.style.left = (parseFloat(el.dataset.x) * 100).toFixed(3) + '%';
+      el.style.top = (parseFloat(el.dataset.y) * 100).toFixed(3) + '%';
     });
 
-    separate();
-  }
-
-  /**
-   * Last resort against one block sitting on top of another.
-   *
-   * This is the working guard now that measurements don't travel: the wider web text
-   * can push the code chip under the QR, and a recipient should never see that. The
-   * block on the left gives way, since the one on the right is where the eye is going.
-   */
-  function separate() {
-    var blocks = [].slice.call($('card').querySelectorAll('.blk'));
-    blocks.forEach(function (a) {
-      var ra = a.getBoundingClientRect();
-      blocks.forEach(function (b) {
-        if (a === b) return;
-        var rb = b.getBoundingClientRect();
-        var vertical = ra.top < rb.bottom && rb.top < ra.bottom;
-        if (!vertical || ra.left >= rb.left || ra.right <= rb.left) return;
-
-        var room = rb.left - 6 - ra.left;
-        if (room <= 0) return;
-        var shrink = Math.max(0.4, room / (ra.width || 1));
-        a.style.transformOrigin = '0 0';
-        a.style.transform = 'scale(' + ((a._k || 1) * shrink).toFixed(4) + ')';
-        a._k = (a._k || 1) * shrink;
-        ra = a.getBoundingClientRect();
+    /*
+     * offset*, not getBoundingClientRect.
+     *
+     * The card is revealed with a `rise` animation that scales it, and a bounding rect
+     * reports the transformed size — so a pass running mid-animation measures a card
+     * a few percent smaller than the one that ends up on screen, decides everything
+     * fits, and stops. The animation never changes the layout box, so the
+     * ResizeObserver has nothing to report and the pass never runs again. offsetLeft
+     * and friends are layout values and ignore ancestor transforms entirely.
+     */
+    function boxes() {
+      return blocks.map(function (el) {
+        return { el: el, art: !!el.dataset.artwork,
+                 x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
       });
+    }
+
+    for (var pass = 0; pass < 30; pass++) {
+      var bs = boxes();
+      var who = null;
+
+      for (var i = 0; i < bs.length && !who; i++) {
+        if (bs[i].x + bs[i].w > cw + 1 || bs[i].y + bs[i].h > ch + 1) who = bs[i];
+      }
+      // A gutter, not bare non-overlap: a code chip whose border just touches the QR
+      // panel reads as a mistake even though nothing strictly overlaps.
+      var g = Math.max(3, cw * 0.008);
+      for (var m = 0; m < bs.length && !who; m++) {
+        for (var n = m + 1; n < bs.length && !who; n++) {
+          var a = bs[m], b = bs[n];
+          if (!(a.x - g < b.x + b.w && b.x - g < a.x + a.w &&
+                a.y - g < b.y + b.h && b.y - g < a.y + a.h)) continue;
+          // Preferred yielder first, the other as a fallback: shrinking cannot move a
+          // block, so when one starts inside another there is nothing the preferred
+          // one can give up. Rather than grind it down to nothing, let the other —
+          // even artwork — take a little.
+          var order = a.art !== b.art ? (a.art ? [b, a] : [a, b])
+                    : (a.y !== b.y ? (a.y < b.y ? [a, b] : [b, a])
+                                   : (a.x <= b.x ? [a, b] : [b, a]));
+          for (var q = 0; q < order.length && !who; q++) {
+            var cand = order[q];
+            if (parseFloat(cand.el.dataset.fit) - 0.04 >= (cand.art ? 0.75 : 0.5)) who = cand;
+          }
+        }
+      }
+      if (!who) break;
+
+      who.el.dataset.fit = String(parseFloat(who.el.dataset.fit) - 0.04);
+      applyFit(who.el);
+    }
+
+    // Whatever is left, keep it on the card.
+    boxes().forEach(function (b) {
+      b.el.style.left = (Math.min(Math.max(b.x, 0), Math.max(0, cw - b.w)) / cw * 100).toFixed(3) + '%';
+      b.el.style.top = (Math.min(Math.max(b.y, 0), Math.max(0, ch - b.h)) / ch * 100).toFixed(3) + '%';
     });
   }
 
@@ -1228,8 +1258,13 @@
           mono.replaceWith(img);
           img.classList.add('blk', 'b-logo');
           img.style.cssText = mono.style.cssText;
+          // Everything the fit pass reads has to come across too, or the icon lands
+          // with no base size and measures as NaN.
           img.dataset.x = mono.dataset.x;
           img.dataset.y = mono.dataset.y;
+          img.dataset.artwork = mono.dataset.artwork;
+          img.dataset.base = mono.dataset.base;
+          img.dataset.fit = mono.dataset.fit;
           fitBlocks();
         };
         img.src = src;

@@ -115,6 +115,23 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
         self == .poster ? 760 : nil
     }
 
+    /// How wide the code chip may grow before it has to shrink to fit.
+    ///
+    /// This one is measured against real data rather than guessed: an App Store offer
+    /// code is eighteen characters, and eighteen characters of monospace at this size
+    /// is a chip about 300 points wide — half as wide again as the twelve-character
+    /// codes these placements were first budgeted around. The limit is the clear run
+    /// from the chip's own left edge to whatever it would otherwise reach.
+    var codeMaxWidth: CGFloat {
+        switch self {
+        case .classic:  return 310   // 480 … the QR at 806
+        case .centered: return 458   // 348 … the QR at 822
+        case .ticket:   return 255   // 721 … the card's right margin
+        case .poster:   return 310
+        case .minimal:  return 304   // 490 … the QR at 810
+        }
+    }
+
     /// The diagonal highlight a laminated card catches. Minimal doesn't catch any.
     var sheenOpacity: Double {
         switch self {
@@ -164,7 +181,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.2360, y: 0.2484),
                 CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.5079),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7619),
-                CardBlock.code.rawValue:     BlockPlacement(x: 0.5600, y: 0.7460),
+                CardBlock.code.rawValue:     BlockPlacement(x: 0.4800, y: 0.7460),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8060, y: 0.6984)
             ]
 
@@ -186,7 +203,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.logo.rawValue:     BlockPlacement(x: 0.4240, y: 0.1524),
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.1800, y: 0.4159),
                 CardBlock.message.rawValue:  BlockPlacement(x: 0.2000, y: 0.5968),
-                CardBlock.code.rawValue:     BlockPlacement(x: 0.4000, y: 0.7587),
+                CardBlock.code.rawValue:     BlockPlacement(x: 0.3480, y: 0.7587),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7778),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8220, y: 0.7175)
             ]
@@ -206,7 +223,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.5238),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7619),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.7890, y: 0.2857),
-                CardBlock.code.rawValue:     BlockPlacement(x: 0.7500, y: 0.5238)
+                CardBlock.code.rawValue:     BlockPlacement(x: 0.7210, y: 0.5900, scale: 0.85)
             ]
 
         /*
@@ -225,7 +242,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.0560, y: 0.4603),
                 CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.6270),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7778),
-                CardBlock.code.rawValue:     BlockPlacement(x: 0.5600, y: 0.7460),
+                CardBlock.code.rawValue:     BlockPlacement(x: 0.4800, y: 0.7460),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8060, y: 0.6984)
             ]
 
@@ -243,7 +260,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.0900, y: 0.4381),
                 CardBlock.message.rawValue:  BlockPlacement(x: 0.0900, y: 0.6111),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0900, y: 0.7619),
-                CardBlock.code.rawValue:     BlockPlacement(x: 0.5600, y: 0.7460),
+                CardBlock.code.rawValue:     BlockPlacement(x: 0.4900, y: 0.7460),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8100, y: 0.6984)
             ]
         }
