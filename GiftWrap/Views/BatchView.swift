@@ -1,11 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Paste the 100 codes App Store Connect handed you, get 100 cards and 100 links back.
+/// Drop in the file App Store Connect handed you, get that many cards and links back.
 @MainActor
 struct BatchView: View {
     @ObservedObject var model: ComposerModel
     @EnvironmentObject private var ledger: GiftLedger
     @ObservedObject private var loc = Localization.shared
+
+    @State private var isDropTarget = false
 
     var body: some View {
         HSplitView {
@@ -16,14 +19,27 @@ struct BatchView: View {
                     .font(.system(size: 12, design: .monospaced))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.25))
+                            .stroke(
+                                isDropTarget ? Color.accentColor : Color.secondary.opacity(0.25),
+                                lineWidth: isDropTarget ? 2 : 1
+                            )
                     )
+                    // The file is the natural input here — five hundred codes is not
+                    // something anyone should be pasting, let alone typing.
+                    .onDrop(of: [.fileURL], isTargeted: $isDropTarget) { providers in
+                        load(from: providers)
+                    }
 
                 HStack {
                     Text(loc.s(T.batchRecognised(model.batchEntries.count)))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Spacer()
+                    Button(loc.s(T.batchImportCSV)) {
+                        if let url = GiftExporter.chooseFile(types: [.commaSeparatedText, .plainText]) {
+                            model.importCodes(from: url)
+                        }
+                    }
                     Button(loc.s(T.batchExport)) { model.exportBatch(into: ledger) }
                         .buttonStyle(.borderedProminent)
                         .disabled(model.draft.app == nil || model.batchEntries.isEmpty)
@@ -57,11 +73,24 @@ struct BatchView: View {
         }
     }
 
+    /// Pulls the first dropped file's URL out and hands it to the model.
+    private func load(from providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            guard let url else { return }
+            Task { @MainActor in model.importCodes(from: url) }
+        }
+        return true
+    }
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(loc.s(T.batchCodeList))
                 .font(.headline)
             Text(loc.s(T.batchHint))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(loc.s(T.batchCSVHint))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if model.draft.app == nil {

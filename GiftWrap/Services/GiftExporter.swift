@@ -46,6 +46,16 @@ enum GiftExporter {
         return url
     }
 
+    static func chooseFile(types: [UTType]) -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = types
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+
     static func chooseFolder(prompt: String = T.chooseFolder.text) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true

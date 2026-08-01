@@ -157,6 +157,14 @@
   .status { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; min-height: 1.2em; }
 
   .warn { color: #a15c00; }
+
+  .drop {
+    border: 2px dashed var(--line); border-radius: var(--radius);
+    padding: 20px; text-align: center; color: var(--ink-2); cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .drop.over { border-color: var(--accent); background: #f0f7ff; }
+  .drop strong { color: var(--ink); font-size: 14px; }
   .note {
     background: #fff8e6; border: 1px solid #f0dca8; border-radius: 10px;
     padding: 11px 13px; font-size: 13.5px; line-height: 1.55; margin-bottom: 14px;
@@ -353,8 +361,15 @@
       <div class="form">
         <section class="panel">
           <h2 data-i18n="batchCodeList">코드 목록</h2>
-          <span class="sub" data-i18n="batchHint"></span>
-          <textarea id="batchInput" rows="10" style="margin-top:8px; font-family:ui-monospace,Menlo,monospace"></textarea>
+
+          <div id="csvDrop" class="drop">
+            <strong data-i18n="csvDropTitle">CSV 파일을 여기에 끌어다 놓으세요</strong><br>
+            <span class="sub" data-i18n="csvDropSub">App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 고를 수도 있습니다</span>
+            <input type="file" id="csvFile" accept=".csv,.txt" hidden>
+          </div>
+
+          <span class="sub" data-i18n="batchHint" style="display:block; margin-top:11px"></span>
+          <textarea id="batchInput" rows="10" style="margin-top:6px; font-family:ui-monospace,Menlo,monospace"></textarea>
           <div class="row" style="margin-top:9px">
             <span class="sub" id="batchCount"></span>
             <button class="primary" id="batchCSV" style="margin-left:auto" data-i18n="batchExportCSV">CSV 내보내기</button>
@@ -474,6 +489,15 @@
       batchNote: '<b>한 줄에 코드 하나.</b> 받는 사람을 함께 적으려면 <code>코드, 이름</code> 형식으로 쓰세요. ' +
                  '카드 디자인·색상·문구는 ‘카드 만들기’ 탭 설정을 그대로 쓰고, 코드와 받는 사람만 줄마다 달라집니다.',
       batchCodeList: '코드 목록',
+      csvDropTitle: 'CSV 파일을 여기에 끌어다 놓으세요',
+      csvDropSub: 'App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 고를 수도 있습니다',
+      csvNoCodes: '코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.',
+      csvLoaded: function (name, n, dropped) {
+        return name + ' — 코드 ' + n + '개' + (dropped > 0 ? ' (중복·빈 줄 ' + dropped + '줄 제외)' : '');
+      },
+      confirmManyPNG: function (n) {
+        return n + '장을 각각 파일로 내려받습니다. 브라우저가 여러 파일 다운로드를 물어볼 수 있어요. 계속할까요?';
+      },
       batchHint: '한 줄에 하나씩. `코드, 이름` 형식도 됩니다.',
       batchRecognised: function (n) { return n + '개 인식됨'; },
       batchExportCSV: 'CSV 내보내기', batchExportPNG: 'PNG 전부 저장',
@@ -549,6 +573,16 @@
       batchNote: '<b>One code per line.</b> To name a recipient too, write <code>CODE, name</code>. ' +
                  'Design, colour and wording come from the Compose tab; only the code and the recipient change line by line.',
       batchCodeList: 'Codes',
+      csvDropTitle: 'Drop a CSV file here',
+      csvDropSub: 'The OfferCodeOneTimeUseCodes….csv from App Store Connect · or click to pick one',
+      csvNoCodes: 'No codes found. Check the file’s format.',
+      csvLoaded: function (name, n, dropped) {
+        return name + ' — ' + n + ' code' + (n === 1 ? '' : 's') +
+          (dropped > 0 ? ' (' + dropped + ' duplicate/blank line' + (dropped === 1 ? '' : 's') + ' skipped)' : '');
+      },
+      confirmManyPNG: function (n) {
+        return 'This saves ' + n + ' separate files, and the browser may ask about multiple downloads. Continue?';
+      },
       batchHint: 'One per line. `CODE, name` works too.',
       batchRecognised: function (n) { return n + ' recognised'; },
       batchExportCSV: 'Export CSV', batchExportPNG: 'Save every PNG',
@@ -2144,6 +2178,73 @@
     }).filter(Boolean);
   }
 
+  /**
+   * Reads the CSV App Store Connect hands you for one-time offer codes.
+   *
+   * The file has no header — the first line is already a code — and two columns:
+   * the code, and a redeem URL carrying `ctx`, the Apple ID and the code again. Both
+   * are read, because either one on its own is enough to place a code, and the URL is
+   * what tells us which app this batch is even for.
+   *
+   * Deliberately forgiving: a file exported with only the codes, or one pasted with
+   * quoting and trailing punctuation, still lands.
+   */
+  function parseCodeCSV(text) {
+    var out = [], seen = {};
+    text.split(/\r?\n/).forEach(function (line) {
+      line = line.trim();
+      if (!line) return;
+      var url = (line.match(/https?:\/\/\S*apps\.apple\.com\/\S*/i) || [])[0];
+      if (url) url = url.replace(/[",;]+$/, '');
+      var code = null, id = '', ctx = '';
+      if (url) {
+        code = (url.match(/[?&]code=([^&\s]+)/i) || [])[1] || null;
+        id = (url.match(/[?&]id=(\d+)/i) || [])[1] || '';
+        ctx = ((url.match(/[?&]ctx=(offercodes|apps)\b/i) || [])[1] || '').toLowerCase();
+      }
+      if (!code) {
+        var first = line.split(',')[0].trim().replace(/^"|"$/g, '');
+        if (/^[A-Z0-9]{8,24}$/i.test(first)) code = first;
+      }
+      if (!code) return;
+      code = decodeURIComponent(code).toUpperCase();
+      if (seen[code]) return;
+      seen[code] = true;
+      out.push({ code: code, id: id, ctx: ctx });
+    });
+    return out;
+  }
+
+  /** Takes a parsed file and sets up the whole batch from it. */
+  function ingestCodes(text, label) {
+    var parsed = parseCodeCSV(text);
+    if (!parsed.length) { $('batchStatus').textContent = t().csvNoCodes; return; }
+
+    $('batchInput').value = parsed.map(function (e) { return e.code; }).join('\n');
+
+    // The file says which kind of code these are, and it is the only thing here that
+    // actually knows. Marked as a deliberate choice so the lookup that follows doesn't
+    // infer its way back to a plain download link from an app that happens to be free.
+    var withCtx = parsed.find(function (e) { return e.ctx; });
+    if (withCtx) {
+      draft.kind = withCtx.ctx === 'apps' ? 'appPromoCode' : 'offerCode';
+      kindChosenManually = true;
+      syncForm();
+    }
+
+    // And which app they belong to, so the batch doesn't need a separate lookup.
+    var withID = parsed.find(function (e) { return e.id; });
+    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); }).length;
+    var dropped = lines - parsed.length;
+    $('batchStatus').textContent = t().csvLoaded(label, parsed.length, dropped);
+
+    if (withID && (!draft.app || String(draft.app.id) !== withID.id)) {
+      $('query').value = withID.id;
+      lookup();
+    }
+    renderBatchPreview();
+  }
+
   /** Runs `fn` with the draft temporarily set to one batch entry, then puts it back. */
   function withEntry(entry, fn) {
     var keepCode = draft.code, keepWho = draft.recipient;
@@ -2187,6 +2288,23 @@
   function bindBatch() {
     $('batchInput').addEventListener('input', renderBatchPreview);
 
+    var drop = $('csvDrop');
+    drop.addEventListener('click', function () { $('csvFile').click(); });
+    ['dragenter', 'dragover'].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (e) {
+      drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove('over'); });
+    });
+    drop.addEventListener('drop', function (ev) {
+      var f = ev.dataTransfer.files[0];
+      if (f) f.text().then(function (text) { ingestCodes(text, f.name); });
+    });
+    $('csvFile').addEventListener('change', function () {
+      var f = this.files[0];
+      if (f) f.text().then(function (text) { ingestCodes(text, f.name); });
+    });
+
     $('batchCSV').addEventListener('click', function () {
       if (!isReadyForBatch()) return;
       var rows = [['code', 'recipient', 'gift_link', 'redeem_link']];
@@ -2205,6 +2323,9 @@
     $('batchPNG').addEventListener('click', function () {
       if (!isReadyForBatch()) return;
       var entries = batchEntries();
+      // A file of offer codes runs to hundreds, and each card is a separate download.
+      // Worth asking before the browser starts a five-hundred-file prompt storm.
+      if (entries.length > 40 && !confirm(t().confirmManyPNG(entries.length))) return;
       var i = 0;
       (function next() {
         if (i >= entries.length) { $('batchStatus').textContent = t().batchDone(entries.length); return; }

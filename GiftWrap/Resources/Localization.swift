@@ -341,6 +341,27 @@ enum T {
         ko: "코드를 한 줄에 하나씩 넣어주세요.",
         en: "Put one code on each line."
     )
+    static let batchImportCSV = Loc(ko: "CSV 불러오기", en: "Load a CSV")
+    static let batchCSVHint = Loc(
+        ko: "App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv를 여기에 끌어다 놓아도 됩니다.",
+        en: "You can also drop the OfferCodeOneTimeUseCodes….csv from App Store Connect here."
+    )
+    static let batchCSVNone = Loc(
+        ko: "코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.",
+        en: "No codes found. Check the file's format."
+    )
+    static let batchCSVUnreadable = Loc(
+        ko: "파일을 읽지 못했습니다.",
+        en: "Couldn't read that file."
+    )
+    static func batchCSVLoaded(_ name: String, _ count: Int, _ skipped: Int) -> Loc {
+        Loc(
+            ko: "\(name) — 코드 \(count)개"
+                + (skipped > 0 ? " (중복·빈 줄 \(skipped)줄 제외)" : ""),
+            en: "\(name) — \(count) code\(count == 1 ? "" : "s")"
+                + (skipped > 0 ? " (\(skipped) duplicate/blank line\(skipped == 1 ? "" : "s") skipped)" : "")
+        )
+    }
 
     // MARK: Ledger
 

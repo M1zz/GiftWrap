@@ -272,6 +272,57 @@ final class ComposerModel: ObservableObject {
             }
     }
 
+    // MARK: Loading a file of codes
+
+    /// Takes the CSV App Store Connect exports and sets the whole batch up from it.
+    ///
+    /// The file knows three things the operator would otherwise re-enter by hand: the
+    /// codes, which app they belong to, and which kind of code they are. All three are
+    /// taken, which is the difference between dropping a file and transcribing one.
+    func importCodes(text: String, label: String) {
+        let parsed = CodeFileParser.parse(text)
+        guard !parsed.codes.isEmpty else {
+            errorMessage = T.batchCSVNone.text
+            return
+        }
+
+        batchInput = parsed.codes.joined(separator: "\n")
+        errorMessage = nil
+
+        if let context = parsed.context {
+            draft.kind = context == "apps" ? .appPromoCode : .offerCode
+            // The file stated it. Marked as deliberate so the lookup below doesn't
+            // infer its way back to a plain link from an app that happens to be free.
+            kindChosenManually = true
+        }
+
+        status = T.batchCSVLoaded(label, parsed.codes.count, parsed.skipped).text
+
+        if let id = parsed.appleID, draft.app?.id != id {
+            query = String(id)
+            Task { await lookup() }
+        }
+    }
+
+    func importCodes(from url: URL) {
+        let opened = url.startAccessingSecurityScopedResource()
+        defer { if opened { url.stopAccessingSecurityScopedResource() } }
+
+        guard let data = try? Data(contentsOf: url) else {
+            errorMessage = T.batchCSVUnreadable.text
+            return
+        }
+        // App Store Connect writes UTF-8, but a file that has been round-tripped through
+        // a spreadsheet can come back in the platform encoding.
+        let text = String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .isoLatin1)
+        guard let text else {
+            errorMessage = T.batchCSVUnreadable.text
+            return
+        }
+        importCodes(text: text, label: url.lastPathComponent)
+    }
+
     /// Writes one PNG + one HTML page per code into a folder, plus a manifest CSV.
     func exportBatch(into ledger: GiftLedger) {
         guard draft.app != nil else { return }

@@ -13,6 +13,7 @@
 		2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */; };
 		3F7A21C05E9B48D6A1C2E4F8 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4E13B7A26D05F8C3B1D7E2 /* Localization.swift */; };
 		6B08D5F41A73C29E4D8016BA /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27C09A648B1D3F5027EA9C1 /* CardStyle.swift */; };
+		D41F8A62B37E05C91D6402EA /* CodeFileParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C93E0D18AF264B305E17CA9 /* CodeFileParser.swift */; };
 		4BE4815B2A4DB6C622DC8053 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF87329F1F80F6102F683158 /* ContentView.swift */; };
 		56A382E1F0A2B9561E3D48E9 /* RedeemLinkBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2850266ADA0841E6486A3733 /* RedeemLinkBuilder.swift */; };
 		5D7368D8AC6904744441CA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */; };
@@ -42,6 +43,7 @@
 		92D098F8A1930D887B48048F /* GiftWrap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiftWrap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9C4E13B7A26D05F8C3B1D7E2 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		E27C09A648B1D3F5027EA9C1 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
+		7C93E0D18AF264B305E17CA9 /* CodeFileParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeFileParser.swift; sourceTree = "<group>"; };
 		A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BF87329F1F80F6102F683158 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreApp.swift; sourceTree = "<group>"; };
@@ -85,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				655F1B0203F77D9746E9D74C /* AppStoreLookupService.swift */,
+				7C93E0D18AF264B305E17CA9 /* CodeFileParser.swift */,
 				0401630E14090C990F6F144F /* GiftExporter.swift */,
 				D818B7D13288CDC40C1F8B2A /* GiftLedger.swift */,
 				012488A6DC2571086D479AEA /* QRCodeRenderer.swift */,
@@ -208,6 +211,7 @@
 				2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */,
 				7A61052B6333387B2DFECF6E /* GiftCard.swift in Sources */,
 				6B08D5F41A73C29E4D8016BA /* CardStyle.swift in Sources */,
+				D41F8A62B37E05C91D6402EA /* CodeFileParser.swift in Sources */,
 				F3ED5D3364B62739A5ACC98C /* GiftTheme.swift in Sources */,
 				1219DBCC20D2038519BDEB4B /* GiftPageTemplate.swift in Sources */,
 				3F7A21C05E9B48D6A1C2E4F8 /* Localization.swift in Sources */,
