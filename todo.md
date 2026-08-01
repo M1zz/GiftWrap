@@ -290,6 +290,30 @@
       캔버스가 패널을 넘침 · 세그먼트 컨트롤이 폭 전체로 늘어남
 - [x] 클립보드가 `file://`에서 항상 실패 — `execCommand` 폴백 추가
 
+### 배포 (gh-pages)
+
+- [x] `gh-pages` = `gift.html` + `studio.html` + `qr.js`. main의 `web/` 3개를 루트로 복사.
+      **주의**: gh-pages에는 `.gitignore`가 없어 `git add -A`가 `.DS_Store`·xcuserstate까지
+      쓸어담음 — 파일을 명시해서 add할 것
+- [x] 라이브에서 조회·5종·링크 생성까지 실동작 확인
+
+### Apple lookup API의 CORS 캐시 (해결)
+
+- [x] 증상 — 배포본에서만 앱 조회가 `TypeError: Failed to fetch`. 로컬에서는 정상
+- [x] 원인 — Apple이 `Access-Control-Allow-Origin`에 **요청한 오리진을 그대로 되돌려주는데**,
+      CDN이 그 헤더까지 캐시하면서 `Vary: Origin`을 붙이지 않음.
+      즉 그 URL을 처음 데운 사람이 "누가 읽을 수 있는지"를 정해 버림.
+      실제로 `country=kr` 응답에 제 로컬 테스트가 남긴
+      `access-control-allow-origin: http://127.0.0.1:8931`가 박혀 있었음
+- [x] 해결 — 요청마다 `cb=<nonce>`를 붙여 각자 캐시 항목과 헤더를 갖게 함.
+      조회는 버튼을 눌러야 일어나므로 포기하는 캐시는 원래 거의 없음.
+      `giftsheet.html`도 같은 노출이라 함께 수정
+- 진단 교훈 두 가지:
+  (1) 브라우저 콘솔에서 실행한 `fetch`는 확장 권한 컨텍스트라 **CORS를 우회**함 —
+      판정 근거로 쓸 수 없고, curl에 `Origin` 헤더를 실어 확인해야 함
+  (2) GitHub Pages HTML은 브라우저가 캐시함. 배포 검증은 쿼리스트링을 붙여 우회할 것
+      (안 그러면 stale 파일을 두고 "고쳐도 안 된다"를 반복하게 됨)
+
 ### 남은 확인
 
 - [ ] 앱에서 포스터·센터를 **메시지가 있는 상태로** 눈으로 확인 — osascript 보조 접근이
