@@ -1112,9 +1112,15 @@
     $('appName').textContent = t().lookingUp;
 
     // Korea first; fall back to the default storefront for apps not released here.
+    //
+    // The `cb` token is for CORS, not freshness: Apple echoes the asking Origin into
+    // `Access-Control-Allow-Origin` and its CDN caches that header without a
+    // `Vary: Origin`, so whoever warms a URL decides who else may read it. A token per
+    // request gives each caller its own entry, and its own header.
     function fetchIn(country) {
+      var nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
       var url = 'https://itunes.apple.com/lookup?id=' + encodeURIComponent(id) +
-        (country ? '&country=' + country : '');
+        (country ? '&country=' + country : '') + '&cb=' + nonce;
       return fetch(url).then(function (r) { return r.json(); });
     }
 
