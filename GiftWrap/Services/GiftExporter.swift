@@ -46,7 +46,7 @@ enum GiftExporter {
         return url
     }
 
-    static func chooseFolder(prompt: String = "이 폴더에 저장") -> URL? {
+    static func chooseFolder(prompt: String = T.chooseFolder.text) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
@@ -62,7 +62,7 @@ enum GiftExporter {
 
     // MARK: - Message text
 
-    /// The text you paste into KakaoTalk, iMessage, or an email.
+    /// The text you paste into a messenger, iMessage, or an email.
     /// Hands the message and the card to the system share sheet as one action, so the
     /// wrapping and the working link travel together instead of being pasted twice.
     static func share(text: String, image: NSImage?, from view: NSView) {
@@ -82,14 +82,18 @@ enum GiftExporter {
         case giftPage
     }
 
+    /// Written in the card's language, not the interface's — this is the recipient's copy.
     static func messageText(for draft: GiftDraft, link: String, style: LinkStyle = .redeem) -> String {
+        let language = draft.cardLanguage
         var lines: [String] = []
 
-        if !draft.recipient.isEmpty { lines.append("\(draft.recipient)님께") }
+        if !draft.recipient.isEmpty {
+            lines.append(C.toHonorific(draft.recipient).text(language))
+        }
 
         if style == .giftPage {
             lines.append("")
-            lines.append("🎁 선물이 도착했어요")
+            lines.append(C.giftArrived.text(language))
             lines.append(link)
         } else {
             if !draft.message.isEmpty { lines.append(draft.message) }
@@ -100,16 +104,13 @@ enum GiftExporter {
             lines.append(link)
 
             if draft.kind.requiresCode && !draft.trimmedCode.isEmpty {
-                lines.append("코드: \(draft.trimmedCode)")
-                lines.append("링크가 열리지 않으면 App Store → 프로필 → ‘기프트 카드 또는 코드 사용’에 입력하세요.")
+                lines.append(C.codeLine(draft.trimmedCode).text(language))
+                lines.append(C.manualRedeem.text(language))
             }
         }
 
         if let expiry = draft.expiry, draft.kind.hasExpiry {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "ko_KR")
-            formatter.dateFormat = "yyyy년 M월 d일"
-            lines.append("\(formatter.string(from: expiry))까지 사용 가능합니다.")
+            lines.append(C.usableUntil(expiry).text(language))
         }
 
         if !draft.sender.isEmpty {

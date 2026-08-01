@@ -9,23 +9,25 @@ enum GiftPageTemplate {
         let theme = draft.theme
         let stops = theme.hexStops
         let blooms = theme.hexBlooms
+        // The page is the recipient's, so every word on it comes from the card's language.
+        let language = draft.cardLanguage
         let appName = escape(app?.name ?? "")
         let developer = escape(app?.developer ?? "")
         let recipient = escape(draft.recipient)
         let sender = escape(draft.sender)
         let message = escape(draft.message).replacingOccurrences(of: "\n", with: "<br>")
-        let occasion = escape(draft.occasion.isEmpty ? "선물" : draft.occasion)
+        let occasion = escape(
+            draft.occasion.isEmpty ? C.defaultOccasion.text(language) : draft.occasion
+        )
         let code = escape(draft.trimmedCode)
         let iconTag = iconBase64.map {
-            "<img class=\"icon\" src=\"data:image/png;base64,\($0)\" alt=\"\(appName) 아이콘\">"
+            let alt = escape(C.iconAlt(app?.name ?? "").text(language))
+            return "<img class=\"icon\" src=\"data:image/png;base64,\($0)\" alt=\"\(alt)\">"
         } ?? "<div class=\"icon icon--placeholder\"></div>"
 
         let expiryLine: String
         if let expiry = draft.expiry, draft.kind.hasExpiry {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "ko_KR")
-            formatter.dateFormat = "yyyy년 M월 d일"
-            expiryLine = "<p class=\"fine\">\(formatter.string(from: expiry))까지 사용할 수 있어요.</p>"
+            expiryLine = "<p class=\"fine\">\(escape(C.usableUntil(expiry).text(language)))</p>"
         } else {
             expiryLine = ""
         }
@@ -33,23 +35,33 @@ enum GiftPageTemplate {
         let codeBlock = code.isEmpty ? "" : """
                 <div class="code-row">
                   <span class="code" id="code">\(code)</span>
-                  <button class="copy" type="button" onclick="copyCode()">코드 복사</button>
+                  <button class="copy" type="button" onclick="copyCode()">\(escape(C.copyCode.text(language)))</button>
                 </div>
-                <p class="fine">버튼이 열리지 않으면 App Store → 프로필 → ‘기프트 카드 또는 코드 사용’에 코드를 입력하세요.</p>
+                <p class="fine">\(escape(C.manualRedeemShort.text(language)))</p>
         """
 
-        let toLine = recipient.isEmpty ? "" : "<p class=\"to\">To. \(recipient)</p>"
-        let fromLine = sender.isEmpty ? "" : "<p class=\"from\">From. \(sender)</p>"
+        let toLine = recipient.isEmpty
+            ? ""
+            : "<p class=\"to\">\(escape(C.to(draft.recipient).text(language)))</p>"
+        let fromLine = sender.isEmpty
+            ? ""
+            : "<p class=\"from\">\(escape(C.from(draft.sender).text(language)))</p>"
+
+        let shareTitle = sender.isEmpty
+            ? occasion
+            : escape(C.sharedTitle(draft.sender, draft.occasion.isEmpty
+                ? C.defaultOccasion.text(language)
+                : draft.occasion).text(language))
 
         return """
         <!DOCTYPE html>
-        <html lang="ko">
+        <html lang="\(language.htmlLang)">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>\(appName) — \(occasion)</title>
-        <meta property="og:title" content="\(sender.isEmpty ? occasion : "\(sender)님이 보낸 \(occasion)")">
-        <meta property="og:description" content="\(appName) 받기">
+        <meta property="og:title" content="\(shareTitle)">
+        <meta property="og:description" content="\(escape(C.pageDescription(app?.name ?? "").text(language)))">
         <style>
           :root {
             --stop-0: \(stops[0]);
@@ -163,7 +175,7 @@ enum GiftPageTemplate {
               \(toLine)
               \(fromLine)
               <div class="actions">
-                <a class="cta" href="\(escape(link))">App Store에서 받기</a>
+                <a class="cta" href="\(escape(link))">\(escape(C.openInStore.text(language)))</a>
         \(codeBlock)
               </div>
               \(expiryLine)
@@ -176,7 +188,7 @@ enum GiftPageTemplate {
               navigator.clipboard.writeText(el.textContent.trim()).then(() => {
                 const button = document.querySelector('.copy');
                 const original = button.textContent;
-                button.textContent = '복사됨';
+                button.textContent = '\(escape(C.copiedCode.text(language)))';
                 setTimeout(() => { button.textContent = original; }, 1600);
               });
             }

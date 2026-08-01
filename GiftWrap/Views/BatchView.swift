@@ -5,6 +5,7 @@ import SwiftUI
 struct BatchView: View {
     @ObservedObject var model: ComposerModel
     @EnvironmentObject private var ledger: GiftLedger
+    @ObservedObject private var loc = Localization.shared
 
     var body: some View {
         HSplitView {
@@ -19,11 +20,11 @@ struct BatchView: View {
                     )
 
                 HStack {
-                    Text("\(model.batchEntries.count)개 인식됨")
+                    Text(loc.s(T.batchRecognised(model.batchEntries.count)))
                         .font(.callout)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("폴더로 내보내기") { model.exportBatch(into: ledger) }
+                    Button(loc.s(T.batchExport)) { model.exportBatch(into: ledger) }
                         .buttonStyle(.borderedProminent)
                         .disabled(model.draft.app == nil || model.batchEntries.isEmpty)
                 }
@@ -36,15 +37,17 @@ struct BatchView: View {
             .frame(minWidth: 380, idealWidth: 440)
 
             VStack(alignment: .leading, spacing: 12) {
-                Text("미리보기")
+                Text(loc.s(T.batchPreview))
                     .font(.headline)
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
 
-                GiftCardPreview(draft: previewDraft, artwork: model.artwork)
+                // The same arrangement the export uses — this preview is a promise
+                // about what lands in the folder.
+                GiftCardPreview(draft: previewDraft, artwork: model.artwork, layout: model.layout)
                     .padding(20)
 
-                Text("카드 색상·문구·메시지는 ‘카드 만들기’ 탭 설정을 그대로 씁니다. 코드와 받는 사람만 줄마다 달라집니다.")
+                Text(loc.s(T.batchPreviewNote))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 20)
@@ -56,13 +59,13 @@ struct BatchView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("코드 목록")
+            Text(loc.s(T.batchCodeList))
                 .font(.headline)
-            Text("한 줄에 하나씩. 받는 사람을 함께 적으려면 `코드, 이름` 형식으로 쓰세요.")
+            Text(loc.s(T.batchHint))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if model.draft.app == nil {
-                Label("먼저 ‘카드 만들기’ 탭에서 앱을 불러오세요.", systemImage: "info.circle")
+                Label(loc.s(T.batchNeedsApp), systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }

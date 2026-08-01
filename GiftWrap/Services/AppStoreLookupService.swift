@@ -9,11 +9,11 @@ enum LookupError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .badInput:
-            return "App Store 링크나 숫자 ID를 넣어주세요."
+            return T.lookupBadInput.text
         case .notFound:
-            return "해당 스토어프론트에서 앱을 찾지 못했습니다. 국가 코드를 확인해 주세요."
+            return T.lookupNotFound.text
         case .network(let message):
-            return "앱 정보를 불러오지 못했습니다. \(message)"
+            return T.lookupNetwork(message).text
         }
     }
 }

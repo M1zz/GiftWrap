@@ -7,7 +7,7 @@ import Foundation
 ///   Product page:                     the trackViewUrl returned by the lookup API
 ///
 /// If redemption fails on an older OS, the recipient can still paste the code into
-/// App Store → profile → "기프트 카드 또는 코드 사용".
+/// App Store → profile → "Redeem Gift Card or Code".
 enum RedeemLinkBuilder {
 
     static func url(
@@ -187,7 +187,7 @@ enum GiftLinkBuilder {
         var d: String?          // developer
         var i: String?          // icon URL
         var u: String?          // redeem URL
-        var p: String?          // product page, for "앱 열기" afterwards
+        var p: String?          // product page, for the "open the app" button afterwards
         var c: String?          // code, for the manual fallback
         var o: String?          // headline (the occasion line)
         var m: String?          // message
@@ -198,6 +198,16 @@ enum GiftLinkBuilder {
         var b: [String]?        // bloom colours
         var q: Bool?            // draw the QR block
         var k: Bool?            // draw the code chip on the card
+        /// The language the page should speak, as the sender chose it: "ko" or "en".
+        /// Not `l` — that key carried the block arrangement on links made before it
+        /// stopped travelling, and the page still reads those.
+        var lg: String?
+        /// Which of the five designs the card was composed in.
+        ///
+        /// The dragged arrangement still doesn't travel — it was ~260 bytes, and the
+        /// page draws each style's own defaults. The style itself is one short word,
+        /// and without it the recipient would open a Classic card whatever was composed.
+        var st: String?
         /// A rendered card image, if one is hosted somewhere. The page prefers it over
         /// redrawing. Left nil by default: the PNG is too big for a link, and putting
         /// it on a public URL would leak the recipient's name and message — the very
@@ -213,12 +223,16 @@ enum GiftLinkBuilder {
         payload.u = draft.redeemURL?.absoluteString
         payload.p = draft.app?.productURL?.absoluteString
         payload.c = draft.kind.requiresCode ? nonEmpty(draft.trimmedCode) : nil
-        payload.o = nonEmpty(draft.occasion) ?? "선물"
+        payload.o = nonEmpty(draft.occasion) ?? C.defaultOccasion.text(draft.cardLanguage)
         payload.m = nonEmpty(draft.message)
         payload.f = nonEmpty(draft.sender)
         payload.r = nonEmpty(draft.recipient)
         payload.g = draft.theme.hexStops.map(stripHash)
         payload.b = draft.theme.hexBlooms.map(stripHash)
+        // Always stated, so the page never has to guess from the recipient's browser
+        // what the sender already decided.
+        payload.lg = draft.cardLanguage.rawValue
+        payload.st = draft.style.rawValue
 
         payload.q = draft.showQRCode && draft.redeemURL != nil
         payload.k = draft.showCodeOnCard && draft.kind.requiresCode && !draft.trimmedCode.isEmpty

@@ -110,6 +110,17 @@
 
   .pagecount { font-size: 14px; color: var(--ink-2); margin-left: auto; }
 
+  /* Interface language. Sits in the header, out of the way of the work. */
+  .lang { margin-left: auto; display: flex; gap: 4px; }
+  .lang button {
+    padding: 4px 10px; font-size: 13px; border-radius: 999px;
+    color: var(--ink-2); background: none; border: 1px solid transparent;
+  }
+  .lang button:hover { background: #ebebed; color: var(--ink); }
+  .lang button[aria-pressed=true] {
+    color: var(--ink); background: #fff; border-color: var(--line); font-weight: 600;
+  }
+
   /* ================= gift card ================= */
   /*
    * Geometry follows the CR80 plastic-card standard used by real gift cards:
@@ -274,137 +285,165 @@
 <body>
 <div class="wrap">
 
+<!--
+  Two languages, two independent choices.
+
+  `data-i18n*` marks the text the operator reads; the switch in the header rewrites all
+  of it in place. The card's own words are a separate select in section 3, because they
+  are read by the recipient, not by whoever is running this.
+
+    data-i18n       → textContent      data-i18n-ph   → placeholder
+    data-i18n-html  → innerHTML        data-i18n-aria → aria-label
+-->
 <div class="noprint">
   <header class="top">
     <h1>GiftSheet</h1>
-    <span class="sub">App Store 오퍼코드 CSV → 기프트 카드 인쇄 · 전송용 메시지</span>
+    <span class="sub" data-i18n="tagline">App Store 오퍼코드 CSV → 기프트 카드 인쇄 · 전송용 메시지</span>
+    <div class="lang" id="uiLang">
+      <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+      <button type="button" data-lang="en" aria-pressed="false">English</button>
+    </div>
   </header>
 
-  <!-- 1. 코드 불러오기 -->
+  <!-- 1. Load the codes -->
   <section class="panel">
-    <h2>1 · 코드 불러오기</h2>
+    <h2 data-i18n="step1">1 · 코드 불러오기</h2>
     <div id="drop" class="drop">
-      <strong>CSV 파일을 여기에 끌어다 놓으세요</strong><br>
-      <span class="sub">App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 선택할 수도 있습니다</span>
+      <strong data-i18n="dropTitle">CSV 파일을 여기에 끌어다 놓으세요</strong><br>
+      <span class="sub" data-i18n="dropSub">App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 선택할 수도 있습니다</span>
       <input type="file" id="file" accept=".csv,.txt" hidden>
     </div>
     <details style="margin-top:12px">
-      <summary class="sub" style="cursor:pointer">직접 붙여넣기</summary>
-      <textarea id="paste" rows="4" placeholder="코드,리딤링크 형식 또는 링크만 한 줄에 하나씩" style="margin-top:8px"></textarea>
-      <button class="mini" id="pasteBtn" style="margin-top:6px">불러오기</button>
+      <summary class="sub" style="cursor:pointer" data-i18n="pasteInstead">직접 붙여넣기</summary>
+      <textarea id="paste" rows="4" data-i18n-ph="pastePlaceholder"
+                placeholder="코드,리딤링크 형식 또는 링크만 한 줄에 하나씩" style="margin-top:8px"></textarea>
+      <button class="mini" id="pasteBtn" style="margin-top:6px" data-i18n="load">불러오기</button>
     </details>
     <div id="loadStatus" class="sub" style="margin-top:10px"></div>
   </section>
 
-  <!-- 2. 앱 -->
+  <!-- 2. App -->
   <section class="panel">
-    <h2>2 · 앱 <span class="sub" style="font-weight:400">— 링크에서 자동으로 찾습니다</span></h2>
+    <h2 data-i18n-html="step2">2 · 앱 <span class="sub" style="font-weight:400">— 링크에서 자동으로 찾습니다</span></h2>
     <div class="appline">
       <img id="appIcon" alt="">
       <div style="flex:1">
-        <div id="appName" style="font-weight:600">코드를 불러오면 자동으로 채워집니다</div>
+        <div id="appName" style="font-weight:600" data-i18n="appNameIdle">코드를 불러오면 자동으로 채워집니다</div>
         <div id="appMeta" class="sub"></div>
       </div>
       <div class="field">
-        <label for="appId">Apple ID · 앱 링크 · 리딤 링크 — 아무거나 붙여넣으세요</label>
+        <label for="appId" data-i18n="appIdLabel">Apple ID · 앱 링크 · 리딤 링크 — 아무거나 붙여넣으세요</label>
         <div class="row" style="gap:6px">
-          <input type="text" id="appId" style="width:280px" placeholder="6759643878 또는 https://apps.apple.com/…">
-          <button class="mini" id="lookupBtn">조회</button>
+          <input type="text" id="appId" style="width:280px" data-i18n-ph="appIdPlaceholder"
+                 placeholder="6759643878 또는 https://apps.apple.com/…">
+          <button class="mini" id="lookupBtn" data-i18n="lookUp">조회</button>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 3. 카드 내용 -->
+  <!-- 3. What's on the card -->
   <section class="panel">
-    <h2>3 · 카드 내용</h2>
+    <h2 data-i18n="step3">3 · 카드 내용</h2>
     <div class="row">
       <div class="field">
-        <label for="value">액면 — 카드에서 가장 큰 글씨</label>
-        <input type="text" id="value" style="width:190px" value="1개월 무료" maxlength="18">
+        <label for="cardLang" data-i18n="cardLangLabel">카드 언어</label>
+        <select id="cardLang">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
       </div>
-      <div class="field" style="flex:1; min-width:230px">
-        <label for="message">메시지</label>
-        <input type="text" id="message" value="즐겁게 써 주세요" maxlength="46">
-      </div>
-      <div class="field">
-        <label for="sender">보내는 사람</label>
-        <input type="text" id="sender" style="width:130px" placeholder="예: 현호">
+      <div class="field" style="flex:1; min-width:240px">
+        <span class="sub" data-i18n="cardLangHint">받는 사람이 카드·QR 안내·전송 문구에서 읽는 언어입니다.</span>
       </div>
     </div>
     <div class="row" style="margin-top:12px">
       <div class="field">
-        <label for="theme">테마</label>
+        <label for="value" data-i18n="valueLabel">액면 — 카드에서 가장 큰 글씨</label>
+        <input type="text" id="value" style="width:190px" value="1개월 무료" maxlength="18">
+      </div>
+      <div class="field" style="flex:1; min-width:230px">
+        <label for="message" data-i18n="messageLabel">메시지</label>
+        <input type="text" id="message" value="즐겁게 써 주세요" maxlength="46">
+      </div>
+      <div class="field">
+        <label for="sender" data-i18n="senderLabel">보내는 사람</label>
+        <input type="text" id="sender" style="width:130px" data-i18n-ph="senderPlaceholder" placeholder="예: 현호">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field">
+        <label for="theme" data-i18n="themeLabel">테마</label>
         <select id="theme">
           <option value="sunrise">Sunrise</option>
           <option value="aurora" selected>Aurora</option>
           <option value="mint">Mint</option>
           <option value="blossom">Blossom</option>
           <option value="graphite">Graphite</option>
-          <option value="paper">Paper (흑백 · 잉크 절약)</option>
+          <option value="paper" data-i18n="themePaper">Paper (흑백 · 잉크 절약)</option>
         </select>
       </div>
       <div class="field">
-        <label for="expiry">유효기간 (선택)</label>
-        <input type="text" id="expiry" style="width:150px" placeholder="예: 2026.12.31까지">
+        <label for="expiry" data-i18n="expiryLabel">유효기간 (선택)</label>
+        <input type="text" id="expiry" style="width:150px" data-i18n-ph="expiryPlaceholder" placeholder="예: 2026.12.31까지">
       </div>
       <div class="field" style="flex:1; min-width:260px">
-        <label for="terms">약관 한 줄</label>
+        <label for="terms" data-i18n="termsLabel">약관 한 줄</label>
         <input type="text" id="terms" value="현금 교환·환불 불가 · 분실 시 재발행 불가 · 판매 목적 사용 불가">
       </div>
     </div>
   </section>
 
   <div class="tabs" role="tablist">
-    <button role="tab" data-tab="print" aria-selected="true">실물 인쇄</button>
-    <button role="tab" data-tab="send" aria-selected="false">디지털 전송</button>
-    <button role="tab" data-tab="ledger" aria-selected="false">배포 대장</button>
+    <button role="tab" data-tab="print" aria-selected="true" data-i18n="tabPrint">실물 인쇄</button>
+    <button role="tab" data-tab="send" aria-selected="false" data-i18n="tabSend">디지털 전송</button>
+    <button role="tab" data-tab="ledger" aria-selected="false" data-i18n="tabLedger">배포 대장</button>
   </div>
 
-  <!-- 실물 인쇄 -->
+  <!-- Print -->
   <section class="panel" id="tab-print">
-    <div class="note">
+    <div class="note" data-i18n-html="printNote">
       <b>1회용 코드라 같은 카드를 여러 장 찍을 수 없습니다.</b> 카드마다 코드가 달라야 하죠.
       대신 A4 한 장에 서로 다른 카드를 여러 개 얹어서 <b>한 번의 인쇄 작업</b>으로 뽑고 잘라 쓰면 됩니다.
       500장이라도 인쇄 버튼은 한 번만 누릅니다.
     </div>
     <div class="row">
       <div class="field">
-        <label for="preset">카드 규격</label>
+        <label for="preset" data-i18n="presetLabel">카드 규격</label>
         <select id="preset">
-          <option value="giftcard" selected>기프트 카드 85.6×54mm (CR80) — A4당 10장</option>
-          <option value="namecard">명함 90×50mm — A4당 10장</option>
-          <option value="wide">와이드 100×62mm — A4당 8장</option>
-          <option value="a6">엽서 A6 105×148mm — A4당 4장</option>
-          <option value="label24">라벨 63.5×33.9mm — A4당 24칸</option>
+          <option value="giftcard" selected data-i18n="presetGiftcard">기프트 카드 85.6×54mm (CR80) — A4당 10장</option>
+          <option value="namecard" data-i18n="presetNamecard">명함 90×50mm — A4당 10장</option>
+          <option value="wide" data-i18n="presetWide">와이드 100×62mm — A4당 8장</option>
+          <option value="a6" data-i18n="presetA6">엽서 A6 105×148mm — A4당 4장</option>
+          <option value="label24" data-i18n="presetLabel24">라벨 63.5×33.9mm — A4당 24칸</option>
         </select>
       </div>
       <div class="field">
-        <label for="sides">면</label>
+        <label for="sides" data-i18n="sidesLabel">면</label>
         <select id="sides">
-          <option value="single">단면 — 앞면에 코드까지</option>
-          <option value="duplex">양면 — 앞면 디자인 / 뒷면 코드</option>
+          <option value="single" data-i18n="sidesSingle">단면 — 앞면에 코드까지</option>
+          <option value="duplex" data-i18n="sidesDuplex">양면 — 앞면 디자인 / 뒷면 코드</option>
         </select>
       </div>
-      <div class="field"><label for="from">시작 번호</label><input type="number" id="from" value="1" min="1"></div>
-      <div class="field"><label for="count">장수</label><input type="number" id="count" value="20" min="1"></div>
-      <div class="field"><label for="offX">가로 보정 mm</label><input type="number" id="offX" value="0" step="0.5"></div>
-      <div class="field"><label for="offY">세로 보정 mm</label><input type="number" id="offY" value="0" step="0.5"></div>
+      <div class="field"><label for="from" data-i18n="startAt">시작 번호</label><input type="number" id="from" value="1" min="1"></div>
+      <div class="field"><label for="count" data-i18n="howMany">장수</label><input type="number" id="count" value="20" min="1"></div>
+      <div class="field"><label for="offX" data-i18n="nudgeX">가로 보정 mm</label><input type="number" id="offX" value="0" step="0.5"></div>
+      <div class="field"><label for="offY" data-i18n="nudgeY">세로 보정 mm</label><input type="number" id="offY" value="0" step="0.5"></div>
     </div>
     <div class="row" style="margin-top:12px">
-      <label><input type="checkbox" id="guides" checked> 재단선</label>
-      <label><input type="checkbox" id="showIcon" checked> 앱 아이콘</label>
-      <label><input type="checkbox" id="serial" checked> 일련번호</label>
-      <button class="primary" id="renderBtn">미리보기 만들기</button>
-      <button id="printBtn">인쇄 / PDF 저장</button>
+      <label><input type="checkbox" id="guides" checked> <span data-i18n="cutGuides">재단선</span></label>
+      <label><input type="checkbox" id="showIcon" checked> <span data-i18n="appIconToggle">앱 아이콘</span></label>
+      <label><input type="checkbox" id="serial" checked> <span data-i18n="serialToggle">일련번호</span></label>
+      <button class="primary" id="renderBtn" data-i18n="buildPreview">미리보기 만들기</button>
+      <button id="printBtn" data-i18n="printSave">인쇄 / PDF 저장</button>
       <span class="pagecount" id="pageCount"></span>
     </div>
     <div class="sub" id="printHint" style="margin-top:10px"></div>
   </section>
 
-  <!-- 디지털 전송 -->
+  <!-- Send -->
   <section class="panel" id="tab-send" hidden>
-    <div class="note">
+    <div class="note" data-i18n-html="sendNote">
       <b>이미지만 보내면 받는 사람이 못 씁니다.</b> 카톡으로 받은 사진 속 QR은 눌러도 아무 일이 없고,
       같은 폰에서는 스캔할 수도 없어서 결국 18자리를 손으로 옮겨 적게 됩니다.
       <ol>
@@ -417,46 +456,54 @@
     <div class="previewWrap">
       <div>
         <canvas id="cardCanvas" width="1240" height="880" tabindex="0"
+                data-i18n-aria="canvasLabel"
                 aria-label="기프트 카드 미리보기 — 요소를 끌어서 배치할 수 있습니다"></canvas>
         <div class="editorbar">
           <span class="sub" id="editorHint">카드 위의 요소를 끌어서 옮겨 보세요. 배치는 인쇄 카드에도 그대로 적용됩니다.</span>
-          <button class="mini" id="resetLayout" style="margin-left:auto">배치 초기화</button>
+          <button class="mini" id="resetLayout" style="margin-left:auto" data-i18n="resetLayout">배치 초기화</button>
         </div>
       </div>
       <div class="previewSide">
         <div class="field">
-          <label for="recipient">받는 사람 (선택 · 카드와 문구에 들어갑니다)</label>
-          <input type="text" id="recipient" placeholder="예: 지민">
+          <label for="recipient" data-i18n="recipientLabel">받는 사람 (선택 · 카드와 문구에 들어갑니다)</label>
+          <input type="text" id="recipient" data-i18n-ph="recipientPlaceholder" placeholder="예: 지민">
         </div>
         <div class="field" style="margin-top:10px">
-          <label for="shareText">보낼 문구</label>
+          <label for="shareText" data-i18n="shareTextLabel">보낼 문구</label>
           <textarea id="shareText" rows="9"></textarea>
         </div>
         <div class="row" style="margin-top:10px">
-          <button class="primary" id="copyText">문구 복사</button>
-          <button id="copyImg">이미지 복사</button>
-          <button id="saveImg">PNG 저장</button>
-          <button id="markSent">보냄 표시 + 다음</button>
+          <button class="primary" id="copyText" data-i18n="copyText">문구 복사</button>
+          <button id="copyImg" data-i18n="copyImg">이미지 복사</button>
+          <button id="saveImg" data-i18n="savePng">PNG 저장</button>
+          <button id="markSent" data-i18n="markSent">보냄 표시 + 다음</button>
         </div>
         <div class="sub" id="sendStatus" style="margin-top:8px"></div>
       </div>
     </div>
     <div style="margin-top:16px" class="row">
-      <input type="text" id="search" placeholder="코드 · 받는 사람 검색" style="flex:1;min-width:200px">
-      <label><input type="checkbox" id="hideSent"> 보낸 것 숨기기</label>
+      <input type="text" id="search" data-i18n-ph="searchPlaceholder"
+             placeholder="코드 · 받는 사람 검색" style="flex:1;min-width:200px">
+      <label><input type="checkbox" id="hideSent"> <span data-i18n="hideSent">보낸 것 숨기기</span></label>
     </div>
     <div class="list" id="sendList" style="margin-top:10px"></div>
   </section>
 
-  <!-- 배포 대장 -->
+  <!-- Ledger -->
   <section class="panel" id="tab-ledger" hidden>
     <div class="row" style="margin-bottom:12px">
       <span class="sub" id="ledgerSummary"></span>
-      <button class="mini" id="exportLedger" style="margin-left:auto">대장 CSV 내보내기</button>
-      <button class="mini" id="clearLedger">기록 지우기</button>
+      <button class="mini" id="exportLedger" style="margin-left:auto" data-i18n="exportLedger">대장 CSV 내보내기</button>
+      <button class="mini" id="clearLedger" data-i18n="clearLedger">기록 지우기</button>
     </div>
     <table class="ledger"><thead>
-      <tr><th style="width:56px">번호</th><th>코드</th><th style="width:150px">받는 사람</th><th style="width:110px">보낸 날</th><th style="width:70px"></th></tr>
+      <tr>
+        <th style="width:56px" data-i18n="thNo">번호</th>
+        <th data-i18n="thCode">코드</th>
+        <th style="width:150px" data-i18n="thWho">받는 사람</th>
+        <th style="width:110px" data-i18n="thSent">보낸 날</th>
+        <th style="width:70px"></th>
+      </tr>
     </thead><tbody id="ledgerBody"></tbody></table>
   </section>
 </div>
@@ -471,6 +518,340 @@
   'use strict';
 
   var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- interface language ----------
+  /*
+   * Everything the operator reads. Static labels come from the `data-i18n*` attributes
+   * in the markup; the rest is looked up here as it's built.
+   */
+  var UI = {
+    ko: {
+      tagline: 'App Store 오퍼코드 CSV → 기프트 카드 인쇄 · 전송용 메시지',
+      step1: '1 · 코드 불러오기',
+      dropTitle: 'CSV 파일을 여기에 끌어다 놓으세요',
+      dropSub: 'App Store Connect에서 받은 OfferCodeOneTimeUseCodes…csv · 클릭해서 선택할 수도 있습니다',
+      pasteInstead: '직접 붙여넣기',
+      pastePlaceholder: '코드,리딤링크 형식 또는 링크만 한 줄에 하나씩',
+      load: '불러오기',
+      step2: '2 · 앱 <span class="sub" style="font-weight:400">— 링크에서 자동으로 찾습니다</span>',
+      appNameIdle: '코드를 불러오면 자동으로 채워집니다',
+      appIdLabel: 'Apple ID · 앱 링크 · 리딤 링크 — 아무거나 붙여넣으세요',
+      appIdPlaceholder: '6759643878 또는 https://apps.apple.com/…',
+      lookUp: '조회',
+      step3: '3 · 카드 내용',
+      cardLangLabel: '카드 언어',
+      cardLangHint: '받는 사람이 카드·QR 안내·전송 문구에서 읽는 언어입니다.',
+      valueLabel: '액면 — 카드에서 가장 큰 글씨',
+      messageLabel: '메시지',
+      senderLabel: '보내는 사람',
+      senderPlaceholder: '예: 현호',
+      themeLabel: '테마',
+      themePaper: 'Paper (흑백 · 잉크 절약)',
+      expiryLabel: '유효기간 (선택)',
+      expiryPlaceholder: '예: 2026.12.31까지',
+      termsLabel: '약관 한 줄',
+      tabPrint: '실물 인쇄',
+      tabSend: '디지털 전송',
+      tabLedger: '배포 대장',
+      printNote: '<b>1회용 코드라 같은 카드를 여러 장 찍을 수 없습니다.</b> 카드마다 코드가 달라야 하죠. ' +
+        '대신 A4 한 장에 서로 다른 카드를 여러 개 얹어서 <b>한 번의 인쇄 작업</b>으로 뽑고 잘라 쓰면 됩니다. ' +
+        '500장이라도 인쇄 버튼은 한 번만 누릅니다.',
+      presetLabel: '카드 규격',
+      presetGiftcard: '기프트 카드 85.6×54mm (CR80) — A4당 10장',
+      presetNamecard: '명함 90×50mm — A4당 10장',
+      presetWide: '와이드 100×62mm — A4당 8장',
+      presetA6: '엽서 A6 105×148mm — A4당 4장',
+      presetLabel24: '라벨 63.5×33.9mm — A4당 24칸',
+      sidesLabel: '면',
+      sidesSingle: '단면 — 앞면에 코드까지',
+      sidesDuplex: '양면 — 앞면 디자인 / 뒷면 코드',
+      startAt: '시작 번호',
+      howMany: '장수',
+      nudgeX: '가로 보정 mm',
+      nudgeY: '세로 보정 mm',
+      cutGuides: '재단선',
+      appIconToggle: '앱 아이콘',
+      serialToggle: '일련번호',
+      buildPreview: '미리보기 만들기',
+      printSave: '인쇄 / PDF 저장',
+      sendNote: '<b>이미지만 보내면 받는 사람이 못 씁니다.</b> 카톡으로 받은 사진 속 QR은 눌러도 아무 일이 없고, ' +
+        '같은 폰에서는 스캔할 수도 없어서 결국 18자리를 손으로 옮겨 적게 됩니다.' +
+        '<ol><li><b>문구(링크 포함)를 먼저</b> 보내세요 — 링크를 누르면 App Store 리딤 창이 코드까지 채워진 채로 열립니다.</li>' +
+        '<li>이미지는 그 뒤에 <b>포장지로</b> 붙이세요.</li>' +
+        '<li>QR은 실물 카드용입니다. 남의 폰으로 스캔할 때만 제 역할을 합니다.</li></ol>' +
+        '그래서 아래 버튼은 <b>문구 복사</b>가 먼저, 이미지가 나중입니다.',
+      canvasLabel: '기프트 카드 미리보기 — 요소를 끌어서 배치할 수 있습니다',
+      resetLayout: '배치 초기화',
+      recipientLabel: '받는 사람 (선택 · 카드와 문구에 들어갑니다)',
+      recipientPlaceholder: '예: 지민',
+      shareTextLabel: '보낼 문구',
+      copyText: '문구 복사',
+      copyImg: '이미지 복사',
+      savePng: 'PNG 저장',
+      markSent: '보냄 표시 + 다음',
+      searchPlaceholder: '코드 · 받는 사람 검색',
+      hideSent: '보낸 것 숨기기',
+      exportLedger: '대장 CSV 내보내기',
+      clearLedger: '기록 지우기',
+      thNo: '번호', thCode: '코드', thWho: '받는 사람', thSent: '보낸 날',
+
+      // dynamic
+      blocks: { logo: '앱 로고', brand: '앱 이름', hero: '액면',
+                note: '메시지', code: '코드', fine: '약관', qr: 'QR' },
+      noCodes: '코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.',
+      pastedLabel: '붙여넣기',
+      loaded: function (label, n, dropped) {
+        return label + ' — 코드 ' + n + '개' +
+          (dropped > 0 ? ' (중복·머리글 ' + dropped + '줄 제외)' : '');
+      },
+      noAppleID: '이 값에서는 Apple ID를 찾지 못했습니다',
+      noAppleIDHint: '숫자 ID, 앱 링크, 리딤 링크 중 아무거나 넣어도 됩니다.',
+      lookingUp: '조회 중…',
+      lookupFailed: function (id) { return '앱 정보를 불러오지 못했습니다 (ID ' + id + ')'; },
+      lookupFailedHint: '오프라인이거나 ID가 잘못됐을 수 있습니다. 카드는 그대로 만들 수 있어요.',
+      loadFirst: '먼저 코드를 불러오세요.',
+      pageCount: function (cards, sheets, perPage) {
+        return cards + '장 · A4 ' + sheets + '쪽 · 한 장당 ' + perPage + '개';
+      },
+      faceFront: function (n) { return '앞면 ' + n; },
+      faceBack: function (n) { return '뒷면 ' + n; },
+      hintDuplex: '양면 인쇄는 프린터 설정에서 <b>양면 · 긴 쪽 넘기기</b>를 고르세요. 뒷면 페이지는 이미 좌우를 뒤집어 두었습니다.',
+      hintSmallQR: function (mm) {
+        return '<span class="warn">QR이 약 ' + mm + 'mm로 작습니다. 카메라를 가까이 대야 인식됩니다 — 더 큰 규격을 권합니다.</span>';
+      },
+      hintCR80: 'CR80 규격입니다. 3mm 모서리 펀치로 모서리를 둥글리면 실물 기프트 카드와 같은 형태가 됩니다.',
+      editorSelected: function (name) {
+        return name + ' 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절';
+      },
+      editorWasReset: '글자 크기가 커져서 저장해 둔 배치를 기본값으로 되돌렸습니다. 다시 옮기면 저장됩니다.',
+      editorChanged: '배치를 바꿨습니다. 인쇄 카드에도 그대로 적용됩니다.',
+      editorIdle: '카드 위의 요소를 끌어서 옮겨 보세요. 배치는 인쇄 카드에도 그대로 적용됩니다.',
+      whoPlaceholder: '받는 사람',
+      picked: '선택됨',
+      pick: '고르기',
+      undo: '해제',
+      noMatch: '조건에 맞는 코드가 없습니다.',
+      loadCSVFirst: '먼저 CSV를 불러오세요.',
+      ledgerSummary: function (total, sent) {
+        return '전체 ' + total + '개 중 보냄 ' + sent + '개 · 남은 코드 ' + (total - sent) + '개';
+      },
+      ledgerIdle: '코드를 불러오면 집계됩니다.',
+      copiedText: '문구를 복사했습니다. 링크를 먼저 보내세요.',
+      copyTextFailed: '복사에 실패했습니다. 문구를 직접 선택해 주세요.',
+      noImageCopy: '이 브라우저는 이미지 복사를 지원하지 않습니다. PNG로 저장해 주세요.',
+      copiedImage: '이미지를 복사했습니다.',
+      copyImageFailed: '이미지 복사에 실패했습니다. PNG로 저장해 주세요.',
+      layoutReset: '배치를 기본값으로 되돌렸습니다.',
+      markedSent: '보냄으로 기록했습니다. 다음 코드로 넘어갔어요.',
+      confirmClear: '배포 기록을 모두 지웁니다. 계속할까요?'
+    },
+    en: {
+      tagline: 'App Store offer-code CSV → printed gift cards and a message to send',
+      step1: '1 · Load the codes',
+      dropTitle: 'Drop a CSV file here',
+      dropSub: 'The OfferCodeOneTimeUseCodes….csv from App Store Connect · or click to pick one',
+      pasteInstead: 'Paste it instead',
+      pastePlaceholder: 'code,redeem-link — or just links, one per line',
+      load: 'Load',
+      step2: '2 · App <span class="sub" style="font-weight:400">— found from the link automatically</span>',
+      appNameIdle: 'Fills in once the codes are loaded',
+      appIdLabel: 'Apple ID · app link · redeem link — paste any of them',
+      appIdPlaceholder: '6759643878 or https://apps.apple.com/…',
+      lookUp: 'Look up',
+      step3: '3 · What goes on the card',
+      cardLangLabel: 'Card language',
+      cardLangHint: 'The language the recipient reads on the card, the QR caption and the message.',
+      valueLabel: 'Value — the biggest type on the card',
+      messageLabel: 'Message',
+      senderLabel: 'From',
+      senderPlaceholder: 'e.g. Hyunho',
+      themeLabel: 'Theme',
+      themePaper: 'Paper (mono · saves ink)',
+      expiryLabel: 'Valid until (optional)',
+      expiryPlaceholder: 'e.g. through Dec 31, 2026',
+      termsLabel: 'Terms, one line',
+      tabPrint: 'Print',
+      tabSend: 'Send',
+      tabLedger: 'Ledger',
+      printNote: '<b>The codes are single-use, so you can’t run off copies of one card.</b> ' +
+        'Every card needs a different code. What you can do is lay many different cards on one ' +
+        'A4 sheet and get them all in <b>a single print job</b>, then cut them apart. ' +
+        'Five hundred cards, one press of Print.',
+      presetLabel: 'Card size',
+      presetGiftcard: 'Gift card 85.6×54mm (CR80) — 10 per A4',
+      presetNamecard: 'Business card 90×50mm — 10 per A4',
+      presetWide: 'Wide 100×62mm — 8 per A4',
+      presetA6: 'Postcard A6 105×148mm — 4 per A4',
+      presetLabel24: 'Label 63.5×33.9mm — 24 per A4',
+      sidesLabel: 'Sides',
+      sidesSingle: 'Single — code on the front',
+      sidesDuplex: 'Double — design front, code back',
+      startAt: 'Start at',
+      howMany: 'How many',
+      nudgeX: 'Nudge X mm',
+      nudgeY: 'Nudge Y mm',
+      cutGuides: 'Cut guides',
+      appIconToggle: 'App icon',
+      serialToggle: 'Serial number',
+      buildPreview: 'Build the preview',
+      printSave: 'Print / save PDF',
+      sendNote: '<b>Send only the image and the recipient can’t use it.</b> A QR inside a photo in a chat ' +
+        'does nothing when tapped, and it can’t be scanned by the phone showing it — so they end up ' +
+        'copying eighteen characters by hand.' +
+        '<ol><li><b>Send the message, link and all, first</b> — tapping the link opens the App Store ' +
+        'redeem sheet with the code already filled in.</li>' +
+        '<li>Send the image after that, as <b>the wrapping</b>.</li>' +
+        '<li>The QR is for the printed card. It earns its place only when someone else’s phone scans it.</li></ol>' +
+        'Which is why <b>Copy message</b> comes first below, and the image second.',
+      canvasLabel: 'Gift card preview — drag the pieces to arrange them',
+      resetLayout: 'Reset layout',
+      recipientLabel: 'Recipient (optional · appears on the card and in the message)',
+      recipientPlaceholder: 'e.g. Jimin',
+      shareTextLabel: 'The message to send',
+      copyText: 'Copy message',
+      copyImg: 'Copy image',
+      savePng: 'Save PNG',
+      markSent: 'Mark sent + next',
+      searchPlaceholder: 'Search codes and recipients',
+      hideSent: 'Hide the sent ones',
+      exportLedger: 'Export ledger CSV',
+      clearLedger: 'Clear the record',
+      thNo: 'No.', thCode: 'Code', thWho: 'Recipient', thSent: 'Sent',
+
+      // dynamic
+      blocks: { logo: 'App logo', brand: 'App name', hero: 'Value',
+                note: 'Message', code: 'Code', fine: 'Terms', qr: 'QR' },
+      noCodes: 'No codes found. Check the file’s format.',
+      pastedLabel: 'Pasted text',
+      loaded: function (label, n, dropped) {
+        return label + ' — ' + n + ' code' + (n === 1 ? '' : 's') +
+          (dropped > 0 ? ' (' + dropped + ' duplicate/header line' + (dropped === 1 ? '' : 's') + ' skipped)' : '');
+      },
+      noAppleID: 'No Apple ID to be found in that',
+      noAppleIDHint: 'A numeric ID, an app link or a redeem link all work.',
+      lookingUp: 'Looking it up…',
+      lookupFailed: function (id) { return 'Couldn’t load the app’s details (ID ' + id + ')'; },
+      lookupFailedHint: 'You may be offline, or the ID may be wrong. You can still make the card.',
+      loadFirst: 'Load the codes first.',
+      pageCount: function (cards, sheets, perPage) {
+        return cards + ' cards · ' + sheets + ' A4 page' + (sheets === 1 ? '' : 's') +
+          ' · ' + perPage + ' per sheet';
+      },
+      faceFront: function (n) { return 'FRONT ' + n; },
+      faceBack: function (n) { return 'BACK ' + n; },
+      hintDuplex: 'For double-sided printing choose <b>two-sided, flip on long edge</b> in the printer’s ' +
+        'settings. The back pages are already mirrored left-to-right.',
+      hintSmallQR: function (mm) {
+        return '<span class="warn">The QR comes out around ' + mm + 'mm, which is small. A camera will ' +
+          'have to get close — a larger size is worth considering.</span>';
+      },
+      hintCR80: 'This is the CR80 size. Round the corners with a 3mm punch and it has the shape of a real gift card.',
+      editorSelected: function (name) {
+        return name + ' selected — drag to move (arrow keys to nudge), resize with the corner grip or +/−';
+      },
+      editorWasReset: 'The type got bigger, so the saved arrangement went back to the default. Move something and it saves again.',
+      editorChanged: 'You’ve changed the arrangement. The printed card keeps it.',
+      editorIdle: 'Drag the pieces of the card around. The printed card keeps whatever you arrange.',
+      whoPlaceholder: 'Recipient',
+      picked: 'Selected',
+      pick: 'Pick',
+      undo: 'Undo',
+      noMatch: 'No codes match.',
+      loadCSVFirst: 'Load a CSV first.',
+      ledgerSummary: function (total, sent) {
+        return sent + ' of ' + total + ' sent · ' + (total - sent) + ' left';
+      },
+      ledgerIdle: 'Counts appear once the codes are loaded.',
+      copiedText: 'Copied the message. Send the link first.',
+      copyTextFailed: 'Copying failed. Select the text yourself.',
+      noImageCopy: 'This browser can’t copy images. Save a PNG instead.',
+      copiedImage: 'Copied the image.',
+      copyImageFailed: 'Copying the image failed. Save a PNG instead.',
+      layoutReset: 'Put the arrangement back to the default.',
+      markedSent: 'Recorded as sent, and moved on to the next code.',
+      confirmClear: 'This clears the whole distribution record. Continue?'
+    }
+  };
+
+  // ---------- card language ----------
+  /*
+   * The words the recipient reads. A separate choice from the interface language: the
+   * operator may well be working in Korean while sending to someone who reads English.
+   * Matches the macOS app, which carries the same choice on the draft.
+   *
+   * Named CARDTEXT, not CARD — the drag editor below already owns `CARD` for the card's
+   * rectangle on the canvas.
+   */
+  var CARDTEXT = {
+    ko: {
+      kicker: '기프트 카드',
+      scan: '스캔해서 받기',
+      to: 'to. ',
+      from: 'from. ',
+      issuerSuffix: ' · App Store 기프트 카드',
+      howToLabel: '사용 방법',
+      howToSteps: '1. QR을 스캔하면 App Store가 열립니다\n2. 코드가 채워진 화면에서 사용을 누르세요',
+      defaultValue: '1개월 무료',
+      defaultMessage: '즐겁게 써 주세요',
+      defaultTerms: '현금 교환·환불 불가 · 분실 시 재발행 불가 · 판매 목적 사용 불가',
+      fallbackAppName: '앱',
+      // The message that travels with the link.
+      toHonorific: function (who) { return who + '님께'; },
+      giftArrived: '🎁 선물이 도착했어요',
+      plainHeadline: function (who, name, value) {
+        return '🎁 ' + (who ? who + '님, ' : '') + '‘' + name + '’ 기프트 카드가 도착했어요' +
+          (value ? ' — ' + value : '');
+      },
+      tapHint: '아래 링크를 누르면 App Store가 열리고 코드까지 자동으로 입력됩니다.',
+      manualLead: '링크가 안 열릴 때는',
+      manualSteps: 'App Store 앱 → 오른쪽 위 프로필 → ‘기프트 카드 또는 코드 사용’ → 아래 코드 입력'
+    },
+    en: {
+      kicker: 'GIFT CARD',
+      scan: 'Scan to redeem',
+      to: 'to. ',
+      from: 'from. ',
+      issuerSuffix: ' · App Store gift card',
+      howToLabel: 'HOW TO USE',
+      howToSteps: '1. Scan the QR and the App Store opens\n2. Tap Redeem on the screen with the code filled in',
+      defaultValue: '1 MONTH FREE',
+      defaultMessage: 'Hope you enjoy it',
+      defaultTerms: 'No cash refunds or exchanges · Not replaced if lost · Not for resale',
+      fallbackAppName: 'the app',
+      toHonorific: function (who) { return 'For ' + who; },
+      giftArrived: '🎁 A gift has arrived for you',
+      plainHeadline: function (who, name, value) {
+        return '🎁 ' + (who ? who + ', a' : 'A') + ' gift card for ‘' + name + '’ has arrived' +
+          (value ? ' — ' + value : '');
+      },
+      tapHint: 'Tap the link below and the App Store opens with the code already entered.',
+      manualLead: 'If the link doesn’t open',
+      manualSteps: 'App Store app → your profile, top right → ‘Redeem Gift Card or Code’ → enter the code below'
+    }
+  };
+
+  /** Chosen languages, remembered between visits. */
+  var LANG = loadPref('giftsheet.uiLang') ||
+    ((navigator.language || 'en').toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en');
+  var CARD_LANG = loadPref('giftsheet.cardLang') || LANG;
+
+  function loadPref(key) {
+    try {
+      var v = localStorage.getItem(key);
+      return (v === 'ko' || v === 'en') ? v : '';
+    } catch (e) { return ''; }
+  }
+  function savePref(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  /** The interface's words. */
+  function t() { return UI[LANG]; }
+  /**
+   * The recipient's words. Spelled out rather than given a one-letter name: the canvas
+   * draw callbacks below take their context as `c`, which would shadow it.
+   */
+  function cardText() { return CARDTEXT[CARD_LANG]; }
 
   // ---------- themes (mirrors GiftTheme.swift) ----------
   var THEMES = {
@@ -531,10 +912,8 @@
    * composed design exactly — nothing moves until the user drags something.
    */
   var BLOCK_IDS = ['logo', 'brand', 'hero', 'note', 'code', 'fine', 'qr'];
-  var BLOCK_NAMES = {
-    logo: '앱 로고', brand: '앱 이름', hero: '액면',
-    note: '메시지', code: '코드', fine: '약관', qr: 'QR'
-  };
+  /** The editor's name for a block, in the interface's language. */
+  function blockName(id) { return t().blocks[id] || id; }
   /* Every block carries its own size. The two artwork blocks spend it on their frame;
      the rest spend it on their type. */
   var ARTWORK = { logo: true, qr: true };
@@ -657,14 +1036,13 @@
   function ingest(text, label) {
     var parsed = parse(text);
     if (!parsed.length) {
-      $('loadStatus').textContent = '코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.';
+      $('loadStatus').textContent = t().noCodes;
       return;
     }
     codes = parsed;
     current = 0;
     var dropped = text.split(/\r?\n/).filter(function (l) { return l.trim(); }).length - parsed.length;
-    $('loadStatus').textContent = label + ' — 코드 ' + parsed.length + '개' +
-      (dropped > 0 ? ' (중복·머리글 ' + dropped + '줄 제외)' : '');
+    $('loadStatus').textContent = t().loaded(label, parsed.length, dropped);
     $('count').value = Math.min(parsed.length, 20);
     $('count').max = parsed.length;
     $('from').max = parsed.length;
@@ -710,8 +1088,8 @@
     if (ctx) app.ctx = ctx;
     if (!id) {
       if (!quiet && String(raw || '').trim()) {
-        $('appName').textContent = '이 값에서는 Apple ID를 찾지 못했습니다';
-        $('appMeta').textContent = '숫자 ID, 앱 링크, 리딤 링크 중 아무거나 넣어도 됩니다.';
+        $('appName').textContent = t().noAppleID;
+        $('appMeta').textContent = t().noAppleIDHint;
       }
       return;
     }
@@ -731,7 +1109,7 @@
   function lookup(id) {
     if (!id) return;
     app.id = id;
-    $('appName').textContent = '조회 중…';
+    $('appName').textContent = t().lookingUp;
 
     // Korea first; fall back to the default storefront for apps not released here.
     function fetchIn(country) {
@@ -743,7 +1121,7 @@
     fetchIn('kr')
       .then(function (d) { return d.resultCount ? d : fetchIn(''); })
       .then(function (d) {
-        if (!d.resultCount) throw new Error('결과 없음');
+        if (!d.resultCount) throw new Error('no results');
         var r = d.results[0];
         app.name = r.trackName;
         app.developer = r.artistName;
@@ -755,8 +1133,8 @@
       })
       .catch(function () {
         app.name = '';
-        $('appName').textContent = '앱 정보를 불러오지 못했습니다 (ID ' + id + ')';
-        $('appMeta').textContent = '오프라인이거나 ID가 잘못됐을 수 있습니다. 카드는 그대로 만들 수 있어요.';
+        $('appName').textContent = t().lookupFailed(id);
+        $('appMeta').textContent = t().lookupFailedHint;
         renderCard();
       });
   }
@@ -877,7 +1255,7 @@
       place('brand', el('brand', app.name || 'App Store'));
 
       var heroWrap = document.createDocumentFragment();
-      heroWrap.appendChild(el('kicker', '기프트 카드'));
+      heroWrap.appendChild(el('kicker', cardText().kicker));
       if (s.value) heroWrap.appendChild(el('value', s.value));
       var heroBox = el('herobox');
       heroBox.appendChild(heroWrap);
@@ -886,7 +1264,7 @@
       if (s.message || s.sender) {
         var noteBox = el('notebox');
         if (s.message) noteBox.appendChild(el('msg', s.message));
-        if (s.sender) noteBox.appendChild(el('fromto', 'from. ' + s.sender));
+        if (s.sender) noteBox.appendChild(el('fromto', cardText().from + s.sender));
         place('note', noteBox);
       }
 
@@ -901,7 +1279,7 @@
         var url2 = redeemURL(entry);
         if (url2) qrbox2.appendChild(qrSVG(url2));
         qrWrap.appendChild(qrbox2);
-        qrWrap.appendChild(el('scan', '스캔해서 받기'));
+        qrWrap.appendChild(el('scan', cardText().scan));
         place('qr', qrWrap);
       }
 
@@ -920,15 +1298,14 @@
     if (face === 'back') {
       // A card back should say who issued it.
       var issuer = el('issuer');
-      issuer.textContent = (app.name || 'App Store') + ' · App Store 기프트 카드';
+      issuer.textContent = (app.name || 'App Store') + cardText().issuerSuffix;
       left.appendChild(issuer);
 
       var steps = el('steps');
       var b = document.createElement('b');
-      b.textContent = '사용 방법';
+      b.textContent = cardText().howToLabel;
       steps.appendChild(b);
-      steps.appendChild(document.createTextNode(
-        '1. QR을 스캔하면 App Store가 열립니다\n2. 코드가 채워진 화면에서 사용을 누르세요'));
+      steps.appendChild(document.createTextNode(cardText().howToSteps));
       steps.style.whiteSpace = 'pre-line';
       left.appendChild(steps);
 
@@ -950,7 +1327,7 @@
     var url = redeemURL(entry);
     if (url) qrbox.appendChild(qrSVG(url));
     right.appendChild(qrbox);
-    right.appendChild(el('scan', '스캔해서 받기'));
+    right.appendChild(el('scan', cardText().scan));
     inner.appendChild(right);
 
     card.appendChild(inner);
@@ -962,7 +1339,7 @@
   function renderSheets() {
     var host = $('sheets');
     host.innerHTML = '';
-    if (!codes.length) { $('pageCount').textContent = '먼저 코드를 불러오세요.'; return; }
+    if (!codes.length) { $('pageCount').textContent = t().loadFirst; return; }
 
     var p = PRESETS[$('preset').value];
     var duplex = $('sides').value === 'duplex';
@@ -998,7 +1375,7 @@
       var pageItems = slice.slice(i * perPage, (i + 1) * perPage);
       var base = from + i * perPage;
 
-      var front = makeSheet(duplex ? '앞면 ' + (i + 1) : '');
+      var front = makeSheet(duplex ? t().faceFront(i + 1) : '');
       pageItems.forEach(function (item, j) {
         front.appendChild(buildCard(item, base + j, opts, duplex ? 'front' : 'single'));
       });
@@ -1007,7 +1384,7 @@
       if (duplex) {
         // Long-edge duplex flips the sheet horizontally, so the back page needs
         // its columns reversed for card N to land behind card N.
-        var back = makeSheet('뒷면 ' + (i + 1));
+        var back = makeSheet(t().faceBack(i + 1));
         for (var r = 0; r < Math.ceil(pageItems.length / p.cols); r++) {
           var rowItems = [];
           for (var c = 0; c < p.cols; c++) {
@@ -1024,13 +1401,13 @@
     }
 
     var sheetCount = duplex ? pages * 2 : pages;
-    $('pageCount').textContent = slice.length + '장 · A4 ' + sheetCount + '쪽 · 한 장당 ' + perPage + '개';
+    $('pageCount').textContent = t().pageCount(slice.length, sheetCount, perPage);
 
     var qrMM = Math.max(14, (p.h / 54) * 21) - 2 * (p.h / 54) * 1.1;
     var hints = [];
-    if (duplex) hints.push('양면 인쇄는 프린터 설정에서 <b>양면 · 긴 쪽 넘기기</b>를 고르세요. 뒷면 페이지는 이미 좌우를 뒤집어 두었습니다.');
-    if (qrMM < 15) hints.push('<span class="warn">QR이 약 ' + qrMM.toFixed(0) + 'mm로 작습니다. 카메라를 가까이 대야 인식됩니다 — 더 큰 규격을 권합니다.</span>');
-    if ($('preset').value === 'giftcard') hints.push('CR80 규격입니다. 3mm 모서리 펀치로 모서리를 둥글리면 실물 기프트 카드와 같은 형태가 됩니다.');
+    if (duplex) hints.push(t().hintDuplex);
+    if (qrMM < 15) hints.push(t().hintSmallQR(qrMM.toFixed(0)));
+    if ($('preset').value === 'giftcard') hints.push(t().hintCR80);
     $('printHint').innerHTML = hints.join('<br>');
   }
 
@@ -1230,7 +1607,8 @@
 
     ctx.font = font('kicker', 'hero');
     var kickerTrack = ts(4, 'hero');
-    var kickerW = measureTracked(ctx, '기프트 카드', kickerTrack);
+    var kickerText = cardText().kicker;
+    var kickerW = measureTracked(ctx, kickerText, kickerTrack);
     ctx.font = font('value', 'hero');
     var valueW = s.value ? ctx.measureText(s.value).width : 0;
     blocks.push({
@@ -1241,7 +1619,7 @@
         c.fillStyle = ink;
         c.globalAlpha = 0.82;
         c.font = font('kicker', 'hero');
-        tracked(c, '기프트 카드', 0, 0, kickerTrack);
+        tracked(c, kickerText, 0, 0, kickerTrack);
         c.globalAlpha = 1;
         if (s.value) { c.font = font('value', 'hero'); c.fillText(s.value, 0, ts(32, 'hero')); }
       }
@@ -1250,9 +1628,9 @@
     var recipient = $('recipient').value.trim();
     ctx.font = font('note', 'note');
     var noteLines = [];
-    if (recipient) noteLines.push({ text: 'to. ' + recipient, dim: 0.9 });
+    if (recipient) noteLines.push({ text: cardText().to + recipient, dim: 0.9 });
     if (s.message) wrapLines(ctx, s.message, 560).forEach(function (l) { noteLines.push({ text: l, dim: 0.9 }); });
-    if (s.sender) noteLines.push({ text: 'from. ' + s.sender, dim: 0.75 });
+    if (s.sender) noteLines.push({ text: cardText().from + s.sender, dim: 0.75 });
     if (noteLines.length) {
       var noteW = 0;
       var noteLead = ts(38, 'note');
@@ -1313,7 +1691,7 @@
           c.globalAlpha = 0.82;
           c.font = font('fine', 'qr');
           c.textAlign = 'center';
-          c.fillText('스캔해서 받기', Q / 2, Q + ts(8, 'qr'));
+          c.fillText(cardText().scan, Q / 2, Q + ts(8, 'qr'));
           c.textAlign = 'left';
           c.globalAlpha = 1;
           if (!url) return;
@@ -1432,7 +1810,7 @@
           ctx.fill();
           ctx.stroke();
         }
-        var label = (BLOCK_NAMES[b.id] || b.id) + '  ' + Math.round(scaleOf(b.id) * 100) + '%';
+        var label = blockName(b.id) + '  ' + Math.round(scaleOf(b.id) * 100) + '%';
         ctx.font = '600 15px "Apple SD Gothic Neo", -apple-system, sans-serif';
         var tw = ctx.measureText(label).width;
         var lx = r.x - m, ly = r.y - m - 24;
@@ -1509,14 +1887,13 @@
   function updateEditorHint() {
     var hint = $('editorHint');
     if (editor.sel) {
-      hint.textContent = (BLOCK_NAMES[editor.sel] || editor.sel) +
-        ' 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절';
+      hint.textContent = t().editorSelected(blockName(editor.sel));
     } else if (layoutWasReset) {
-      hint.textContent = '글자 크기가 커져서 저장해 둔 배치를 기본값으로 되돌렸습니다. 다시 옮기면 저장됩니다.';
+      hint.textContent = t().editorWasReset;
     } else if (!layoutIsDefault()) {
-      hint.textContent = '배치를 바꿨습니다. 인쇄 카드에도 그대로 적용됩니다.';
+      hint.textContent = t().editorChanged;
     } else {
-      hint.textContent = '카드 위의 요소를 끌어서 옮겨 보세요. 배치는 인쇄 카드에도 그대로 적용됩니다.';
+      hint.textContent = t().editorIdle;
     }
   }
 
@@ -1668,7 +2045,9 @@
     var theme = THEMES[s.theme] || {};
     var strip = function (h) { return String(h).replace('#', ''); };
 
-    var payload = { v: 1, u: url, c: entry.code, q: true, k: true };
+    // `lg` states the card language, so the gift page opens in it rather than guessing
+    // from the recipient's browser. Same key the macOS app writes.
+    var payload = { v: 1, u: url, c: entry.code, q: true, k: true, lg: CARD_LANG };
     if (app.name) payload.n = app.name;
     if (app.developer) payload.d = app.developer;
     if (app.icon) payload.i = app.icon;
@@ -1692,12 +2071,14 @@
     var wrapped = giftLink(entry);
     var lines = [];
 
+    var W = cardText();
+
     if (wrapped) {
       // The page unwraps to the app, the code and the redeem button — naming them
       // here would give away what it is about to open.
-      if (recipient) lines.push(recipient + '님께');
+      if (recipient) lines.push(W.toHonorific(recipient));
       lines.push('');
-      lines.push('🎁 선물이 도착했어요');
+      lines.push(W.giftArrived);
       lines.push(wrapped);
       if (s.expiry) { lines.push(''); lines.push(s.expiry); }
       if (s.sender) { lines.push(''); lines.push('— ' + s.sender); }
@@ -1705,16 +2086,15 @@
       return;
     }
 
-    var name = app.name || '앱';
-    lines.push('🎁 ' + (recipient ? recipient + '님, ' : '') + '‘' + name + '’ 기프트 카드가 도착했어요' +
-      (s.value ? ' — ' + s.value : ''));
+    var name = app.name || W.fallbackAppName;
+    lines.push(W.plainHeadline(recipient, name, s.value));
     if (s.message) lines.push(s.message);
     lines.push('');
-    lines.push('아래 링크를 누르면 App Store가 열리고 코드까지 자동으로 입력됩니다.');
+    lines.push(W.tapHint);
     lines.push(redeemURL(entry));
     lines.push('');
-    lines.push('링크가 안 열릴 때는');
-    lines.push('App Store 앱 → 오른쪽 위 프로필 → ‘기프트 카드 또는 코드 사용’ → 아래 코드 입력');
+    lines.push(W.manualLead);
+    lines.push(W.manualSteps);
     lines.push(groupCode(entry.code));
     if (s.expiry) { lines.push(''); lines.push(s.expiry); }
     if (s.sender) { lines.push(''); lines.push('— ' + s.sender); }
@@ -1745,7 +2125,7 @@
       var who = el('who');
       var input = document.createElement('input');
       input.type = 'text';
-      input.placeholder = '받는 사람';
+      input.placeholder = t().whoPlaceholder;
       input.value = rec && rec.who ? rec.who : '';
       input.addEventListener('input', function () {
         ledger[entry.code] = ledger[entry.code] || {};
@@ -1758,7 +2138,7 @@
 
       var pick = document.createElement('button');
       pick.className = 'mini';
-      pick.textContent = i === current ? '선택됨' : '고르기';
+      pick.textContent = i === current ? t().picked : t().pick;
       pick.disabled = i === current;
       pick.addEventListener('click', function () {
         current = i;
@@ -1771,7 +2151,7 @@
     });
 
     if (!shown) {
-      var empty = el('item sub', codes.length ? '조건에 맞는 코드가 없습니다.' : '먼저 CSV를 불러오세요.');
+      var empty = el('item sub', codes.length ? t().noMatch : t().loadCSVFirst);
       host.appendChild(empty);
     }
   }
@@ -1807,7 +2187,7 @@
       var tdAct = document.createElement('td');
       var undo = document.createElement('button');
       undo.className = 'mini';
-      undo.textContent = '해제';
+      undo.textContent = t().undo;
       undo.addEventListener('click', function () {
         delete ledger[entry.code];
         saveLedger();
@@ -1819,8 +2199,8 @@
       body.appendChild(tr);
     });
     $('ledgerSummary').textContent = codes.length
-      ? '전체 ' + codes.length + '개 중 보냄 ' + sent + '개 · 남은 코드 ' + (codes.length - sent) + '개'
-      : '코드를 불러오면 집계됩니다.';
+      ? t().ledgerSummary(codes.length, sent)
+      : t().ledgerIdle;
   }
 
   function exportLedger() {
@@ -1865,7 +2245,7 @@
     var f = this.files[0];
     if (f) f.text().then(function (t) { ingest(t, f.name); });
   });
-  $('pasteBtn').addEventListener('click', function () { ingest($('paste').value, '붙여넣기'); });
+  $('pasteBtn').addEventListener('click', function () { ingest($('paste').value, t().pastedLabel); });
 
   $('lookupBtn').addEventListener('click', function () { lookupFrom($('appId').value); });
   $('appId').addEventListener('change', function () { lookupFrom(this.value); });
@@ -1908,16 +2288,16 @@
 
   $('copyText').addEventListener('click', function () {
     navigator.clipboard.writeText($('shareText').value)
-      .then(function () { flash('문구를 복사했습니다. 링크를 먼저 보내세요.'); })
-      .catch(function () { flash('복사에 실패했습니다. 문구를 직접 선택해 주세요.'); });
+      .then(function () { flash(t().copiedText); })
+      .catch(function () { flash(t().copyTextFailed); });
   });
 
   $('copyImg').addEventListener('click', function () {
     withCleanCard(function (blob) {
-      if (!window.ClipboardItem) { flash('이 브라우저는 이미지 복사를 지원하지 않습니다. PNG로 저장해 주세요.'); return; }
+      if (!window.ClipboardItem) { flash(t().noImageCopy); return; }
       navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-        .then(function () { flash('이미지를 복사했습니다.'); })
-        .catch(function () { flash('이미지 복사에 실패했습니다. PNG로 저장해 주세요.'); });
+        .then(function () { flash(t().copiedImage); })
+        .catch(function () { flash(t().copyImageFailed); });
     });
   });
 
@@ -1933,7 +2313,7 @@
     editor.guides = [];
     updateEditorHint();
     renderCard();
-    flash('배치를 기본값으로 되돌렸습니다.');
+    flash(t().layoutReset);
   });
 
   $('markSent').addEventListener('click', function () {
@@ -1948,23 +2328,91 @@
     renderCard();
     renderSendList();
     renderLedger();
-    flash('보냄으로 기록했습니다. 다음 코드로 넘어갔어요.');
+    flash(t().markedSent);
   });
 
   $('exportLedger').addEventListener('click', exportLedger);
   $('clearLedger').addEventListener('click', function () {
-    if (!confirm('배포 기록을 모두 지웁니다. 계속할까요?')) return;
+    if (!confirm(t().confirmClear)) return;
     ledger = {};
     saveLedger();
     renderLedger();
     renderSendList();
   });
 
+  // ---------- language switches ----------
+
+  /** Rewrites every `data-i18n*` label, then the pieces built in JS. */
+  function applyUILanguage() {
+    document.documentElement.lang = LANG;
+    document.title = 'GiftSheet — ' + t().tagline;
+
+    var attrs = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-ph', function (el, v) { el.placeholder = v; }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }]
+    ];
+    attrs.forEach(function (pair) {
+      document.querySelectorAll('[' + pair[0] + ']').forEach(function (node) {
+        var value = t()[node.getAttribute(pair[0])];
+        if (value !== undefined) pair[1](node, value);
+      });
+    });
+
+    [].forEach.call($('uiLang').children, function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.lang === LANG));
+    });
+
+    // The lists and the editor hint carry their own wording.
+    updateEditorHint();
+    renderSendList();
+    renderLedger();
+    renderCard();
+    // Sheets already on the page were labelled in the old language.
+    if ($('sheets').children.length) renderSheets();
+  }
+
+  /**
+   * Moves the card's own defaults over to the new language — but only the ones still
+   * sitting at a default. Anything typed is the operator's words, and switching the
+   * card language is not a reason to throw them away.
+   */
+  function applyCardLanguage(previous) {
+    [['value', 'defaultValue'], ['message', 'defaultMessage'], ['terms', 'defaultTerms']]
+      .forEach(function (pair) {
+        var field = $(pair[0]);
+        if (field.value.trim() === CARDTEXT[previous][pair[1]]) {
+          field.value = cardText()[pair[1]];
+        }
+      });
+    renderCard();
+    if ($('sheets').children.length) renderSheets();
+  }
+
+  [].forEach.call($('uiLang').children, function (button) {
+    button.addEventListener('click', function () {
+      if (button.dataset.lang === LANG) return;
+      LANG = button.dataset.lang;
+      savePref('giftsheet.uiLang', LANG);
+      applyUILanguage();
+    });
+  });
+
+  $('cardLang').addEventListener('change', function () {
+    var previous = CARD_LANG;
+    CARD_LANG = this.value === 'en' ? 'en' : 'ko';
+    savePref('giftsheet.cardLang', CARD_LANG);
+    applyCardLanguage(previous);
+  });
+
+  // ---------- boot ----------
   bindEditor();
-  renderCard();
-  updateEditorHint();
-  renderSendList();
-  renderLedger();
+  $('cardLang').value = CARD_LANG;
+  // The markup ships Korean defaults; if the card is starting in English, move them
+  // across before the first paint.
+  if (CARD_LANG !== 'ko') applyCardLanguage('ko');
+  applyUILanguage();
 })();
 </script>
 </body>

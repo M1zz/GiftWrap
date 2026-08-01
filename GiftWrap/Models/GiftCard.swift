@@ -9,17 +9,21 @@ enum CardBlock: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
+    /// The name the editor calls this block, in the interface's language — the operator
+    /// reads it, not the recipient.
     var label: String {
+        let loc: Loc
         switch self {
-        case .occasion: return "머리말"
-        case .badge:    return "받기 배지"
-        case .logo:     return "앱 아이콘"
-        case .title:    return "앱 이름"
-        case .message:  return "메시지"
-        case .people:   return "받는 · 보내는 사람"
-        case .code:     return "코드"
-        case .qr:       return "QR"
+        case .occasion: loc = T.blockOccasion
+        case .badge:    loc = T.blockBadge
+        case .logo:     loc = T.blockLogo
+        case .title:    loc = T.blockTitle
+        case .message:  loc = T.blockMessage
+        case .people:   loc = T.blockPeople
+        case .code:     loc = T.blockCode
+        case .qr:       loc = T.blockQR
         }
+        return loc.text
     }
 
     /// Artwork scales its frame; text scales its font. Either way the block carries
@@ -37,44 +41,40 @@ struct BlockPlacement: Codable, Hashable {
 
 /// The placement of every block on the card.
 ///
-/// Stored as fractions of `GiftCardView.canvas`. The defaults reproduce the composed
-/// design — nothing moves until the user drags something.
+/// Stored as fractions of `GiftCardView.canvas`. The defaults reproduce the chosen
+/// style's composition — nothing moves until the user drags something.
 struct CardLayout: Codable, Hashable {
 
     static let canvas = CGSize(width: 1000, height: 630)
     static let padding: CGFloat = 56
     static let scaleRange: ClosedRange<Double> = 0.4...2.5
 
+    /// Which design these placements belong to. Carried on the layout itself so that
+    /// "what is the default here?" and "where do I save this?" never need the caller to
+    /// remember — the two questions that would otherwise let one style's arrangement
+    /// leak into another's.
+    var style: CardStyle = .classic
+
     /// Keyed by `CardBlock.rawValue` — a plain string dictionary so the JSON stays
     /// readable and survives a block being added or renamed.
     private var placements: [String: BlockPlacement]
 
-    init(placements: [String: BlockPlacement] = [:]) {
+    init(style: CardStyle = .classic, placements: [String: BlockPlacement] = [:]) {
+        self.style = style
         self.placements = placements
     }
 
-    /*
-     * The default composition, in canvas points (1000 × 630, 56pt padding so
-     * content runs 56…574 vertically):
-     *
-     *   occasion  56 … 78     badge   48 … 86  (top right)
-     *   logo     130 …282     title  157 …256  (beside the logo)
-     *   message  320 …449     code   470 …523  (right column)
-     *   people   480 …563     qr     440 …562  (right column)
-     */
-    static let standard = CardLayout(placements: [
-        CardBlock.occasion.rawValue: BlockPlacement(x: 0.0560, y: 0.0889),
-        CardBlock.badge.rawValue:    BlockPlacement(x: 0.7670, y: 0.0762),
-        CardBlock.logo.rawValue:     BlockPlacement(x: 0.0560, y: 0.2063),
-        CardBlock.title.rawValue:    BlockPlacement(x: 0.2360, y: 0.2484),
-        CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.5079),
-        CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7619),
-        CardBlock.code.rawValue:     BlockPlacement(x: 0.5600, y: 0.7460),
-        CardBlock.qr.rawValue:       BlockPlacement(x: 0.8060, y: 0.6984)
-    ])
+    /// The arrangement a style opens with.
+    static func defaults(for style: CardStyle) -> CardLayout {
+        CardLayout(style: style, placements: style.defaultPlacements)
+    }
 
     subscript(block: CardBlock) -> BlockPlacement {
-        get { placements[block.rawValue] ?? CardLayout.standard.placements[block.rawValue] ?? BlockPlacement(x: 0, y: 0) }
+        get {
+            placements[block.rawValue]
+                ?? style.defaultPlacements[block.rawValue]
+                ?? BlockPlacement(x: 0, y: 0)
+        }
         set { placements[block.rawValue] = newValue }
     }
 
@@ -103,9 +103,11 @@ struct CardLayout: Codable, Hashable {
         self[block] = p
     }
 
-    var isStandard: Bool {
-        CardBlock.allCases.allSatisfy { block in
-            let a = self[block], b = CardLayout.standard[block]
+    /// Whether nothing has been moved from where this style put it.
+    var isDefault: Bool {
+        let defaults = CardLayout.defaults(for: style)
+        return CardBlock.allCases.allSatisfy { block in
+            let a = self[block], b = defaults[block]
             return abs(a.x - b.x) < 1e-6 && abs(a.y - b.y) < 1e-6 && abs(a.scale - b.scale) < 1e-6
         }
     }
@@ -226,7 +228,14 @@ extension CardLayout {
 
 extension CardLayout {
 
-    private static let storeKey = "GiftWrap.cardLayout"
+    /// One saved arrangement per style, so moving a block in Ticket doesn't disturb
+    /// what was composed in Classic.
+    private static func storeKey(_ style: CardStyle) -> String {
+        "GiftWrap.cardLayout.\(style.rawValue)"
+    }
+
+    /// Where the single, style-less arrangement used to live.
+    private static let legacyStoreKey = "GiftWrap.cardLayout"
 
     /// Bumped when a change makes saved positions wrong rather than merely different
     /// — a new type scale is one, since the defaults are budgeted around the sizes it
@@ -238,13 +247,15 @@ extension CardLayout {
         var placements: [String: BlockPlacement]
     }
 
-    static func load() -> CardLayout {
-        guard let data = UserDefaults.standard.data(forKey: storeKey),
+    static func load(_ style: CardStyle) -> CardLayout {
+        migrateLegacyStore()
+
+        guard let data = UserDefaults.standard.data(forKey: storeKey(style)),
               let stored = try? JSONDecoder().decode(Stored.self, from: data),
               stored.version == storeVersion
-        else { return .standard }
+        else { return .defaults(for: style) }
 
-        var layout = CardLayout.standard
+        var layout = CardLayout.defaults(for: style)
         for block in CardBlock.allCases {
             if let p = stored.placements[block.rawValue] {
                 layout[block] = BlockPlacement(
@@ -262,7 +273,19 @@ extension CardLayout {
     func save() {
         let stored = Stored(version: CardLayout.storeVersion, placements: placements)
         guard let data = try? JSONEncoder().encode(stored) else { return }
-        UserDefaults.standard.set(data, forKey: CardLayout.storeKey)
+        UserDefaults.standard.set(data, forKey: CardLayout.storeKey(style))
+    }
+
+    /// An arrangement saved before styles existed was composed against what is now
+    /// Classic, so that's where it belongs. Moved rather than copied, and only when
+    /// Classic has nothing of its own to overwrite.
+    private static func migrateLegacyStore() {
+        let defaults = UserDefaults.standard
+        guard let data = defaults.data(forKey: legacyStoreKey) else { return }
+        if defaults.data(forKey: storeKey(.classic)) == nil {
+            defaults.set(data, forKey: storeKey(.classic))
+        }
+        defaults.removeObject(forKey: legacyStoreKey)
     }
 }
 
@@ -279,20 +302,17 @@ enum GiftLinkKind: String, Codable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .directLink:   return "다운로드 링크"
-        case .appPromoCode: return "앱 프로모션 코드"
-        case .offerCode:    return "인앱 오퍼 코드"
+        case .directLink:   return T.kindDirectLink.text
+        case .appPromoCode: return T.kindAppPromoCode.text
+        case .offerCode:    return T.kindOfferCode.text
         }
     }
 
     var explanation: String {
         switch self {
-        case .directLink:
-            return "코드 없이 App Store 제품 페이지로 보냅니다. 무료 앱에 적합합니다."
-        case .appPromoCode:
-            return "유료 앱을 무료로 받는 1회용 코드입니다. 생성 후 4주간 유효합니다."
-        case .offerCode:
-            return "구독·인앱 결제용 코드입니다. 앱이 무료 다운로드라면 이 방식을 씁니다."
+        case .directLink:   return T.kindDirectLinkWhy.text
+        case .appPromoCode: return T.kindAppPromoCodeWhy.text
+        case .offerCode:    return T.kindOfferCodeWhy.text
         }
     }
 
@@ -310,7 +330,16 @@ struct GiftDraft: Codable, Hashable {
     var recipient: String = ""
     var sender: String = ""
     var message: String = ""
-    var occasion: String = "선물"
+    /// Left empty on purpose: the card draws `C.defaultOccasion` in the card's own
+    /// language when nothing has been typed, so the headline follows the language the
+    /// sender picked instead of being frozen at whatever it was seeded with.
+    var occasion: String = ""
+    /// Which of the five card designs this gift is composed in.
+    var style: CardStyle = .current
+    /// The language the recipient reads — the card, the gift page, and the message that
+    /// carries the link. A separate choice from the interface language, because a sender
+    /// working in Korean may be sending to someone who doesn't.
+    var cardLanguage: AppLanguage = .current
     var theme: GiftTheme = .sunrise
     var expiry: Date? = nil
     var showCodeOnCard: Bool = true

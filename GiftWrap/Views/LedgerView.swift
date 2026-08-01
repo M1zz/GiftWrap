@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 @MainActor
 struct LedgerView: View {
     @EnvironmentObject private var ledger: GiftLedger
+    @ObservedObject private var loc = Localization.shared
     @State private var search = ""
 
     private var filtered: [GiftRecord] {
@@ -32,9 +33,9 @@ struct LedgerView: View {
             Image(systemName: "shippingbox")
                 .font(.system(size: 34))
                 .foregroundStyle(.tertiary)
-            Text("아직 보낸 선물이 없습니다.")
+            Text(loc.s(T.ledgerEmptyTitle))
                 .font(.headline)
-            Text("카드를 만든 뒤 ‘보낸 기록에 추가’를 누르면 여기에 쌓입니다.")
+            Text(loc.s(T.ledgerEmptyBody))
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -43,28 +44,28 @@ struct LedgerView: View {
 
     private var table: some View {
         Table(filtered) {
-            TableColumn("보낸 날짜") { record in
+            TableColumn(loc.s(T.ledgerDate)) { record in
                 Text(record.issuedAt, format: .dateTime.year().month().day())
             }
             .width(min: 100, ideal: 110)
 
-            TableColumn("앱", value: \.appName)
+            TableColumn(loc.s(T.ledgerApp), value: \.appName)
 
-            TableColumn("받는 사람") { record in
+            TableColumn(loc.s(T.recipient)) { record in
                 Text(record.recipient.isEmpty ? "—" : record.recipient)
             }
 
-            TableColumn("코드") { record in
+            TableColumn(loc.s(T.codeField)) { record in
                 Text(record.code.isEmpty ? "—" : record.code)
                     .font(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
             }
 
-            TableColumn("방식") { record in
+            TableColumn(loc.s(T.ledgerKind)) { record in
                 Text(record.kind.label)
             }
 
-            TableColumn("사용됨") { record in
+            TableColumn(loc.s(T.ledgerRedeemed)) { record in
                 Toggle("", isOn: Binding(
                     get: { record.redeemed },
                     set: { _ in ledger.toggleRedeemed(record) }
@@ -80,7 +81,7 @@ struct LedgerView: View {
                     Image(systemName: "link")
                 }
                 .buttonStyle(.borderless)
-                .help("링크 복사")
+                .help(loc.s(T.ledgerCopyLink))
             }
             .width(34)
         }
@@ -88,14 +89,14 @@ struct LedgerView: View {
 
     private var footer: some View {
         HStack {
-            TextField("검색", text: $search)
+            TextField(loc.s(T.search), text: $search)
                 .textFieldStyle(.roundedBorder)
                 .frame(maxWidth: 240)
             Spacer()
-            Text("\(ledger.records.count)건")
+            Text(loc.s(T.ledgerCount(ledger.records.count)))
                 .font(.callout)
                 .foregroundStyle(.secondary)
-            Button("CSV 내보내기") {
+            Button(loc.s(T.exportCSV)) {
                 GiftExporter.save(
                     data: Data(ledger.csv().utf8),
                     suggestedName: "giftwrap-ledger.csv",

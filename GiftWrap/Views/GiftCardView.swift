@@ -19,42 +19,112 @@ struct GiftCardView: View {
 
     static let canvas = CardLayout.canvas
 
-    /// One knob for every piece of text on the card. The sizes this started from were
-    /// tuned for a big preview; at the size the card is actually read they were small.
-    /// The default placements are budgeted around whatever value sits here — change it
-    /// and `CardLayout.standard` has to be re-checked for collisions.
+    /// One knob for every piece of text on the card, before the style has its say. The
+    /// sizes this started from were tuned for a big preview; at the size the card is
+    /// actually read they were small. Every style's default placements are budgeted
+    /// around whatever value sits here — change it and they all have to be re-checked
+    /// for collisions.
     static let typeScale: CGFloat = 1.18
 
     let draft: GiftDraft
     let artwork: NSImage?
-    var layout: CardLayout = .standard
+    var layout: CardLayout = .defaults(for: .classic)
+
+    /// The arrangement actually drawn with.
+    ///
+    /// An arrangement composed for one style would scatter the blocks where *that*
+    /// style wanted them underneath this one's chrome — ticket positions with poster
+    /// type, say. When the two disagree the style wins, since the style is what the
+    /// card visibly is.
+    private var placement: CardLayout {
+        layout.style == draft.style ? layout : .defaults(for: draft.style)
+    }
 
     private var theme: GiftTheme { draft.theme }
 
-    /// A measurement at the card's type scale, times whatever size the block itself
-    /// has been given. Used for fonts and for the spacing that hangs off them, so a
-    /// resized text block grows as a piece rather than just changing font size.
+    /// Everything drawn on the card speaks the recipient's language, not the operator's.
+    private var language: AppLanguage { draft.cardLanguage }
+
+    /// Which of the five designs is being drawn.
+    private var style: CardStyle { draft.style }
+
+    /// A measurement at the card's type scale, times the style's own scale, times
+    /// whatever size the block itself has been given. Used for fonts and for the
+    /// spacing that hangs off them, so a resized text block grows as a piece rather
+    /// than just changing font size.
     private func t(_ size: CGFloat, _ block: CardBlock) -> CGFloat {
-        (size * Self.typeScale * layout.scale(block)).rounded()
+        let emphasis = block == .occasion ? style.headlineScale : 1
+        return (size * Self.typeScale * style.typeScale * emphasis * placement.scale(block)).rounded()
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             background
 
+            if style.hasPerforation { perforation }
+
             ForEach(CardBlock.allCases) { block in
                 placed(block)
             }
+
+            if style.hasFrame { frame }
         }
         .frame(width: Self.canvas.width, height: Self.canvas.height)
-        .clipShape(RoundedRectangle(cornerRadius: 56, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
+        // The notches are cut, not painted: the card sits on a preview backdrop here
+        // and on nothing at all in the exported PNG, and only a real hole is right in
+        // both places. destinationOut needs the group to erase within.
+        .overlay(alignment: .topLeading) {
+            if style.hasPerforation {
+                notches.blendMode(.destinationOut)
+            }
+        }
+        .compositingGroup()
+    }
+
+    // MARK: - Style chrome
+
+    /// The stub's tear line.
+    private var perforation: some View {
+        let x = Self.canvas.width * CardStyle.perforationX
+        return Path { path in
+            path.move(to: CGPoint(x: x, y: 26))
+            path.addLine(to: CGPoint(x: x, y: Self.canvas.height - 26))
+        }
+        .stroke(
+            theme.ink.opacity(0.5),
+            style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [9, 11])
+        )
+    }
+
+    /// The two half-circles bitten out of the tear line's ends.
+    private var notches: some View {
+        let x = Self.canvas.width * CardStyle.perforationX
+        let radius: CGFloat = 22
+        return ZStack(alignment: .topLeading) {
+            Circle()
+                .frame(width: radius * 2, height: radius * 2)
+                .offset(x: x - radius, y: -radius)
+            Circle()
+                .frame(width: radius * 2, height: radius * 2)
+                .offset(x: x - radius, y: Self.canvas.height - radius)
+        }
+        .frame(width: Self.canvas.width, height: Self.canvas.height, alignment: .topLeading)
+    }
+
+    /// A hairline inset border, the way a printed card is often bounded.
+    private var frame: some View {
+        RoundedRectangle(cornerRadius: style.cornerRadius - 22, style: .continuous)
+            .stroke(theme.ink.opacity(0.32), lineWidth: 1.6)
+            .padding(30)
+            .frame(width: Self.canvas.width, height: Self.canvas.height)
     }
 
     // MARK: - Placement
 
     @ViewBuilder
     private func placed(_ block: CardBlock) -> some View {
-        let origin = layout.origin(block)
+        let origin = placement.origin(block)
         content(for: block)
             .background(
                 GeometryReader { proxy in
@@ -88,51 +158,68 @@ struct GiftCardView: View {
             theme.gradient
 
             Circle()
-                .fill(theme.blooms[0].opacity(0.55))
+                .fill(theme.blooms[0].opacity(0.55 * style.bloomOpacity))
                 .frame(width: 620, height: 620)
                 .blur(radius: 140)
                 .offset(x: -300, y: -230)
 
             Circle()
-                .fill(theme.blooms[1].opacity(0.5))
+                .fill(theme.blooms[1].opacity(0.5 * style.bloomOpacity))
                 .frame(width: 700, height: 700)
                 .blur(radius: 160)
                 .offset(x: 330, y: 250)
 
             // Single diagonal sheen — the one flourish; everything else stays flat.
-            LinearGradient(
-                colors: [.white.opacity(0.26), .white.opacity(0.0)],
-                startPoint: .topLeading,
-                endPoint: .init(x: 0.62, y: 0.55)
-            )
+            // Minimal turns it off entirely, which is most of what makes it minimal.
+            if style.sheenOpacity > 0 {
+                LinearGradient(
+                    colors: [.white.opacity(style.sheenOpacity), .white.opacity(0.0)],
+                    startPoint: .topLeading,
+                    endPoint: .init(x: 0.62, y: 0.55)
+                )
+            }
         }
         .frame(width: Self.canvas.width, height: Self.canvas.height)
     }
 
     // MARK: - Blocks
 
+    /// Which way the text runs inside the blocks that can hold more than one line.
+    private var textAlignment: TextAlignment { style.centersText ? .center : .leading }
+    private var stackAlignment: HorizontalAlignment { style.centersText ? .center : .leading }
+
     private var occasionView: some View {
-        Text(draft.occasion.isEmpty ? "선물" : draft.occasion)
+        Text(draft.occasion.isEmpty ? C.defaultOccasion.text(language) : draft.occasion)
             .font(.system(size: t(15, .occasion), weight: .bold, design: .rounded))
-            .tracking(4.5 * layout.scale(.occasion))
+            // Poster blows the headline up; the letter-spacing that reads well at 18pt
+            // becomes a gap at 60, so it shrinks as the type grows.
+            // Poster blows the headline up; the letter-spacing that reads well at 18pt
+            // becomes a gap at 88, so it shrinks as the type grows.
+            .tracking(4.5 * placement.scale(.occasion) * (style == .poster ? 0.30 : 1))
             .textCase(.uppercase)
             .foregroundStyle(theme.ink.opacity(0.85))
+            .multilineTextAlignment(textAlignment)
+            .frame(
+                maxWidth: style.headlineMaxWidth,
+                alignment: style.centersText ? .center : .leading
+            )
+            .fixedSize(horizontal: style.headlineMaxWidth == nil, vertical: true)
     }
 
     private var badgeView: some View {
-        Text("App Store에서 받기")
+        Text(C.badge.text(language))
             .font(.system(size: t(14, .badge), weight: .semibold, design: .rounded))
             .foregroundStyle(theme.ink.opacity(0.75))
-            .padding(.horizontal, 16 * layout.scale(.badge))
-            .padding(.vertical, 8 * layout.scale(.badge))
+            .padding(.horizontal, 16 * placement.scale(.badge))
+            .padding(.vertical, 8 * placement.scale(.badge))
             .background(
                 Capsule().stroke(theme.ink.opacity(0.45), lineWidth: 1.2)
             )
     }
 
     private var logoView: some View {
-        let side = 152 * layout.scale(.logo)
-        let radius = 34 * layout.scale(.logo)
+        let side = 152 * placement.scale(.logo)
+        let radius = 34 * placement.scale(.logo)
         return Group {
             if let artwork {
                 Image(nsImage: artwork)
@@ -158,21 +245,25 @@ struct GiftCardView: View {
     }
 
     private var titleView: some View {
-        VStack(alignment: .leading, spacing: 8 * layout.scale(.title)) {
-            Text(draft.app?.name ?? "앱을 불러오세요")
+        VStack(alignment: stackAlignment, spacing: 8 * placement.scale(.title)) {
+            Text(draft.app?.name ?? C.placeholderApp.text(language))
                 .font(.system(size: t(44, .title), weight: .bold, design: .rounded))
                 .foregroundStyle(theme.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.6)
+                .multilineTextAlignment(textAlignment)
 
-            Text(draft.app?.developer ?? "개발자")
+            Text(draft.app?.developer ?? C.placeholderDev.text(language))
                 .font(.system(size: t(20, .title), weight: .medium, design: .rounded))
                 .foregroundStyle(theme.inkSecondary)
                 .lineLimit(1)
         }
         // The wrap width grows with the type, so the line breaks stay where they were
         // and the block's box tracks the grip being dragged.
-        .frame(maxWidth: 640 * layout.scale(.title), alignment: .leading)
+        .frame(
+            maxWidth: style.titleMaxWidth * placement.scale(.title),
+            alignment: style.centersText ? .center : .leading
+        )
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -182,10 +273,14 @@ struct GiftCardView: View {
             Text(draft.message)
                 .font(.system(size: t(25, .message), weight: .regular, design: .rounded))
                 .foregroundStyle(theme.ink.opacity(0.95))
-                .lineSpacing(7 * layout.scale(.message))
+                .lineSpacing(7 * placement.scale(.message))
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
-                .frame(maxWidth: 700 * layout.scale(.message), alignment: .leading)
+                .multilineTextAlignment(textAlignment)
+                .frame(
+                    maxWidth: style.messageMaxWidth * placement.scale(.message),
+                    alignment: style.centersText ? .center : .leading
+                )
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -193,22 +288,22 @@ struct GiftCardView: View {
     @ViewBuilder
     private var peopleView: some View {
         if !draft.recipient.isEmpty || !draft.sender.isEmpty || draft.expiry != nil {
-            VStack(alignment: .leading, spacing: 6 * layout.scale(.people)) {
+            VStack(alignment: .leading, spacing: 6 * placement.scale(.people)) {
                 if !draft.recipient.isEmpty {
-                    Text("To. \(draft.recipient)")
+                    Text(C.to(draft.recipient).text(language))
                         .font(.system(size: t(19, .people), weight: .semibold, design: .rounded))
                         .foregroundStyle(theme.ink.opacity(0.9))
                 }
                 if !draft.sender.isEmpty {
-                    Text("From. \(draft.sender)")
+                    Text(C.from(draft.sender).text(language))
                         .font(.system(size: t(17, .people), weight: .medium, design: .rounded))
                         .foregroundStyle(theme.inkSecondary)
                 }
                 if let expiry = draft.expiry, draft.kind.hasExpiry {
-                    Text("\(expiry, format: .dateTime.year().month().day())까지")
+                    Text(C.validUntil(expiry).text(language))
                         .font(.system(size: t(14, .people), weight: .medium, design: .rounded))
                         .foregroundStyle(theme.ink.opacity(0.65))
-                        .padding(.top, 4 * layout.scale(.people))
+                        .padding(.top, 4 * placement.scale(.people))
                 }
             }
             .fixedSize()
@@ -220,12 +315,12 @@ struct GiftCardView: View {
         if draft.showCodeOnCard, draft.kind.requiresCode, !draft.trimmedCode.isEmpty {
             Text(draft.trimmedCode)
                 .font(.system(size: t(18, .code), weight: .medium, design: .monospaced))
-                .tracking(2 * layout.scale(.code))
+                .tracking(2 * placement.scale(.code))
                 .foregroundStyle(theme.ink)
-                .padding(.horizontal, 20 * layout.scale(.code))
-                .padding(.vertical, 13 * layout.scale(.code))
+                .padding(.horizontal, 20 * placement.scale(.code))
+                .padding(.vertical, 13 * placement.scale(.code))
                 .background(
-                    RoundedRectangle(cornerRadius: 16 * layout.scale(.code), style: .continuous)
+                    RoundedRectangle(cornerRadius: 16 * placement.scale(.code), style: .continuous)
                         .stroke(style: StrokeStyle(lineWidth: 1.4, dash: [6, 5]))
                         .foregroundStyle(theme.ink.opacity(0.6))
                 )
@@ -238,14 +333,14 @@ struct GiftCardView: View {
         if draft.showQRCode,
            let link = draft.redeemURL?.absoluteString,
            let qr = QRCodeRenderer.image(from: link, size: 256) {
-            let side = 104 * layout.scale(.qr)
+            let side = 104 * placement.scale(.qr)
             Image(nsImage: qr)
                 .resizable()
                 .interpolation(.none)
                 .frame(width: side, height: side)
-                .padding(9 * layout.scale(.qr))
+                .padding(9 * placement.scale(.qr))
                 .background(
-                    RoundedRectangle(cornerRadius: 16 * layout.scale(.qr), style: .continuous)
+                    RoundedRectangle(cornerRadius: 16 * placement.scale(.qr), style: .continuous)
                         .fill(.white)
                 )
         }
@@ -266,6 +361,8 @@ struct EditableCardPreview: View {
     let artwork: NSImage?
     @Binding var layout: CardLayout
     @Binding var selection: CardBlock?
+
+    @ObservedObject private var loc = Localization.shared
 
     /// What each block measured, for hit-testing and snapping. It stays inside the
     /// editor now — the gift link no longer carries block footprints.
@@ -386,17 +483,19 @@ struct EditableCardPreview: View {
                     .foregroundStyle(.orange)
 
                 Text(
-                    pairs.count > 1
-                        ? "\(a.label)과 \(b.label)를 비롯해 \(pairs.count)곳이 겹칩니다"
-                        : "\(a.label)과 \(b.label)가 겹칩니다"
+                    loc.s(
+                        pairs.count > 1
+                            ? T.collisionMany(a.label, b.label, count: pairs.count)
+                            : T.collisionOne(a.label, b.label)
+                    )
                 )
                 .font(.system(size: 12, weight: .medium))
 
-                Text("내보내는 이미지에도 그대로 나갑니다")
+                Text(loc.s(T.collisionExported))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
-                Button("겹친 것만 되돌리기") { resetColliding() }
+                Button(loc.s(T.resetColliding)) { resetColliding() }
                     .controlSize(.small)
             }
             .padding(.horizontal, 12)
@@ -410,11 +509,12 @@ struct EditableCardPreview: View {
     }
 
     /// Puts just the offending blocks back where they started, leaving the rest of the
-    /// arrangement alone — "배치 초기화" throws away everything, which is too much when
+    /// arrangement alone — Reset layout throws away everything, which is too much when
     /// one enlarged icon is the problem.
     private func resetColliding() {
+        let defaults = CardLayout.defaults(for: layout.style)
         for block in collidingBlocks {
-            layout[block] = CardLayout.standard[block]
+            layout[block] = defaults[block]
         }
         layout.save()
     }
@@ -630,7 +730,7 @@ struct EditableCardPreview: View {
 struct GiftCardPreview: View {
     let draft: GiftDraft
     let artwork: NSImage?
-    var layout: CardLayout = .standard
+    var layout: CardLayout = .defaults(for: .classic)
 
     var body: some View {
         GeometryReader { proxy in

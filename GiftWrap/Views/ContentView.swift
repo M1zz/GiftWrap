@@ -3,19 +3,27 @@ import SwiftUI
 @MainActor
 struct ContentView: View {
     @StateObject private var model = ComposerModel()
+    @ObservedObject private var loc = Localization.shared
 
     var body: some View {
         TabView {
             ComposerView(model: model)
-                .tabItem { Label("카드 만들기", systemImage: "gift") }
+                .tabItem { Label(loc.s(T.composerTab), systemImage: "gift") }
 
             BatchView(model: model)
-                .tabItem { Label("여러 장 만들기", systemImage: "square.stack.3d.up") }
+                .tabItem { Label(loc.s(T.batchTab), systemImage: "square.stack.3d.up") }
 
             LedgerView()
-                .tabItem { Label("보낸 기록", systemImage: "list.bullet.rectangle") }
+                .tabItem { Label(loc.s(T.ledgerTab), systemImage: "list.bullet.rectangle") }
         }
         .padding(12)
+        // Status lines and lookup errors were written in the language that was current
+        // when they happened, and there's nothing to re-run to translate them. Clearing
+        // them beats leaving a sentence behind in the language you just switched away from.
+        .onChange(of: loc.language) { _, _ in
+            model.status = nil
+            model.errorMessage = nil
+        }
     }
 }
 
@@ -25,6 +33,7 @@ struct ContentView: View {
 struct ComposerView: View {
     @ObservedObject var model: ComposerModel
     @EnvironmentObject private var ledger: GiftLedger
+    @ObservedObject private var loc = Localization.shared
     @State private var hasExpiry = false
 
     var body: some View {
@@ -54,38 +63,43 @@ struct ComposerView: View {
 
     private var editor: some View {
         Form {
-            Section("앱") {
+            Section(loc.s(T.appSection)) {
                 HStack {
-                    TextField("App Store 링크 또는 ID", text: $model.query)
+                    TextField(loc.s(T.appQueryField), text: $model.query)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { Task { await model.lookup() } }
-                    Button("불러오기") { Task { await model.lookup() } }
+                    Button(loc.s(T.lookUp)) { Task { await model.lookup() } }
                         .disabled(model.query.isEmpty || model.isLoading)
                 }
-                Picker("스토어프론트", selection: $model.storefront) {
-                    Text("한국 (kr)").tag("kr")
-                    Text("미국 (us)").tag("us")
-                    Text("일본 (jp)").tag("jp")
-                    Text("영국 (gb)").tag("gb")
+                Picker(loc.s(T.storefront), selection: $model.storefront) {
+                    Text(loc.s(T.storeKR)).tag("kr")
+                    Text(loc.s(T.storeUS)).tag("us")
+                    Text(loc.s(T.storeJP)).tag("jp")
+                    Text(loc.s(T.storeGB)).tag("gb")
                 }
                 if model.isLoading {
                     ProgressView().controlSize(.small)
                 }
                 if let app = model.draft.app {
-                    LabeledContent("확인됨") {
-                        Text("\(app.name) · \(app.formattedPrice ?? (app.isFree ? "무료" : ""))")
+                    LabeledContent(loc.s(T.resolved)) {
+                        Text("\(app.name) · \(app.formattedPrice ?? (app.isFree ? loc.s(T.free) : ""))")
                             .foregroundStyle(.secondary)
                     }
                 }
             }
 
-            Section("전달 방식") {
-                Picker("방식", selection: model.kindSelection) {
+            Section(loc.s(T.deliverySection)) {
+                Picker(loc.s(T.deliveryKind), selection: model.kindSelection) {
                     ForEach(GiftLinkKind.allCases) { kind in
                         Text(kind.label).tag(kind)
                     }
                 }
                 .pickerStyle(.segmented)
+                // The segmented style is an NSSegmentedControl underneath, and it keeps
+                // the titles it was first built with: the cases' identities don't change
+                // when the language does, so nothing tells it to re-read them. Keying it
+                // to the language rebuilds the control instead.
+                .id(loc.language)
 
                 if let notice = model.autoFillNotice {
                     Label(notice, systemImage: "wand.and.stars")
@@ -98,17 +112,17 @@ struct ComposerView: View {
                     .foregroundStyle(.secondary)
 
                 if model.draft.kind.requiresCode {
-                    TextField("코드", text: $model.draft.code)
+                    TextField(loc.s(T.codeField), text: $model.draft.code)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
 
                     if ledger.isCodeUsed(model.draft.code) {
-                        Label("이미 보낸 코드입니다.", systemImage: "exclamationmark.triangle.fill")
+                        Label(loc.s(T.codeAlreadySent), systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
 
-                    Toggle("만료일 표시", isOn: $hasExpiry)
+                    Toggle(loc.s(T.showExpiry), isOn: $hasExpiry)
                         .onChange(of: hasExpiry) { _, isOn in
                             model.draft.expiry = isOn
                                 ? Calendar.current.date(byAdding: .day, value: 28, to: Date())
@@ -117,7 +131,7 @@ struct ComposerView: View {
 
                     if hasExpiry {
                         DatePicker(
-                            "만료일",
+                            loc.s(T.expiryField),
                             selection: Binding(
                                 get: { model.draft.expiry ?? Date() },
                                 set: { model.draft.expiry = $0 }
@@ -128,13 +142,40 @@ struct ComposerView: View {
                 }
             }
 
-            Section("카드") {
-                TextField("문구 (예: 생일 축하해요)", text: $model.draft.occasion)
-                TextField("받는 사람", text: $model.draft.recipient)
-                TextField("보내는 사람", text: $model.draft.sender)
+            Section(loc.s(T.cardSection)) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(loc.s(T.cardStyle)).font(.caption).foregroundStyle(.secondary)
+                    CardStylePicker(selection: model.styleSelection, theme: model.draft.theme)
+                    Text(loc.s(T.cardStyleHint))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                // The one choice on this form that isn't about the interface: it decides
+                // what language the recipient is spoken to in.
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker(loc.s(T.cardLanguage), selection: $model.draft.cardLanguage) {
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.displayName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(loc.s(T.cardLanguageHint))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                TextField(
+                    loc.s(T.occasionField),
+                    text: $model.draft.occasion,
+                    prompt: Text(C.defaultOccasion.text(model.draft.cardLanguage))
+                )
+                TextField(loc.s(T.recipient), text: $model.draft.recipient)
+                TextField(loc.s(T.sender), text: $model.draft.sender)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("메시지").font(.caption).foregroundStyle(.secondary)
+                    Text(loc.s(T.message)).font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $model.draft.message)
                         .font(.system(size: 13))
                         .frame(height: 76)
@@ -142,23 +183,23 @@ struct ComposerView: View {
                             RoundedRectangle(cornerRadius: 6)
                                 .stroke(Color.secondary.opacity(0.25))
                         )
-                    Text("세 줄까지 카드에 들어갑니다.")
+                    Text(loc.s(T.messageLimit))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
                 ThemePicker(selection: $model.draft.theme)
 
-                Toggle("카드에 코드 표시", isOn: $model.draft.showCodeOnCard)
+                Toggle(loc.s(T.showCode), isOn: $model.draft.showCodeOnCard)
                     .disabled(!model.draft.kind.requiresCode)
-                Toggle("QR 코드 넣기", isOn: $model.draft.showQRCode)
+                Toggle(loc.s(T.showQR), isOn: $model.draft.showQRCode)
             }
 
             Section {
-                DisclosureGroup("캠페인 추적 (선택)") {
+                DisclosureGroup(loc.s(T.campaignGroup)) {
                     TextField("Provider token (pt)", text: $model.draft.providerToken)
                     TextField("Campaign code (ct)", text: $model.draft.campaignCode)
-                    Text("App Analytics에서 유입을 구분하고 싶을 때만 채우세요.")
+                    Text(loc.s(T.campaignHint))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -199,9 +240,9 @@ struct ComposerView: View {
 
             Spacer()
 
-            Button("배치 초기화") { model.resetLayout() }
+            Button(loc.s(T.resetLayout)) { model.resetLayout() }
                 .controlSize(.small)
-                .disabled(model.layout.isStandard)
+                .disabled(model.layout.isDefault)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -210,11 +251,9 @@ struct ComposerView: View {
 
     private var layoutHint: String {
         guard let block = model.selectedBlock else {
-            return model.layout.isStandard
-                ? "카드 위의 요소를 끌어서 옮겨 보세요. PNG로 내보낼 때도 그대로 나갑니다."
-                : "배치를 바꿨습니다. 내보내는 이미지에도 그대로 적용됩니다."
+            return loc.s(model.layout.isDefault ? T.layoutIdle : T.layoutChanged)
         }
-        return "\(block.label) 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절"
+        return loc.s(T.layoutSelected(block.label))
     }
 
     private var actionBar: some View {
@@ -228,7 +267,7 @@ struct ComposerView: View {
                         .textSelection(.enabled)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("열기") { model.openLink() }
+                    Button(loc.s(T.open)) { model.openLink() }
                         .controlSize(.small)
                 }
             }
@@ -240,23 +279,23 @@ struct ComposerView: View {
                 // One action carries both halves — the link that works and the
                 // wrapping that makes it a gift.
                 ShareAnchor { view in model.share(from: view) } label: {
-                    Label("공유", systemImage: "square.and.arrow.up")
+                    Label(loc.s(T.share), systemImage: "square.and.arrow.up")
                 }
                 .frame(width: 96, height: 28)
 
-                Button("문구 복사") { model.copyMessage() }
-                Button("이미지 복사") { model.copyCardImage() }
+                Button(loc.s(T.copyMessage)) { model.copyMessage() }
+                Button(loc.s(T.copyImage)) { model.copyCardImage() }
                 Spacer()
             }
             .disabled(!model.draft.isReady)
 
             // Checking and keeping.
             HStack(spacing: 8) {
-                Button("받는 화면 미리보기") { model.openGiftLink() }
-                Button("PNG 저장") { model.saveCardImage() }
-                Button("낱장 HTML 저장") { model.saveGiftPage() }
+                Button(loc.s(T.previewReceived)) { model.openGiftLink() }
+                Button(loc.s(T.savePNG)) { model.saveCardImage() }
+                Button(loc.s(T.saveHTML)) { model.saveGiftPage() }
                 Spacer()
-                Button("보낸 기록에 추가") { model.recordIssued(into: ledger) }
+                Button(loc.s(T.addToLedger)) { model.recordIssued(into: ledger) }
                     .keyboardShortcut(.return, modifiers: .command)
             }
             .disabled(!model.draft.isReady)
@@ -273,26 +312,26 @@ struct ComposerView: View {
     }
 
     /// Two different links can end up on the clipboard, so neither button says just
-    /// "복사" — each names the link it copies, and both sit under one heading where
+    /// "Copy" — each names the link it copies, and both sit under one heading where
     /// they can't be missed.
     private var copySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("링크 복사", systemImage: "link")
+            Label(loc.s(T.copyLinkHeading), systemImage: "link")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
                 CopyLinkButton(
-                    title: "선물 페이지 링크 복사",
-                    subtitle: "카드가 먼저 열리는 선물 페이지",
+                    title: loc.s(T.copyGiftLink),
+                    subtitle: loc.s(T.copyGiftLinkSub),
                     systemImage: "gift",
                     isProminent: true
                 ) { model.copyGiftLink() }
                 .disabled(model.giftPageURL == nil)
 
                 CopyLinkButton(
-                    title: "프로모션 링크만 복사",
-                    subtitle: "App Store로 바로 가는 원본 링크",
+                    title: loc.s(T.copyRedeemLink),
+                    subtitle: loc.s(T.copyRedeemLinkSub),
                     systemImage: "arrow.up.right.square",
                     isProminent: false
                 ) { model.copyLink() }
@@ -393,21 +432,32 @@ struct ShareAnchor<Label: View>: NSViewRepresentable {
     let action: (NSView) -> Void
     @ViewBuilder let label: () -> Label
 
-    func makeNSView(context: Context) -> NSView {
-        let host = NSHostingView(
-            rootView: Button(action: { [weak coordinator = context.coordinator] in
+    func makeNSView(context: Context) -> NSHostingView<AnyView> {
+        let host = NSHostingView(rootView: button(coordinator: context.coordinator))
+        host.translatesAutoresizingMaskIntoConstraints = false
+        context.coordinator.view = host
+        return host
+    }
+
+    /// Hands the hosting view a freshly built button.
+    ///
+    /// `label` is a value captured when the representable was made, so a hosting view
+    /// left alone keeps the words it was first given — which is how the share button
+    /// stayed in the previous language after a switch.
+    func updateNSView(_ nsView: NSHostingView<AnyView>, context: Context) {
+        nsView.rootView = button(coordinator: context.coordinator)
+    }
+
+    private func button(coordinator: Coordinator) -> AnyView {
+        AnyView(
+            Button(action: { [weak coordinator] in
                 guard let view = coordinator?.view else { return }
                 action(view)
             }, label: label)
             // Sharing is what this pane is for, so it carries the emphasis.
             .buttonStyle(.borderedProminent)
         )
-        host.translatesAutoresizingMaskIntoConstraints = false
-        context.coordinator.view = host
-        return host
     }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -417,15 +467,157 @@ struct ShareAnchor<Label: View>: NSViewRepresentable {
     }
 }
 
+// MARK: - Style thumbnails
+
+/// Picks one of the five card designs.
+///
+/// The thumbnails are schematics, not miniature renders: five live `GiftCardView`s
+/// would each build a QR and an icon to be looked at a centimetre wide. Bars where the
+/// blocks go carry the one thing being chosen — the shape of the card — and stay
+/// legible at this size, which a real render would not.
+@MainActor
+struct CardStylePicker: View {
+    @Binding var selection: CardStyle
+    let theme: GiftTheme
+
+    @ObservedObject private var loc = Localization.shared
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(CardStyle.allCases) { style in
+                Button {
+                    selection = style
+                } label: {
+                    VStack(spacing: 4) {
+                        thumbnail(style)
+                            .frame(width: 76, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(
+                                        selection == style ? Color.accentColor : Color.primary.opacity(0.15),
+                                        lineWidth: selection == style ? 2.5 : 1
+                                    )
+                            )
+
+                        Text(loc.s(style.label))
+                            .font(.system(size: 10, weight: selection == style ? .semibold : .regular))
+                            .foregroundStyle(selection == style ? Color.accentColor : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(loc.s(style.label))
+            }
+        }
+    }
+
+    /// The card's shape in miniature: the gradient, then a bar wherever a block sits.
+    private func thumbnail(_ style: CardStyle) -> some View {
+        GeometryReader { proxy in
+            let w = proxy.size.width, h = proxy.size.height
+            ZStack(alignment: .topLeading) {
+                theme.gradient
+                    .opacity(style == .minimal ? 0.75 : 1)
+
+                ForEach(Array(marks(style).enumerated()), id: \.offset) { _, mark in
+                    RoundedRectangle(cornerRadius: mark.round ? 2.5 : 0.8, style: .continuous)
+                        .fill(.white.opacity(mark.strong ? 0.95 : 0.5))
+                        .frame(width: mark.w * w, height: mark.h * h)
+                        .offset(x: mark.x * w, y: mark.y * h)
+                }
+
+                if style.hasPerforation {
+                    Rectangle()
+                        .fill(.white.opacity(0.55))
+                        .frame(width: 1, height: h * 0.74)
+                        .offset(x: CardStyle.perforationX * w, y: h * 0.13)
+                }
+            }
+        }
+    }
+
+    /// One bar on a thumbnail, in fractions of it.
+    private struct Mark {
+        var x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat
+        var strong = false
+        var round = false
+    }
+
+    /// Roughly where each style puts things — the icon, the name, the message, and the
+    /// code and QR at the bottom. Traced from the real placements, not measured from
+    /// them: a thumbnail wants the gist, and the gist survives the block sizes changing.
+    private func marks(_ style: CardStyle) -> [Mark] {
+        switch style {
+        case .classic:
+            return [
+                Mark(x: 0.06, y: 0.09, w: 0.16, h: 0.05),
+                Mark(x: 0.06, y: 0.21, w: 0.17, h: 0.27, strong: true, round: true),
+                Mark(x: 0.27, y: 0.25, w: 0.34, h: 0.09, strong: true),
+                Mark(x: 0.27, y: 0.38, w: 0.22, h: 0.05),
+                Mark(x: 0.06, y: 0.55, w: 0.52, h: 0.05),
+                Mark(x: 0.06, y: 0.64, w: 0.40, h: 0.05),
+                Mark(x: 0.06, y: 0.80, w: 0.24, h: 0.05),
+                Mark(x: 0.56, y: 0.76, w: 0.18, h: 0.08, round: true),
+                Mark(x: 0.80, y: 0.70, w: 0.14, h: 0.22, strong: true, round: true)
+            ]
+        case .centered:
+            return [
+                Mark(x: 0.42, y: 0.09, w: 0.16, h: 0.05),
+                Mark(x: 0.42, y: 0.18, w: 0.16, h: 0.25, strong: true, round: true),
+                Mark(x: 0.32, y: 0.48, w: 0.36, h: 0.08, strong: true),
+                Mark(x: 0.40, y: 0.59, w: 0.20, h: 0.04),
+                Mark(x: 0.26, y: 0.68, w: 0.48, h: 0.04),
+                Mark(x: 0.38, y: 0.78, w: 0.24, h: 0.08, round: true),
+                Mark(x: 0.06, y: 0.80, w: 0.16, h: 0.05),
+                Mark(x: 0.82, y: 0.72, w: 0.13, h: 0.20, strong: true, round: true)
+            ]
+        case .ticket:
+            return [
+                Mark(x: 0.06, y: 0.09, w: 0.15, h: 0.05),
+                Mark(x: 0.06, y: 0.21, w: 0.16, h: 0.26, strong: true, round: true),
+                Mark(x: 0.26, y: 0.25, w: 0.30, h: 0.09, strong: true),
+                Mark(x: 0.26, y: 0.38, w: 0.20, h: 0.05),
+                Mark(x: 0.06, y: 0.56, w: 0.48, h: 0.05),
+                Mark(x: 0.06, y: 0.65, w: 0.34, h: 0.05),
+                Mark(x: 0.06, y: 0.80, w: 0.22, h: 0.05),
+                Mark(x: 0.775, y: 0.28, w: 0.15, h: 0.24, strong: true, round: true),
+                Mark(x: 0.755, y: 0.60, w: 0.19, h: 0.07, round: true)
+            ]
+        case .poster:
+            return [
+                Mark(x: 0.06, y: 0.09, w: 0.10, h: 0.15, strong: true, round: true),
+                Mark(x: 0.06, y: 0.30, w: 0.62, h: 0.16, strong: true),
+                Mark(x: 0.06, y: 0.51, w: 0.40, h: 0.07),
+                Mark(x: 0.06, y: 0.63, w: 0.50, h: 0.04),
+                Mark(x: 0.06, y: 0.80, w: 0.22, h: 0.05),
+                Mark(x: 0.56, y: 0.76, w: 0.18, h: 0.08, round: true),
+                Mark(x: 0.80, y: 0.70, w: 0.14, h: 0.22, strong: true, round: true)
+            ]
+        case .minimal:
+            return [
+                Mark(x: 0.09, y: 0.14, w: 0.13, h: 0.035),
+                Mark(x: 0.09, y: 0.23, w: 0.12, h: 0.19, strong: true, round: true),
+                Mark(x: 0.09, y: 0.46, w: 0.30, h: 0.06),
+                Mark(x: 0.09, y: 0.57, w: 0.18, h: 0.035),
+                Mark(x: 0.09, y: 0.66, w: 0.42, h: 0.035),
+                Mark(x: 0.09, y: 0.79, w: 0.20, h: 0.035),
+                Mark(x: 0.56, y: 0.76, w: 0.17, h: 0.07, round: true),
+                Mark(x: 0.81, y: 0.70, w: 0.13, h: 0.21, round: true)
+            ]
+        }
+    }
+}
+
 // MARK: - Theme swatches
 
 @MainActor
 struct ThemePicker: View {
     @Binding var selection: GiftTheme
+    @ObservedObject private var loc = Localization.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("색상").font(.caption).foregroundStyle(.secondary)
+            Text(loc.s(T.colour)).font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 12) {
                 ForEach(GiftTheme.allCases) { theme in
                     Button {

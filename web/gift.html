@@ -10,6 +10,14 @@
   on the way out — so the payload would leak past the host that already has it.
 -->
 <meta name="referrer" content="no-referrer">
+<!--
+  Korean in the markup, both languages in the script.
+
+  The page speaks whichever language the sender chose (`lg` in the payload), falling
+  back to the recipient's browser. The static copy below is only what shows if the
+  script never runs at all; the script rewrites every line of it before first paint,
+  and sets `<html lang>` to match.
+-->
 <title>선물이 도착했어요</title>
 <style>
   /*
@@ -58,6 +66,26 @@
   }
   /* .card sets its own display, which would beat the UA rule for [hidden]. */
   [hidden] { display: none !important; }
+
+  /*
+   * The language switch. Deliberately the quietest thing on the page — the sender
+   * already chose, and this is only here for when they chose wrong. Fixed rather than
+   * in the flow so it never pushes the gift off centre.
+   */
+  .lang {
+    position: fixed; top: 0; right: 0; z-index: 5;
+    display: flex; gap: 2px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  }
+  .lang button {
+    padding: 5px 9px; border: 0; border-radius: 999px; cursor: pointer;
+    background: none; color: #fff; font: inherit; font-size: 12px;
+    opacity: .38; -webkit-tap-highlight-color: transparent;
+  }
+  .lang button:hover { opacity: .7; }
+  .lang button[aria-pressed=true] {
+    opacity: .9; font-weight: 600; background: rgba(255,255,255,.16);
+  }
 
   /* ---------- closed ---------- */
   .lead { font-size: 17px; opacity: .85; margin: 0 0 4px; }
@@ -179,6 +207,82 @@
   .card.shot { background: none; }
   .card.shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
+  /*
+   * ---------- the five designs ----------
+   *
+   * Mirrors CardStyle.swift: the block positions arrive from STYLE_LAYOUTS below, and
+   * what a style does to the card itself lives here. `st` in the payload picks one; a
+   * link made before styles existed has no `st` and gets Classic, which is what those
+   * cards were composed in.
+   */
+
+  /* Ticket — a stub torn off down the right. The notches are masked out rather than
+     painted over, so the page's own backdrop shows through them the way a real bite
+     out of the card would. */
+  /*
+   * The notches are ellipses sized in percentages, not `circle … cqw`.
+   *
+   * An element can't query the container it establishes itself, and `.card` is the
+   * container — so `cqw` here falls back to the viewport and the notch comes out about
+   * four times too big on a phone-width card. Percentage radii resolve against the
+   * element's own box, and 2.2% × 3.492% of a 1000 × 630 card is the circle of radius
+   * 22 that CardStyle cuts.
+   */
+  .card.s-ticket {
+    border-radius: 1.4cqw;
+    -webkit-mask-image:
+      radial-gradient(ellipse 2.2% 3.492% at 70% 0, transparent 99%, #000 100%),
+      radial-gradient(ellipse 2.2% 3.492% at 70% 100%, transparent 99%, #000 100%);
+    mask-image:
+      radial-gradient(ellipse 2.2% 3.492% at 70% 0, transparent 99%, #000 100%),
+      radial-gradient(ellipse 2.2% 3.492% at 70% 100%, transparent 99%, #000 100%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .card.s-ticket::before {
+    content: ""; position: absolute; z-index: 1; pointer-events: none;
+    left: 70%; top: 4.1cqw; bottom: 4.1cqw; width: 0;
+    border-left: 0.25cqw dashed rgba(255,255,255,.5);
+  }
+  .card.s-ticket::after {
+    background: linear-gradient(104deg, transparent 30%, rgba(255,255,255,.09) 46%, transparent 62%);
+  }
+
+  /* Poster — the headline is the card. 1.5cqw × 5.0, matching CardStyle.headlineScale. */
+  .card.s-poster .b-occasion {
+    font-size: calc(7.5cqw * var(--t));
+    letter-spacing: .135cqw;
+    line-height: 1.02;
+    max-width: 76cqw;
+  }
+  .card.s-poster::after {
+    background: linear-gradient(104deg, transparent 30%, rgba(255,255,255,.16) 46%, transparent 62%);
+  }
+
+  /* Centred — the two blocks that take a width become full columns, placed at
+     (100 − width) / 2, so centring the text inside them centres it on the card.
+     Without the width they would hug their text and sit wherever their left edge
+     was put, which is not the middle. */
+  .card.s-centered .b-occasion,
+  .card.s-centered .b-title,
+  .card.s-centered .b-message { text-align: center; }
+  .card.s-centered .b-title { width: 64cqw; }
+  .card.s-centered .b-message { width: 70cqw; max-width: none; }
+
+  /* Ticket — the text has to stop short of the perforation at 70%. */
+  .card.s-ticket .b-title { max-width: 43cqw; }
+  .card.s-ticket .b-message { max-width: 60cqw; }
+
+  /* Minimal — no sheen, softer blooms, a hairline frame, and smaller type (the scale
+     itself is applied in JS, alongside the app's). */
+  .card.s-minimal { border-radius: 1.9cqw; }
+  .card.s-minimal::after { background: none; }
+  .card.s-minimal::before {
+    content: ""; position: absolute; z-index: 1; pointer-events: none;
+    inset: 3cqw; border-radius: 1.1cqw;
+    border: 0.16cqw solid rgba(255,255,255,.32);
+  }
+
   .blk { position: absolute; z-index: 2; --t: 1.18; --s: 1; }
   .blk > * { overflow-wrap: anywhere; }
 
@@ -282,6 +386,11 @@
 </style>
 </head>
 <body>
+<div class="lang" id="lang">
+  <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+  <button type="button" data-lang="en" aria-pressed="false">English</button>
+</div>
+
 <main class="stage" id="stage">
 
   <div class="demo" id="demo" hidden><b id="demoTitle">샘플 선물입니다</b><span id="demoWhy"></span></div>
@@ -308,7 +417,7 @@
 
     <details class="howto" id="howto" hidden>
       <summary>버튼이 열리지 않으면</summary>
-      <p>App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.</p>
+      <p id="howtoBody">App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.</p>
       <p><span class="code" id="code"></span><button class="copy" id="copyBtn" type="button">복사</button></p>
     </details>
 
@@ -694,6 +803,94 @@
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage');
 
+  /** Names and messages arrive in the URL, so nothing from the payload goes into
+      innerHTML without passing through here first. */
+  function esc(text) {
+    return String(text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /* ---------- words ---------- */
+
+  var MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  var STR = {
+    ko: {
+      title: '선물이 도착했어요',
+      sub: '탭해서 열어 보세요',
+      boxLabel: '선물 열기',
+      open: '열어보기',
+      skip: '그냥 바로 받기',
+      cta: 'App Store에서 받기',
+      badge: 'App Store에서 받기',
+      howtoSummary: '버튼이 열리지 않으면',
+      howtoBody: 'App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.',
+      copy: '복사',
+      copied: '복사했어요',
+      openApp: '앱 열기',
+      back: '받으셨나요? 이제 앱에서 바로 쓸 수 있어요.',
+      backFrom: function (f) { return f + '님의 선물, 잘 받으셨나요? 이제 앱에서 바로 쓸 수 있어요.'; },
+      to: function (n) { return 'To. ' + n; },
+      from: function (n) { return 'From. ' + n; },
+      until: function (y, m, d) { return y + '년 ' + m + '월 ' + d + '일까지'; },
+      cardAlt: function (n) { return n + ' 기프트 카드'; },
+      iconAlt: function (n) { return n + ' 아이콘'; },
+      demoTitle: '샘플 선물입니다',
+      demoNoPayload: '주소 뒤에 선물 내용이 없어서, 페이지가 어떻게 보이는지 알려 주는 예시를 대신 띄웠습니다. ' +
+                     '아래 이름과 아이콘은 실제 선물의 것이 아닙니다.',
+      demoUnreadable: '선물 내용을 읽지 못했습니다.',
+      demoBroken: '선물 내용이 깨져 있습니다. 링크가 중간에 잘렸을 수 있으니 보낸 사람에게 다시 받아 보세요.',
+      /** The closed state names the people but never the app — that's what's inside. */
+      lead: function (r, f) {
+        if (f) return (r ? '<b>' + r + '님</b>께 ' : '') + '<b>' + f + '님</b>이 보냈어요';
+        if (r) return '<b>' + r + '님</b>, 선물이 도착했어요';
+        return '선물이 도착했어요';
+      }
+    },
+    en: {
+      title: 'A gift has arrived',
+      sub: 'Tap to unwrap it',
+      boxLabel: 'Open the gift',
+      open: 'Open it',
+      skip: 'Skip to the gift',
+      cta: 'Get it on the App Store',
+      badge: 'Get it on the App Store',
+      howtoSummary: 'If the button doesn’t open',
+      howtoBody: 'App Store app → your profile, top right → <b>Redeem Gift Card or Code</b> → enter the code below.',
+      copy: 'Copy',
+      copied: 'Copied',
+      openApp: 'Open the app',
+      back: 'Got it? You can start using it in the app now.',
+      backFrom: function (f) { return 'Got ' + f + '’s gift? You can start using it in the app now.'; },
+      to: function (n) { return 'To. ' + n; },
+      from: function (n) { return 'From. ' + n; },
+      until: function (y, m, d) { return 'Valid through ' + (MONTHS_EN[m - 1] || m) + ' ' + d + ', ' + y; },
+      cardAlt: function (n) { return n + ' gift card'; },
+      iconAlt: function (n) { return n + ' icon'; },
+      demoTitle: 'This is a sample gift',
+      demoNoPayload: 'There was no gift in the address, so this is an example of how the page looks. ' +
+                     'The name and icon below are not from a real gift.',
+      demoUnreadable: 'Couldn’t read the gift.',
+      demoBroken: 'The gift is garbled — the link may have been cut short on the way. ' +
+                  'Ask whoever sent it for a fresh one.',
+      lead: function (r, f) {
+        if (f) return r ? '<b>' + f + '</b> sent this to <b>' + r + '</b>'
+                        : '<b>' + f + '</b> sent you a gift';
+        if (r) return '<b>' + r + '</b>, a gift has arrived for you';
+        return 'A gift has arrived for you';
+      }
+    }
+  };
+
+  /** A date the way each language writes it. `iso` is yyyy-MM-dd. */
+  function untilText(iso, lang) {
+    var p = String(iso).split('-');
+    if (p.length !== 3) return '';
+    return STR[lang].until(p[0], +p[1], +p[2]);
+  }
+
   /* ---------- payload ---------- */
 
   /** base64url → UTF-8 text. The fragment carries Korean, so decode through bytes. */
@@ -706,16 +903,29 @@
     return new TextDecoder('utf-8').decode(bytes);
   }
 
-  var DEMO = {
-    n: '실수 100', d: 'devkoan', o: '1개월 무료',
-    m: '한 달 동안 마음껏 써 보세요.\n도움이 되면 좋겠어요.',
-    f: '현호', r: '지민', c: 'ABCDEFGHIJKL',
-    u: 'https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=ABCDEFGHIJKL',
-    p: 'https://apps.apple.com/kr/app/id6759643878',
-    e: '2026-08-26',
-    g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'],
-    q: true, k: true
-  };
+  /** The stand-in gift, in whichever language the page is speaking. */
+  function demoFor(lang) {
+    var demo = {
+      n: '실수 100', d: 'devkoan', c: 'ABCDEFGHIJKL',
+      u: 'https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=ABCDEFGHIJKL',
+      p: 'https://apps.apple.com/kr/app/id6759643878',
+      e: '2026-08-26',
+      g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'],
+      q: true, k: true
+    };
+    if (lang === 'en') {
+      demo.o = '1 MONTH FREE';
+      demo.m = 'Yours to use for a month.\nHope it earns its keep.';
+      demo.f = 'Hyunho';
+      demo.r = 'Jimin';
+    } else {
+      demo.o = '1개월 무료';
+      demo.m = '한 달 동안 마음껏 써 보세요.\n도움이 되면 좋겠어요.';
+      demo.f = '현호';
+      demo.r = '지민';
+    }
+    return demo;
+  }
 
   /**
    * The payload, from `?d=` first and the fragment second.
@@ -730,43 +940,98 @@
     return location.hash.replace(/^#/, '');
   }
 
-  var gift = DEMO, why = '';
+  /**
+   * The real gift, or null when there wasn't one. `whyKey` names the notice to show
+   * instead — held as a key rather than a sentence so it can be re-read in the other
+   * language if the recipient switches.
+   */
+  var sent = null, whyKey = '';
   var raw = payloadFromURL();
   if (!raw) {
-    why = '주소 뒤에 선물 내용이 없어서, 페이지가 어떻게 보이는지 알려 주는 예시를 대신 띄웠습니다. ' +
-          '아래 이름과 아이콘은 실제 선물의 것이 아닙니다.';
+    whyKey = 'demoNoPayload';
   } else {
     try {
       var parsed = JSON.parse(decode(raw));
-      if (parsed && typeof parsed === 'object') gift = parsed;
-      else why = '선물 내용을 읽지 못했습니다.';
+      if (parsed && typeof parsed === 'object') sent = parsed;
+      else whyKey = 'demoUnreadable';
     } catch (e) {
       // A mangled link shouldn't show a blank page — say what happened and show the sample.
-      why = '선물 내용이 깨져 있습니다. 링크가 중간에 잘렸을 수 있으니 ' +
-            '보낸 사람에게 다시 받아 보세요.';
+      whyKey = 'demoBroken';
     }
   }
-  if (why) {
-    $('demoWhy').textContent = why;
-    $('demo').hidden = false;
+
+  /**
+   * Which language to speak.
+   *
+   * The sender's choice (`lg`) wins: they know who they're sending to, and the page
+   * shouldn't second-guess a decision already made. Links from before `lg` existed —
+   * and the sample, which has no sender — fall back to the browser.
+   */
+  function initialLanguage() {
+    var chosen = sent && sent.lg;
+    if (chosen === 'ko' || chosen === 'en') return chosen;
+    var nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+    return nav.indexOf('ko') === 0 ? 'ko' : 'en';
   }
+
+  var LANG = initialLanguage();
+  var gift = sent || demoFor(LANG);
 
   /* ---------- the card ---------- */
 
   /**
-   * Matches CardLayout.standard — the arrangement the composer starts from, and the
-   * one this page draws. A custom arrangement no longer rides in the link (it was
-   * ~260 bytes), so `gift.l` only appears on links made before that changed; when it
-   * does, it still wins.
+   * Where each style starts its blocks — the same numbers as CardStyle.swift, which is
+   * the composer's own set of defaults.
+   *
+   * A *dragged* arrangement still doesn't ride in the link (it was ~260 bytes); the
+   * style does, as one short word, so a Ticket card doesn't arrive as a Classic one.
+   * `gift.l` only appears on links made while the full arrangement travelled, and when
+   * it does it still wins.
+   *
+   * Entries are [x, y] or [x, y, scale].
    */
-  var FALLBACK_LAYOUT = {
-    occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
-    logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
-    message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
-    code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+  var STYLE_LAYOUTS = {
+    classic: {
+      occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
+      logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+      message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
+      code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+    },
+    centered: {
+      occasion: [0.4550, 0.0889], badge: [0.7670, 0.0762],
+      logo:     [0.4240, 0.1524], title: [0.1800, 0.4159],
+      message:  [0.1500, 0.5968], code:  [0.4000, 0.7587],
+      people:   [0.0560, 0.7778], qr:    [0.8220, 0.7175]
+    },
+    ticket: {
+      occasion: [0.0560, 0.0889], badge: [0.4600, 0.0762],
+      logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+      message:  [0.0560, 0.5238], people: [0.0560, 0.7619],
+      qr:       [0.7890, 0.2857], code:  [0.7500, 0.5238]
+    },
+    poster: {
+      logo:     [0.0560, 0.0889, 0.55], badge: [0.7670, 0.0984],
+      occasion: [0.0560, 0.2540], title: [0.0560, 0.4603],
+      message:  [0.0560, 0.6429], people: [0.0560, 0.7778],
+      code:     [0.5600, 0.7460], qr:    [0.8060, 0.6984]
+    },
+    minimal: {
+      occasion: [0.0900, 0.1429], badge: [0.7500, 0.0952],
+      logo:     [0.0900, 0.2222, 0.75], title: [0.0900, 0.4381],
+      message:  [0.0900, 0.6111], people: [0.0900, 0.7619],
+      code:     [0.5600, 0.7460], qr:    [0.8100, 0.6984]
+    }
   };
+
   var TYPE_SCALE = 1.18;            // GiftCardView.typeScale
+  /** CardStyle.typeScale — a whole-card multiplier on top of TYPE_SCALE. */
+  var STYLE_TYPE_SCALE = { classic: 1, centered: 1, ticket: 1, poster: 1, minimal: 0.88 };
   var ARTWORK = { logo: 1, qr: 1 }; // these spend their scale on the frame, not the type
+
+  /** The style this gift was composed in, or Classic for links that never said. */
+  function styleOf(g) {
+    return STYLE_LAYOUTS[g.st] ? g.st : 'classic';
+  }
 
   function node(tag, cls, value) {
     var el = document.createElement(tag);
@@ -776,7 +1041,8 @@
   }
 
   function place(id, el) {
-    var l = (gift.l && gift.l[id]) || FALLBACK_LAYOUT[id];
+    var style = styleOf(gift);
+    var l = (gift.l && gift.l[id]) || STYLE_LAYOUTS[style][id];
     if (!l) return;
     el.classList.add('blk', 'b-' + id);
     // Keep the composer's fractions around — the clamp below has to work from the
@@ -788,7 +1054,7 @@
     el.style.top = (l[1] * 100).toFixed(3) + '%';
     var s = l[2] || 1;
     if (ARTWORK[id]) el.style.setProperty('--s', s);
-    else el.style.setProperty('--t', (TYPE_SCALE * s).toFixed(4));
+    else el.style.setProperty('--t', (TYPE_SCALE * STYLE_TYPE_SCALE[style] * s).toFixed(4));
     $('card').appendChild(el);
   }
 
@@ -888,7 +1154,7 @@
       card.classList.add('shot');
       var shot = node('img');
       shot.src = gift.img;
-      shot.alt = (gift.n || '') + ' 기프트 카드';
+      shot.alt = STR[LANG].cardAlt(gift.n || '');
       shot.onerror = function () { card.classList.remove('shot'); card.innerHTML = ''; paintBlocks(); };
       card.appendChild(shot);
       return;
@@ -915,7 +1181,7 @@
     if (gift.i) {
       var img = node('img');
       img.src = gift.i;
-      img.alt = (gift.n || '') + ' 아이콘';
+      img.alt = STR[LANG].iconAlt(gift.n || '');
       img.onerror = function () {
         img.remove();
         lookupLogo(node('div', '', (gift.n || '?').trim().charAt(0)));
@@ -926,6 +1192,12 @@
     lookupLogo(null);
   }
 
+  /**
+   * Bumped every time the card is redrawn, so a lookup still in flight from the
+   * previous language can tell that its monogram is no longer on the page and stop.
+   */
+  var paintGeneration = 0;
+
   /** Monogram now, real icon if Apple's lookup can name one. */
   function lookupLogo(existing) {
     var mono = existing || node('div', '', (gift.n || '?').trim().charAt(0));
@@ -934,18 +1206,21 @@
     var id = appleID();
     if (!id) return;
 
+    var generation = paintGeneration;
+
     fetch('https://itunes.apple.com/lookup?id=' + id)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         var app = data && data.results && data.results[0];
         var src = app && (app.artworkUrl512 || app.artworkUrl100);
-        if (!src) return;
+        if (!src || generation !== paintGeneration) return;
 
         // Swap only once it has actually decoded, so the card never flashes a broken
         // image frame between the monogram and the icon.
         var img = node('img');
-        img.alt = (gift.n || '') + ' 아이콘';
+        img.alt = STR[LANG].iconAlt(gift.n || '');
         img.onload = function () {
+          if (generation !== paintGeneration) return;
           mono.replaceWith(img);
           img.classList.add('blk', 'b-logo');
           img.style.cssText = mono.style.cssText;
@@ -960,7 +1235,7 @@
 
   function paintBlocks() {
     if (gift.o) place('occasion', node('div', '', gift.o));
-    place('badge', node('div', '', 'App Store에서 받기'));
+    place('badge', node('div', '', STR[LANG].badge));
 
     placeLogo();
 
@@ -975,13 +1250,11 @@
 
     if (gift.r || gift.f || gift.e) {
       var people = node('div');
-      if (gift.r) people.appendChild(node('div', 'to', 'To. ' + gift.r));
-      if (gift.f) people.appendChild(node('div', 'from', 'From. ' + gift.f));
+      if (gift.r) people.appendChild(node('div', 'to', STR[LANG].to(gift.r)));
+      if (gift.f) people.appendChild(node('div', 'from', STR[LANG].from(gift.f)));
       if (gift.e) {
-        var p = String(gift.e).split('-');
-        if (p.length === 3) {
-          people.appendChild(node('div', 'till', p[0] + '년 ' + (+p[1]) + '월 ' + (+p[2]) + '일까지'));
-        }
+        var till = untilText(gift.e, LANG);
+        if (till) people.appendChild(node('div', 'till', till));
       }
       place('people', people);
     }
@@ -1000,31 +1273,82 @@
 
   /* ---------- paint ---------- */
 
-  if (Array.isArray(gift.g) && gift.g.length === 3) {
-    document.documentElement.style.setProperty('--g1', '#' + gift.g[0]);
-    document.documentElement.style.setProperty('--g2', '#' + gift.g[1]);
-    document.documentElement.style.setProperty('--g3', '#' + gift.g[2]);
+  function paintTheme() {
+    if (Array.isArray(gift.g) && gift.g.length === 3) {
+      document.documentElement.style.setProperty('--g1', '#' + gift.g[0]);
+      document.documentElement.style.setProperty('--g2', '#' + gift.g[1]);
+      document.documentElement.style.setProperty('--g3', '#' + gift.g[2]);
+    }
+    if (Array.isArray(gift.b) && gift.b.length === 2) {
+      document.documentElement.style.setProperty('--b1', '#' + gift.b[0]);
+      document.documentElement.style.setProperty('--b2', '#' + gift.b[1]);
+    }
   }
-  if (Array.isArray(gift.b) && gift.b.length === 2) {
-    document.documentElement.style.setProperty('--b1', '#' + gift.b[0]);
-    document.documentElement.style.setProperty('--b2', '#' + gift.b[1]);
+
+  /**
+   * Writes the whole page in one language, and can be run again in the other.
+   *
+   * Everything the recipient reads goes through here — including the card, which is
+   * torn down and redrawn, since the badge, the names and the expiry line are all
+   * words. Whether the gift is already unwrapped is left alone: switching language
+   * shouldn't re-wrap a gift someone has already opened.
+   */
+  function applyLanguage(next) {
+    LANG = next;
+    var S = STR[next];
+
+    document.documentElement.lang = next;
+    document.title = S.title;
+    gift = sent || demoFor(next);
+    paintTheme();
+
+    [].forEach.call($('lang').children, function (button) {
+      button.setAttribute('aria-pressed', String(button.dataset.lang === next));
+    });
+
+    if (whyKey) {
+      $('demoTitle').textContent = S.demoTitle;
+      $('demoWhy').textContent = S[whyKey];
+      $('demo').hidden = false;
+    }
+
+    $('lead').innerHTML = S.lead(gift.r ? esc(gift.r) : '', gift.f ? esc(gift.f) : '');
+    $('sub').textContent = S.sub;
+    $('box').setAttribute('aria-label', S.boxLabel);
+    $('openBtn').textContent = S.open;
+    $('skipBtn').textContent = S.skip;
+    $('cta').textContent = S.cta;
+    $('howto').querySelector('summary').textContent = S.howtoSummary;
+    $('howtoBody').innerHTML = S.howtoBody;
+    $('copyBtn').textContent = S.copy;
+    $('openApp').textContent = S.openApp;
+    $('backMsg').textContent = gift.f ? S.backFrom(gift.f) : S.back;
+
+    var redeem = gift.u || gift.p || '';
+    $('cta').href = redeem || '#';
+    $('openApp').href = gift.p || redeem || '#';
+
+    $('howto').hidden = !gift.c;
+    $('code').textContent = gift.c || '';
+
+    // Redraw the card in the new language. Anything the previous paint had in flight
+    // is stale from here on.
+    paintGeneration++;
+    var card = $('card');
+    // Rebuild the class list from scratch — the previous paint left its own style on.
+    card.className = 'card s-' + styleOf(gift);
+    card.innerHTML = '';
+    drawCard();
+    if (stage.classList.contains('is-open')) fitBlocks();
   }
 
-  // The closed state names the people but never the app — that's what's inside.
-  var lead = gift.r ? gift.r + '님, 선물이 도착했어요' : '선물이 도착했어요';
-  if (gift.f) lead = (gift.r ? gift.r + '님께 ' : '') + gift.f + '님이 보냈어요';
-  $('lead').innerHTML = lead.replace(/(\S+님)/, '<b>$1</b>');
+  applyLanguage(LANG);
 
-  drawCard();
-
-  var redeem = gift.u || gift.p || '';
-  $('cta').href = redeem || '#';
-  $('openApp').href = gift.p || redeem || '#';
-
-  if (gift.c) {
-    $('howto').hidden = false;
-    $('code').textContent = gift.c;
-  }
+  [].forEach.call($('lang').children, function (button) {
+    button.addEventListener('click', function () {
+      if (button.dataset.lang !== LANG) applyLanguage(button.dataset.lang);
+    });
+  });
 
   /* ---------- opening ---------- */
 
@@ -1069,13 +1393,13 @@
   $('cta').addEventListener('click', function () { went = true; });
   document.addEventListener('visibilitychange', function () {
     if (went && document.visibilityState === 'visible') {
+      // The wording is already in place from applyLanguage — this only reveals it.
       stage.classList.add('is-back');
-      if (gift.f) $('backMsg').textContent = gift.f + '님의 선물, 잘 받으셨나요? 이제 앱에서 바로 쓸 수 있어요.';
     }
   });
 
   $('copyBtn').addEventListener('click', function () {
-    var done = function () { $('copyBtn').textContent = '복사했어요'; };
+    var done = function () { $('copyBtn').textContent = STR[LANG].copied; };
     if (navigator.clipboard) navigator.clipboard.writeText(gift.c).then(done, done);
     else done();
   });

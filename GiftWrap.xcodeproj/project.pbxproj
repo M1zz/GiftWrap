@@ -11,6 +11,8 @@
 		1219DBCC20D2038519BDEB4B /* GiftPageTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F66E735CAA8AC117C8BB9F70 /* GiftPageTemplate.swift */; };
 		21EE5C22D42D946434400301 /* GiftExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0401630E14090C990F6F144F /* GiftExporter.swift */; };
 		2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */; };
+		3F7A21C05E9B48D6A1C2E4F8 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C4E13B7A26D05F8C3B1D7E2 /* Localization.swift */; };
+		6B08D5F41A73C29E4D8016BA /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27C09A648B1D3F5027EA9C1 /* CardStyle.swift */; };
 		4BE4815B2A4DB6C622DC8053 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF87329F1F80F6102F683158 /* ContentView.swift */; };
 		56A382E1F0A2B9561E3D48E9 /* RedeemLinkBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2850266ADA0841E6486A3733 /* RedeemLinkBuilder.swift */; };
 		5D7368D8AC6904744441CA08 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */; };
@@ -38,6 +40,8 @@
 		75E8087D10C8F6B94BDDEB5A /* GiftWrap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GiftWrap.entitlements; sourceTree = "<group>"; };
 		8BB98F86B576591849611BE9 /* ComposerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposerModel.swift; sourceTree = "<group>"; };
 		92D098F8A1930D887B48048F /* GiftWrap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GiftWrap.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9C4E13B7A26D05F8C3B1D7E2 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		E27C09A648B1D3F5027EA9C1 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
 		A79EA8DE98CD9BCF76842E3F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BF87329F1F80F6102F683158 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreApp.swift; sourceTree = "<group>"; };
@@ -61,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				D6FBEA3EACD56DC817A6E655 /* AppStoreApp.swift */,
+				E27C09A648B1D3F5027EA9C1 /* CardStyle.swift */,
 				654C1E3379E180E26089F726 /* GiftCard.swift */,
 				6AEBA174CEA43862109A1B40 /* GiftTheme.swift */,
 			);
@@ -71,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				F66E735CAA8AC117C8BB9F70 /* GiftPageTemplate.swift */,
+				9C4E13B7A26D05F8C3B1D7E2 /* Localization.swift */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -201,8 +207,10 @@
 				88193A737FABAAFBC80D95FB /* GiftWrapApp.swift in Sources */,
 				2C4EDD58ADD28539965BC453 /* AppStoreApp.swift in Sources */,
 				7A61052B6333387B2DFECF6E /* GiftCard.swift in Sources */,
+				6B08D5F41A73C29E4D8016BA /* CardStyle.swift in Sources */,
 				F3ED5D3364B62739A5ACC98C /* GiftTheme.swift in Sources */,
 				1219DBCC20D2038519BDEB4B /* GiftPageTemplate.swift in Sources */,
+				3F7A21C05E9B48D6A1C2E4F8 /* Localization.swift in Sources */,
 				F9D836C26C0602E37B60101D /* AppStoreLookupService.swift in Sources */,
 				21EE5C22D42D946434400301 /* GiftExporter.swift in Sources */,
 				80A9CCDB754C005A278779ED /* GiftLedger.swift in Sources */,
