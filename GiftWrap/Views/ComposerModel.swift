@@ -48,6 +48,19 @@ final class ComposerModel: ObservableObject {
         )
     }
 
+    /// The card-language picker writes through here so the choice becomes the default
+    /// for later cards, not just this one.
+    var cardLanguageSelection: Binding<AppLanguage> {
+        Binding(
+            get: { self.draft.cardLanguage },
+            set: { newValue in
+                guard newValue != self.draft.cardLanguage else { return }
+                self.draft.cardLanguage = newValue
+                AppLanguage.persistCard(newValue)
+            }
+        )
+    }
+
     func resetLayout() {
         layout = .defaults(for: draft.style)
         layout.save()

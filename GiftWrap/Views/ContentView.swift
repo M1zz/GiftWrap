@@ -154,7 +154,7 @@ struct ComposerView: View {
                 // The one choice on this form that isn't about the interface: it decides
                 // what language the recipient is spoken to in.
                 VStack(alignment: .leading, spacing: 4) {
-                    Picker(loc.s(T.cardLanguage), selection: $model.draft.cardLanguage) {
+                    Picker(loc.s(T.cardLanguage), selection: model.cardLanguageSelection) {
                         ForEach(AppLanguage.allCases) { language in
                             Text(language.displayName).tag(language)
                         }

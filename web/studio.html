@@ -1,0 +1,2273 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GiftWrap Studio</title>
+<!--
+  The macOS app, in a browser.
+
+  Same three tabs, same card, same links. It exists because the app only runs on a Mac
+  and only for whoever built it, while a gift link is something you might want to make
+  from any machine.
+
+  Two things are deliberately shared with the rest of the repo rather than reinvented:
+  the card's geometry (CardStyle.swift — same fractions, same chrome) and the gift-link
+  payload (RedeemLinkBuilder.swift — same short keys, same base64url). A card composed
+  here and a card composed in the app produce the same drawing and the same URL.
+
+  The card is drawn on a canvas rather than in the DOM, so the preview and the exported
+  PNG are one renderer at two scales — the same bargain the app makes with SwiftUI.
+-->
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --line: #d2d2d7;
+    --accent: #0071e3;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 15.5px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); font-size: 13px; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 80px; }
+  header.top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+  }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field > label, .field > .lbl { font-size: 12.5px; color: var(--ink-2); }
+  input[type=text], input[type=date], input[type=number], select, textarea {
+    font: inherit; padding: 6px 9px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit;
+  }
+  textarea { width: 100%; resize: vertical; font-size: 13px; }
+  button {
+    font: inherit; font-weight: 500; padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer;
+  }
+  button:hover { background: #f0f0f2; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.mini { padding: 4px 9px; font-size: 12.5px; }
+
+  .lang { margin-left: auto; display: flex; gap: 4px; }
+  .lang button {
+    padding: 4px 10px; font-size: 12.5px; border-radius: 999px;
+    color: var(--ink-2); background: none; border: 1px solid transparent;
+  }
+  .lang button:hover { background: #ebebed; color: var(--ink); }
+  .lang button[aria-pressed=true] {
+    color: var(--ink); background: #fff; border-color: var(--line); font-weight: 600;
+  }
+
+  .tabs { display: flex; gap: 6px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    border: none; background: none; border-bottom: 2px solid transparent;
+    border-radius: 0; padding: 8px 13px; color: var(--ink-2);
+  }
+  .tabs button:hover { background: none; color: var(--ink); }
+  .tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+
+  /* Two columns: the form, then the card. Same split as the app's HSplitView. */
+  .studio { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .form { flex: 0 1 430px; min-width: 340px; }
+  .stage { flex: 1 1 560px; min-width: 420px; position: sticky; top: 16px; }
+
+  /* align-self, because .field is a flex column and its children stretch by default —
+     which would pull a three-item segmented control across the whole panel. */
+  .seg {
+    display: inline-flex; align-self: flex-start;
+    border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  .seg button {
+    border: none; border-radius: 0; border-right: 1px solid var(--line);
+    padding: 5px 11px; font-size: 13px; background: #fff;
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button[aria-pressed=true] { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Design picker — schematics, not miniature renders. Five real cards at a centimetre
+     wide would each build a QR to be squinted at; bars where the blocks go carry the
+     one thing being chosen. */
+  .styles { display: flex; gap: 7px; flex-wrap: wrap; }
+  .styles .pick { border: none; background: none; padding: 0; cursor: pointer; }
+  /* display:block — a span is inline, and an inline box ignores width and height,
+     which collapses the whole thumbnail to a hairline. */
+  .styles .thumb {
+    display: block;
+    width: 78px; height: 49px; border-radius: 6px; position: relative; overflow: hidden;
+    border: 1px solid rgba(0,0,0,.15);
+  }
+  .styles .pick[aria-pressed=true] .thumb { border: 2.5px solid var(--accent); }
+  .styles .name { display: block; font-size: 10.5px; color: var(--ink-2); margin-top: 2px; text-align: center; }
+  .styles .pick[aria-pressed=true] .name { color: var(--accent); font-weight: 600; }
+  .styles .mark { display: block; position: absolute; background: rgba(255,255,255,.5); }
+  .styles .mark.strong { background: rgba(255,255,255,.95); }
+  .styles .perf { position: absolute; width: 1px; background: rgba(255,255,255,.55); }
+
+  .swatches { display: flex; gap: 10px; }
+  .swatches button {
+    width: 28px; height: 28px; border-radius: 999px; padding: 0; border: none; cursor: pointer;
+  }
+  .swatches button[aria-pressed=true] { box-shadow: 0 0 0 2.5px var(--accent); }
+
+  /* Both preview canvases scale to their column — they carry a fixed pixel size for
+     drawing, which without this would lay out at its full width and overflow. */
+  .stage canvas { width: 100%; height: auto; display: block; }
+  canvas#card { touch-action: none; outline: none; }
+  canvas#card:focus-visible { box-shadow: 0 0 0 3px rgba(0,113,227,.4); border-radius: 10px; }
+
+  .editorbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 7px 10px; background: #ececee; border-radius: 8px; margin-top: 6px;
+  }
+  .linkline {
+    display: flex; gap: 8px; align-items: center; margin-top: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; color: var(--ink-2);
+  }
+  .linkline span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .copybox {
+    margin-top: 10px; padding: 11px; border-radius: 11px;
+    background: rgba(0,113,227,.06); border: 1px solid rgba(0,113,227,.22);
+  }
+  .copybox .head { font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 7px; }
+  .copybox .pair { display: flex; gap: 9px; flex-wrap: wrap; }
+  .copybox .pair button { flex: 1 1 200px; text-align: left; padding: 8px 11px; line-height: 1.3; }
+  .copybox .pair button b { display: block; font-size: 12px; font-weight: 600; }
+  .copybox .pair button small { font-size: 10px; opacity: .75; }
+
+  .actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .status { font-size: 12.5px; color: var(--ink-2); margin-top: 8px; min-height: 1.2em; }
+
+  .warn { color: #a15c00; }
+  .note {
+    background: #fff8e6; border: 1px solid #f0dca8; border-radius: 10px;
+    padding: 11px 13px; font-size: 13.5px; line-height: 1.55; margin-bottom: 14px;
+  }
+
+  table.ledger { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.ledger th, table.ledger td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.ledger th { color: var(--ink-2); font-weight: 500; }
+  table.ledger td.code { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  table.ledger tr.done { background: #f2fbf5; }
+
+  @media (max-width: 900px) {
+    .stage { position: static; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>GiftWrap Studio</h1>
+    <span class="sub" data-i18n="tagline">App Store 선물 카드와 링크를 브라우저에서 만듭니다</span>
+    <div class="lang" id="uiLang">
+      <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+      <button type="button" data-lang="en" aria-pressed="false">English</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="compose" aria-selected="true" data-i18n="tabCompose">카드 만들기</button>
+    <button role="tab" data-tab="batch" aria-selected="false" data-i18n="tabBatch">여러 장 만들기</button>
+    <button role="tab" data-tab="ledger" aria-selected="false" data-i18n="tabLedger">보낸 기록</button>
+  </div>
+
+  <!-- ============ Compose ============ -->
+  <section id="tab-compose">
+    <div class="studio">
+      <div class="form">
+
+        <section class="panel">
+          <h2 data-i18n="appSection">앱</h2>
+          <div class="row">
+            <div class="field" style="flex:1; min-width:190px">
+              <label for="query" data-i18n="appQueryField">App Store 링크 또는 ID</label>
+              <input type="text" id="query" data-i18n-ph="appQueryPlaceholder"
+                     placeholder="6759643878 또는 https://apps.apple.com/…">
+            </div>
+            <button id="lookupBtn" data-i18n="lookUp">불러오기</button>
+            <div class="field">
+              <label for="storefront" data-i18n="storefront">스토어프론트</label>
+              <select id="storefront">
+                <option value="kr" data-i18n="storeKR">한국 (kr)</option>
+                <option value="us" data-i18n="storeUS">미국 (us)</option>
+                <option value="jp" data-i18n="storeJP">일본 (jp)</option>
+                <option value="gb" data-i18n="storeGB">영국 (gb)</option>
+              </select>
+            </div>
+          </div>
+          <div class="sub" id="appStatus" style="margin-top:8px"></div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="deliverySection">전달 방식</h2>
+          <div class="seg" id="kindSeg">
+            <button type="button" data-kind="directLink" aria-pressed="true" data-i18n="kindDirectLink">다운로드 링크</button>
+            <button type="button" data-kind="appPromoCode" aria-pressed="false" data-i18n="kindAppPromoCode">앱 프로모션 코드</button>
+            <button type="button" data-kind="offerCode" aria-pressed="false" data-i18n="kindOfferCode">인앱 오퍼 코드</button>
+          </div>
+          <div class="sub" id="kindWhy" style="margin-top:7px"></div>
+          <div class="sub" id="autoFill" style="margin-top:5px"></div>
+
+          <div id="codeArea" style="margin-top:11px" hidden>
+            <div class="field">
+              <label for="code" data-i18n="codeField">코드</label>
+              <input type="text" id="code" style="font-family:ui-monospace,Menlo,monospace">
+            </div>
+            <div class="sub warn" id="codeUsed" style="margin-top:5px" hidden></div>
+            <label style="display:block; margin-top:9px; font-size:13px">
+              <input type="checkbox" id="hasExpiry"> <span data-i18n="showExpiry">만료일 표시</span>
+            </label>
+            <div class="field" id="expiryField" style="margin-top:6px" hidden>
+              <label for="expiry" data-i18n="expiryField">만료일</label>
+              <input type="date" id="expiry" style="width:170px">
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="cardSection">카드</h2>
+
+          <div class="field">
+            <span class="lbl" data-i18n="cardStyle">디자인</span>
+            <div class="styles" id="stylePicker"></div>
+            <span class="sub" data-i18n="cardStyleHint" style="font-size:11.5px">스타일마다 배치를 따로 기억합니다.</span>
+          </div>
+
+          <div class="field" style="margin-top:11px">
+            <span class="lbl" data-i18n="cardLanguage">카드 언어</span>
+            <div class="seg" id="cardLangSeg">
+              <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+              <button type="button" data-lang="en" aria-pressed="false">English</button>
+            </div>
+            <span class="sub" data-i18n="cardLanguageHint" style="font-size:11.5px">받는 사람이 보는 언어입니다.</span>
+          </div>
+
+          <div class="row" style="margin-top:11px">
+            <div class="field" style="flex:1; min-width:150px">
+              <label for="occasion" data-i18n="occasionField">문구</label>
+              <input type="text" id="occasion" maxlength="24">
+            </div>
+            <div class="field" style="width:110px">
+              <label for="recipient" data-i18n="recipient">받는 사람</label>
+              <input type="text" id="recipient">
+            </div>
+            <div class="field" style="width:110px">
+              <label for="sender" data-i18n="sender">보내는 사람</label>
+              <input type="text" id="sender">
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:9px">
+            <label for="message" data-i18n="message">메시지</label>
+            <textarea id="message" rows="3"></textarea>
+            <span class="sub" data-i18n="messageLimit" style="font-size:11.5px">세 줄까지 카드에 들어갑니다.</span>
+          </div>
+
+          <div class="field" style="margin-top:11px">
+            <span class="lbl" data-i18n="colour">색상</span>
+            <div class="swatches" id="themePicker"></div>
+          </div>
+
+          <div style="margin-top:11px; font-size:13px">
+            <label style="display:block"><input type="checkbox" id="showCode" checked> <span data-i18n="showCode">카드에 코드 표시</span></label>
+            <label style="display:block; margin-top:4px"><input type="checkbox" id="showQR" checked> <span data-i18n="showQR">QR 코드 넣기</span></label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <details>
+            <summary class="sub" style="cursor:pointer" data-i18n="campaignGroup">캠페인 추적 (선택)</summary>
+            <div class="row" style="margin-top:9px">
+              <div class="field"><label for="pt">Provider token (pt)</label><input type="text" id="pt" style="width:160px"></div>
+              <div class="field"><label for="ct">Campaign code (ct)</label><input type="text" id="ct" style="width:160px"></div>
+            </div>
+            <div class="sub" data-i18n="campaignHint" style="margin-top:6px; font-size:11.5px"></div>
+          </details>
+        </section>
+      </div>
+
+      <div class="stage">
+        <canvas id="card" width="1240" height="880" tabindex="0" data-i18n-aria="canvasLabel"
+                aria-label="카드 미리보기 — 요소를 끌어서 배치할 수 있습니다"></canvas>
+
+        <div class="editorbar">
+          <span class="sub" id="editorHint"></span>
+          <button class="mini" id="resetLayout" style="margin-left:auto" data-i18n="resetLayout">배치 초기화</button>
+        </div>
+
+        <div class="linkline" id="linkLine" hidden>
+          <span id="redeemLink"></span>
+          <button class="mini" id="openRedeem" data-i18n="open">열기</button>
+        </div>
+
+        <div class="copybox">
+          <div class="head" data-i18n="copyLinkHeading">링크 복사</div>
+          <div class="pair">
+            <button class="primary" id="copyGift">
+              <b data-i18n="copyGiftLink">선물 페이지 링크 복사</b>
+              <small data-i18n="copyGiftLinkSub">카드가 먼저 열리는 선물 페이지</small>
+            </button>
+            <button id="copyRedeem">
+              <b data-i18n="copyRedeemLink">프로모션 링크만 복사</b>
+              <small data-i18n="copyRedeemLinkSub">App Store로 바로 가는 원본 링크</small>
+            </button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="copyMessage" data-i18n="copyMessage">문구 복사</button>
+          <button id="copyImage" data-i18n="copyImage">이미지 복사</button>
+          <button id="savePNG" data-i18n="savePNG">PNG 저장</button>
+          <button id="previewGift" data-i18n="previewReceived">받는 화면 미리보기</button>
+          <button class="primary" id="addLedger" style="margin-left:auto" data-i18n="addToLedger">보낸 기록에 추가</button>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Batch ============ -->
+  <section id="tab-batch" hidden>
+    <div class="note" data-i18n-html="batchNote"></div>
+    <div class="studio">
+      <div class="form">
+        <section class="panel">
+          <h2 data-i18n="batchCodeList">코드 목록</h2>
+          <span class="sub" data-i18n="batchHint"></span>
+          <textarea id="batchInput" rows="10" style="margin-top:8px; font-family:ui-monospace,Menlo,monospace"></textarea>
+          <div class="row" style="margin-top:9px">
+            <span class="sub" id="batchCount"></span>
+            <button class="primary" id="batchCSV" style="margin-left:auto" data-i18n="batchExportCSV">CSV 내보내기</button>
+            <button id="batchPNG" data-i18n="batchExportPNG">PNG 전부 저장</button>
+          </div>
+          <div class="sub" id="batchStatus" style="margin-top:8px"></div>
+        </section>
+      </div>
+      <div class="stage">
+        <canvas id="batchCard" width="1240" height="880"></canvas>
+        <div class="sub" data-i18n="batchPreviewNote" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Ledger ============ -->
+  <section id="tab-ledger" hidden>
+    <section class="panel">
+      <div class="row" style="margin-bottom:11px">
+        <input type="text" id="ledgerSearch" data-i18n-ph="search" placeholder="검색" style="flex:1; min-width:180px">
+        <span class="sub" id="ledgerCount"></span>
+        <button class="mini" id="ledgerCSV" data-i18n="exportCSV">CSV 내보내기</button>
+        <button class="mini" id="ledgerClear" data-i18n="clearLedger">기록 지우기</button>
+      </div>
+      <table class="ledger"><thead>
+        <tr>
+          <th style="width:96px" data-i18n="ledgerDate">보낸 날짜</th>
+          <th data-i18n="ledgerApp">앱</th>
+          <th style="width:110px" data-i18n="recipient">받는 사람</th>
+          <th style="width:140px" data-i18n="codeField">코드</th>
+          <th style="width:120px" data-i18n="ledgerKind">방식</th>
+          <th style="width:58px" data-i18n="ledgerRedeemed">사용됨</th>
+          <th style="width:66px"></th>
+        </tr>
+      </thead><tbody id="ledgerBody"></tbody></table>
+      <div class="sub" id="ledgerEmpty" style="margin-top:14px"></div>
+    </section>
+  </section>
+
+</div>
+
+<script src="qr.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // =====================================================================
+  //  Words
+  // =====================================================================
+  /* The interface's language and the card's language are separate choices, exactly as
+     in the app: the first is for whoever is composing, the second is picked on the
+     recipient's behalf and travels in the link. */
+
+  var UI = {
+    ko: {
+      tagline: 'App Store 선물 카드와 링크를 브라우저에서 만듭니다',
+      tabCompose: '카드 만들기', tabBatch: '여러 장 만들기', tabLedger: '보낸 기록',
+      appSection: '앱', appQueryField: 'App Store 링크 또는 ID',
+      appQueryPlaceholder: '6759643878 또는 https://apps.apple.com/…',
+      lookUp: '불러오기', storefront: '스토어프론트',
+      storeKR: '한국 (kr)', storeUS: '미국 (us)', storeJP: '일본 (jp)', storeGB: '영국 (gb)',
+      deliverySection: '전달 방식',
+      kindDirectLink: '다운로드 링크', kindAppPromoCode: '앱 프로모션 코드', kindOfferCode: '인앱 오퍼 코드',
+      kindDirectLinkWhy: '코드 없이 App Store 제품 페이지로 보냅니다. 무료 앱에 적합합니다.',
+      kindAppPromoCodeWhy: '유료 앱을 무료로 받는 1회용 코드입니다. 생성 후 4주간 유효합니다.',
+      kindOfferCodeWhy: '구독·인앱 결제용 코드입니다. 앱이 무료 다운로드라면 이 방식을 씁니다.',
+      codeField: '코드', codeAlreadySent: '이미 보낸 코드입니다.',
+      showExpiry: '만료일 표시', expiryField: '만료일',
+      cardSection: '카드', cardStyle: '디자인',
+      cardStyleHint: '스타일마다 배치를 따로 기억합니다. 옮겨 둔 배치는 그대로 남아요.',
+      cardLanguage: '카드 언어',
+      cardLanguageHint: '받는 사람이 보는 카드·선물 페이지·전송 문구의 언어입니다. 다음 카드도 이 언어로 시작합니다.',
+      occasionField: '문구', recipient: '받는 사람', sender: '보내는 사람',
+      message: '메시지', messageLimit: '세 줄까지 카드에 들어갑니다.',
+      colour: '색상', showCode: '카드에 코드 표시', showQR: 'QR 코드 넣기',
+      campaignGroup: '캠페인 추적 (선택)',
+      campaignHint: 'App Analytics에서 유입을 구분하고 싶을 때만 채우세요.',
+      canvasLabel: '카드 미리보기 — 요소를 끌어서 배치할 수 있습니다',
+      resetLayout: '배치 초기화', open: '열기',
+      copyLinkHeading: '링크 복사',
+      copyGiftLink: '선물 페이지 링크 복사', copyGiftLinkSub: '카드가 먼저 열리는 선물 페이지',
+      copyRedeemLink: '프로모션 링크만 복사', copyRedeemLinkSub: 'App Store로 바로 가는 원본 링크',
+      copyMessage: '문구 복사', copyImage: '이미지 복사', savePNG: 'PNG 저장',
+      previewReceived: '받는 화면 미리보기', addToLedger: '보낸 기록에 추가',
+      styleClassic: '클래식', styleCentered: '센터', styleTicket: '티켓',
+      stylePoster: '포스터', styleMinimal: '미니멀',
+      blocks: { occasion: '머리말', badge: '받기 배지', logo: '앱 아이콘', title: '앱 이름',
+                message: '메시지', people: '받는 · 보내는 사람', code: '코드', qr: 'QR' },
+      editorIdle: '카드 위의 요소를 끌어서 옮겨 보세요. PNG로 내보낼 때도 그대로 나갑니다.',
+      editorChanged: '배치를 바꿨습니다. 내보내는 이미지에도 그대로 적용됩니다.',
+      editorSelected: function (n) {
+        return n + ' 선택됨 — 끌어서 이동(방향키 미세 조정), 모서리 손잡이나 +/− 키로 크기 조절';
+      },
+      collide: function (a, b) {
+        return a + waGwa(a) + ' ' + b + iGa(b) + ' 겹칩니다 — 내보내는 이미지에도 그대로 나갑니다';
+      },
+      lookingUp: '조회 중…',
+      resolved: function (name, price) { return '확인됨 — ' + name + ' · ' + price; },
+      free: '무료',
+      lookupBadInput: 'App Store 링크나 숫자 ID를 넣어주세요.',
+      lookupNotFound: '해당 스토어프론트에서 앱을 찾지 못했습니다. 국가 코드를 확인해 주세요.',
+      lookupFailed: '앱 정보를 불러오지 못했습니다. 오프라인이거나 ID가 잘못됐을 수 있습니다.',
+      autoFilled: function (parts) { return '링크에서 ' + parts + ' 자동 설정'; },
+      needApp: '먼저 앱을 불러오세요.',
+      needCode: '코드를 입력하세요.',
+      copiedGiftLink: '선물 페이지 링크를 복사했습니다 — 카드부터 열립니다.',
+      copiedRedeemLink: '프로모션 링크를 복사했습니다 — App Store로 바로 갑니다.',
+      copiedMessage: '메시지를 복사했습니다 — 카드 이미지도 함께 보내세요.',
+      copiedImage: '카드 이미지를 복사했습니다.',
+      copyFailed: '복사에 실패했습니다.',
+      noImageCopy: '이 브라우저는 이미지 복사를 지원하지 않습니다. PNG로 저장해 주세요.',
+      saved: function (n) { return '저장했습니다 — ' + n; },
+      layoutReset: '카드 배치를 기본값으로 되돌렸습니다.',
+      recorded: '보낸 기록에 추가했습니다.',
+      batchNote: '<b>한 줄에 코드 하나.</b> 받는 사람을 함께 적으려면 <code>코드, 이름</code> 형식으로 쓰세요. ' +
+                 '카드 디자인·색상·문구는 ‘카드 만들기’ 탭 설정을 그대로 쓰고, 코드와 받는 사람만 줄마다 달라집니다.',
+      batchCodeList: '코드 목록',
+      batchHint: '한 줄에 하나씩. `코드, 이름` 형식도 됩니다.',
+      batchRecognised: function (n) { return n + '개 인식됨'; },
+      batchExportCSV: 'CSV 내보내기', batchExportPNG: 'PNG 전부 저장',
+      batchPreviewNote: '첫 번째 코드로 그린 미리보기입니다.',
+      batchDownloading: function (i, n) { return i + '/' + n + '장 저장 중…'; },
+      batchDone: function (n) { return n + '장 저장했습니다. 브라우저가 여러 파일 다운로드를 물어보면 허용해 주세요.'; },
+      batchAdded: function (n) { return n + '건을 보낸 기록에 추가했습니다.'; },
+      search: '검색', exportCSV: 'CSV 내보내기', clearLedger: '기록 지우기',
+      ledgerDate: '보낸 날짜', ledgerApp: '앱', ledgerKind: '방식', ledgerRedeemed: '사용됨',
+      ledgerCount: function (n) { return n + '건'; },
+      ledgerEmpty: '아직 보낸 선물이 없습니다. 카드를 만든 뒤 ‘보낸 기록에 추가’를 누르면 여기에 쌓입니다.',
+      confirmClear: '보낸 기록을 모두 지웁니다. 계속할까요?',
+      copyLink: '링크 복사'
+    },
+    en: {
+      tagline: 'App Store gift cards and links, made in the browser',
+      tabCompose: 'Compose', tabBatch: 'Batch', tabLedger: 'Sent',
+      appSection: 'App', appQueryField: 'App Store link or ID',
+      appQueryPlaceholder: '6759643878 or https://apps.apple.com/…',
+      lookUp: 'Look up', storefront: 'Storefront',
+      storeKR: 'Korea (kr)', storeUS: 'United States (us)', storeJP: 'Japan (jp)', storeGB: 'United Kingdom (gb)',
+      deliverySection: 'Delivery',
+      kindDirectLink: 'Download link', kindAppPromoCode: 'App promo code', kindOfferCode: 'In-app offer code',
+      kindDirectLinkWhy: 'Sends them to the App Store product page, no code involved. Right for a free app.',
+      kindAppPromoCodeWhy: 'A single-use code for a free copy of a paid app. Valid for four weeks after it’s made.',
+      kindOfferCodeWhy: 'A code for a subscription or in-app purchase. Use this when the app itself is a free download.',
+      codeField: 'Code', codeAlreadySent: 'This code has already been sent.',
+      showExpiry: 'Show an expiry date', expiryField: 'Expires',
+      cardSection: 'Card', cardStyle: 'Design',
+      cardStyleHint: 'Each style remembers its own arrangement, so what you dragged stays put.',
+      cardLanguage: 'Card language',
+      cardLanguageHint: 'The language of the card, the gift page and the message the recipient gets. Later cards start here too.',
+      occasionField: 'Headline', recipient: 'To', sender: 'From',
+      message: 'Message', messageLimit: 'Up to three lines fit on the card.',
+      colour: 'Colour', showCode: 'Show the code on the card', showQR: 'Include a QR code',
+      campaignGroup: 'Campaign tracking (optional)',
+      campaignHint: 'Fill these in only to tell the traffic apart in App Analytics.',
+      canvasLabel: 'Card preview — drag the pieces to arrange them',
+      resetLayout: 'Reset layout', open: 'Open',
+      copyLinkHeading: 'Copy a link',
+      copyGiftLink: 'Copy the gift page link', copyGiftLinkSub: 'The page that unwraps the card first',
+      copyRedeemLink: 'Copy the redeem link only', copyRedeemLinkSub: 'The raw link straight to the App Store',
+      copyMessage: 'Copy message', copyImage: 'Copy image', savePNG: 'Save PNG',
+      previewReceived: 'Preview what they see', addToLedger: 'Add to sent',
+      styleClassic: 'Classic', styleCentered: 'Centered', styleTicket: 'Ticket',
+      stylePoster: 'Poster', styleMinimal: 'Minimal',
+      blocks: { occasion: 'Headline', badge: 'Badge', logo: 'App icon', title: 'App name',
+                message: 'Message', people: 'To · From', code: 'Code', qr: 'QR' },
+      editorIdle: 'Drag the pieces of the card around. The exported PNG keeps whatever you arrange.',
+      editorChanged: 'You’ve changed the arrangement. The exported image keeps it.',
+      editorSelected: function (n) {
+        return n + ' selected — drag to move (arrow keys to nudge), resize with the corner grip or +/−';
+      },
+      collide: function (a, b) { return a + ' and ' + b + ' overlap — the exported image keeps it'; },
+      lookingUp: 'Looking it up…',
+      resolved: function (name, price) { return 'Resolved — ' + name + ' · ' + price; },
+      free: 'Free',
+      lookupBadInput: 'Enter an App Store link or a numeric ID.',
+      lookupNotFound: 'No app found in that storefront. Check the country code.',
+      lookupFailed: 'Couldn’t load the app’s details. You may be offline, or the ID may be wrong.',
+      autoFilled: function (parts) { return 'Set ' + parts + ' from the link'; },
+      needApp: 'Look an app up first.',
+      needCode: 'Enter a code.',
+      copiedGiftLink: 'Copied the gift page link — the card opens first.',
+      copiedRedeemLink: 'Copied the redeem link — it goes straight to the App Store.',
+      copiedMessage: 'Copied the message — send the card image with it.',
+      copiedImage: 'Copied the card image.',
+      copyFailed: 'Copying failed.',
+      noImageCopy: 'This browser can’t copy images. Save a PNG instead.',
+      saved: function (n) { return 'Saved — ' + n; },
+      layoutReset: 'Put the card’s arrangement back to the default.',
+      recorded: 'Added to the sent list.',
+      batchNote: '<b>One code per line.</b> To name a recipient too, write <code>CODE, name</code>. ' +
+                 'Design, colour and wording come from the Compose tab; only the code and the recipient change line by line.',
+      batchCodeList: 'Codes',
+      batchHint: 'One per line. `CODE, name` works too.',
+      batchRecognised: function (n) { return n + ' recognised'; },
+      batchExportCSV: 'Export CSV', batchExportPNG: 'Save every PNG',
+      batchPreviewNote: 'Drawn with the first code.',
+      batchDownloading: function (i, n) { return 'Saving ' + i + ' of ' + n + '…'; },
+      batchDone: function (n) { return 'Saved ' + n + ' cards. Allow multiple downloads if the browser asks.'; },
+      batchAdded: function (n) { return 'Added ' + n + ' to the sent list.'; },
+      search: 'Search', exportCSV: 'Export CSV', clearLedger: 'Clear the record',
+      ledgerDate: 'Sent', ledgerApp: 'App', ledgerKind: 'Method', ledgerRedeemed: 'Redeemed',
+      ledgerCount: function (n) { return n === 1 ? '1 gift' : n + ' gifts'; },
+      ledgerEmpty: 'Nothing sent yet. Make a card, press Add to sent, and it lands here.',
+      confirmClear: 'This clears the whole sent record. Continue?',
+      copyLink: 'Copy link'
+    }
+  };
+
+  var MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /** What the recipient reads. Mirrors the `C` table in Localization.swift. */
+  var CARDTEXT = {
+    ko: {
+      defaultOccasion: '선물',
+      badge: 'App Store에서 받기',
+      placeholderApp: '앱을 불러오세요',
+      placeholderDev: '개발자',
+      to: function (n) { return 'To. ' + n; },
+      from: function (n) { return 'From. ' + n; },
+      validUntil: function (y, m, d) { return y + '년 ' + m + '월 ' + d + '일까지'; },
+      usableUntil: function (y, m, d) { return y + '년 ' + m + '월 ' + d + '일까지 사용할 수 있어요.'; },
+      toHonorific: function (n) { return n + '님께'; },
+      giftArrived: '🎁 선물이 도착했어요',
+      codeLine: function (c) { return '코드: ' + c; },
+      manualRedeem: '링크가 열리지 않으면 App Store → 프로필 → ‘기프트 카드 또는 코드 사용’에 입력하세요.'
+    },
+    en: {
+      defaultOccasion: 'GIFT',
+      badge: 'Get it on the App Store',
+      placeholderApp: 'Look up an app',
+      placeholderDev: 'Developer',
+      to: function (n) { return 'To. ' + n; },
+      from: function (n) { return 'From. ' + n; },
+      validUntil: function (y, m, d) { return 'Valid through ' + (MONTHS_EN[m - 1] || m) + ' ' + d + ', ' + y; },
+      usableUntil: function (y, m, d) {
+        return 'You can use it through ' + (MONTHS_EN[m - 1] || m) + ' ' + d + ', ' + y + '.';
+      },
+      toHonorific: function (n) { return 'For ' + n; },
+      giftArrived: '🎁 A gift has arrived for you',
+      codeLine: function (c) { return 'Code: ' + c; },
+      manualRedeem: 'If the link doesn’t open, go to App Store → your profile → Redeem Gift Card or Code and enter it.'
+    }
+  };
+
+  /**
+   * Korean particles that change shape with the word in front of them.
+   *
+   * "메시지과 코드가" is wrong twice over — it should be "메시지와 코드가". Hangul
+   * syllables are laid out so the final consonant is (code − 0xAC00) mod 28, and zero
+   * means there isn't one. "QR" and anything else non-Hangul is read ending in a
+   * consonant, which is also the safer default.
+   */
+  function endsInConsonant(word) {
+    if (!word) return true;
+    var code = word.charCodeAt(word.length - 1);
+    if (code < 0xAC00 || code > 0xD7A3) return true;
+    return (code - 0xAC00) % 28 !== 0;
+  }
+  function waGwa(w) { return endsInConsonant(w) ? '과' : '와'; }
+  function iGa(w) { return endsInConsonant(w) ? '이' : '가'; }
+
+  function t() { return UI[LANG]; }
+  /** Spelled out, not `c()` — the canvas draw callbacks take their context as `c`. */
+  function cardText() { return CARDTEXT[draft.cardLang]; }
+
+  // =====================================================================
+  //  Themes and styles — mirrors GiftTheme.swift and CardStyle.swift
+  // =====================================================================
+
+  var THEMES = {
+    sunrise:  { stops: ['#FF3D77', '#FF7A59', '#FFC15E'], blooms: ['#FFD98A', '#FF4FA3'] },
+    aurora:   { stops: ['#3D5AFE', '#7A5BFF', '#2ED8C3'], blooms: ['#8AF0FF', '#B08CFF'] },
+    mint:     { stops: ['#0BA98A', '#34E0A1', '#B8F5D8'], blooms: ['#EFFFF7', '#00C2A8'] },
+    blossom:  { stops: ['#E0489A', '#FF7FB2', '#FFD3C1'], blooms: ['#FFE7C9', '#FF5C9E'] },
+    graphite: { stops: ['#161618', '#2C2C2E', '#5B5B60'], blooms: ['#8E8E93', '#3A3A3C'] }
+  };
+  var THEME_IDS = ['sunrise', 'aurora', 'mint', 'blossom', 'graphite'];
+
+  var CANVAS = { w: 1000, h: 630 };
+  var PADDING = 56;
+  var TYPE_SCALE = 1.18;
+  var SCALE_MIN = 0.4, SCALE_MAX = 2.5;
+  var PERFORATION_X = 0.70;
+  var BLOCK_IDS = ['occasion', 'badge', 'logo', 'title', 'message', 'people', 'code', 'qr'];
+  var ARTWORK = { logo: true, qr: true };
+
+  var STYLES = {
+    classic: {
+      cornerRadius: 56, typeScale: 1, headlineScale: 1, sheen: 0.26, bloom: 1,
+      frame: false, perforation: false, centered: false,
+      titleMaxWidth: 640, messageMaxWidth: 700, headlineMaxWidth: 0,
+      layout: {
+        occasion: [0.0560, 0.0889], badge: [0.7670, 0.0762],
+        logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+        message:  [0.0560, 0.5079], people: [0.0560, 0.7619],
+        code:     [0.5600, 0.7460], qr:     [0.8060, 0.6984]
+      }
+    },
+    centered: {
+      cornerRadius: 56, typeScale: 1, headlineScale: 1, sheen: 0.26, bloom: 1,
+      frame: false, perforation: false, centered: true,
+      // 600, centred at x 200 → stops at 800, clear of the QR corner at 822.
+      titleMaxWidth: 640, messageMaxWidth: 600, headlineMaxWidth: 0,
+      layout: {
+        occasion: [0.4550, 0.0889], badge: [0.7670, 0.0762],
+        logo:     [0.4240, 0.1524], title: [0.1800, 0.4159],
+        message:  [0.2000, 0.5968], code:  [0.4000, 0.7587],
+        people:   [0.0560, 0.7778], qr:    [0.8220, 0.7175]
+      }
+    },
+    ticket: {
+      cornerRadius: 28, typeScale: 1, headlineScale: 1, sheen: 0.18, bloom: 1,
+      frame: false, perforation: true, centered: false,
+      titleMaxWidth: 430, messageMaxWidth: 600, headlineMaxWidth: 0,
+      layout: {
+        occasion: [0.0560, 0.0889], badge: [0.4600, 0.0762],
+        logo:     [0.0560, 0.2063], title: [0.2360, 0.2484],
+        message:  [0.0560, 0.5238], people: [0.0560, 0.7619],
+        qr:       [0.7890, 0.2857], code:  [0.7500, 0.5238]
+      }
+    },
+    poster: {
+      cornerRadius: 56, typeScale: 1, headlineScale: 5.0, sheen: 0.30, bloom: 1,
+      frame: false, perforation: false, centered: false,
+      // 480, not 700: poster's message sits level with the code chip at x 560 rather
+      // than well above it, so the usual width would run underneath.
+      titleMaxWidth: 640, messageMaxWidth: 480, headlineMaxWidth: 760,
+      layout: {
+        logo:     [0.0560, 0.0889, 0.55], badge: [0.7670, 0.0984],
+        occasion: [0.0560, 0.2540], title: [0.0560, 0.4603],
+        message:  [0.0560, 0.6270], people: [0.0560, 0.7778],
+        code:     [0.5600, 0.7460], qr:    [0.8060, 0.6984]
+      }
+    },
+    minimal: {
+      cornerRadius: 44, typeScale: 0.88, headlineScale: 1, sheen: 0, bloom: 0.22,
+      frame: true, perforation: false, centered: false,
+      titleMaxWidth: 640, messageMaxWidth: 700, headlineMaxWidth: 0,
+      layout: {
+        occasion: [0.0900, 0.1429], badge: [0.7500, 0.0952],
+        logo:     [0.0900, 0.2222, 0.75], title: [0.0900, 0.4381],
+        message:  [0.0900, 0.6111], people: [0.0900, 0.7619],
+        code:     [0.5600, 0.7460], qr:    [0.8100, 0.6984]
+      }
+    }
+  };
+  var STYLE_IDS = ['classic', 'centered', 'ticket', 'poster', 'minimal'];
+
+  /** Rough block positions for the picker thumbnails: [x, y, w, h, strong]. */
+  var THUMBS = {
+    classic: [[.06,.09,.16,.05],[.06,.21,.17,.27,1],[.27,.25,.34,.09,1],[.27,.38,.22,.05],
+              [.06,.55,.52,.05],[.06,.64,.40,.05],[.06,.80,.24,.05],[.56,.76,.18,.08],[.80,.70,.14,.22,1]],
+    centered: [[.42,.09,.16,.05],[.42,.18,.16,.25,1],[.32,.48,.36,.08,1],[.40,.59,.20,.04],
+               [.26,.68,.48,.04],[.38,.78,.24,.08],[.06,.80,.16,.05],[.82,.72,.13,.20,1]],
+    ticket: [[.06,.09,.15,.05],[.06,.21,.16,.26,1],[.26,.25,.30,.09,1],[.26,.38,.20,.05],
+             [.06,.56,.48,.05],[.06,.65,.34,.05],[.06,.80,.22,.05],[.775,.28,.15,.24,1],[.755,.60,.19,.07]],
+    poster: [[.06,.09,.10,.15,1],[.06,.30,.62,.16,1],[.06,.51,.40,.07],[.06,.63,.50,.04],
+             [.06,.80,.22,.05],[.56,.76,.18,.08],[.80,.70,.14,.22,1]],
+    minimal: [[.09,.14,.13,.035],[.09,.23,.12,.19,1],[.09,.46,.30,.06],[.09,.57,.18,.035],
+              [.09,.66,.42,.035],[.09,.79,.20,.035],[.56,.76,.17,.07],[.81,.70,.13,.21]]
+  };
+
+  // =====================================================================
+  //  State
+  // =====================================================================
+
+  var GIFT_PAGE = 'https://m1zz.github.io/GiftWrap/gift.html';
+
+  function pref(key, allowed, fallback) {
+    try {
+      var v = localStorage.getItem(key);
+      return allowed.indexOf(v) >= 0 ? v : fallback;
+    } catch (e) { return fallback; }
+  }
+  function setPref(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  var LANG = pref('giftwrap.uiLang', ['ko', 'en'],
+    (navigator.language || 'en').toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en');
+
+  var draft = {
+    app: null,
+    kind: 'directLink',
+    code: '', recipient: '', sender: '', message: '', occasion: '',
+    style: pref('giftwrap.style', STYLE_IDS, 'classic'),
+    cardLang: pref('giftwrap.cardLang', ['ko', 'en'], LANG),
+    theme: pref('giftwrap.theme', THEME_IDS, 'sunrise'),
+    expiry: '', showCode: true, showQR: true, pt: '', ct: ''
+  };
+
+  /** Whether the kind picker was touched, so a later lookup stops second-guessing. */
+  var kindChosenManually = false;
+  var iconImg = null;
+  var layout = loadLayout(draft.style);
+  var ledger = loadLedger();
+
+  // ---------- layout, saved per style ----------
+
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function normScale(v) { return (isFinite(v) && v > 0) ? clamp(v, SCALE_MIN, SCALE_MAX) : 1; }
+
+  function defaultLayout(style) {
+    var out = {};
+    BLOCK_IDS.forEach(function (id) {
+      var d = STYLES[style].layout[id];
+      out[id] = d ? { x: d[0], y: d[1], s: d[2] || 1 } : { x: 0, y: 0, s: 1 };
+    });
+    return out;
+  }
+  function loadLayout(style) {
+    var out = defaultLayout(style), saved = {};
+    try { saved = JSON.parse(localStorage.getItem('giftwrap.layout.' + style) || '{}'); } catch (e) {}
+    BLOCK_IDS.forEach(function (id) {
+      var p = saved[id];
+      if (p && isFinite(p.x) && isFinite(p.y)) {
+        out[id] = { x: clamp(p.x, 0, 1), y: clamp(p.y, 0, 1), s: normScale(p.s) };
+      }
+    });
+    return out;
+  }
+  /**
+   * Saves an arrangement, or forgets it when it matches the style's own defaults.
+   *
+   * Not storing the untouched case matters: switching styles saves the outgoing one,
+   * so merely visiting a style would otherwise pin whatever its defaults were that
+   * day, and a later correction to the design would never reach anyone who had looked.
+   */
+  function saveLayout() {
+    var key = 'giftwrap.layout.' + draft.style;
+    try {
+      if (layoutIsDefault()) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(layout));
+    } catch (e) {}
+  }
+  function layoutIsDefault() {
+    var d = defaultLayout(draft.style);
+    return BLOCK_IDS.every(function (id) {
+      return Math.abs(layout[id].x - d[id].x) < 1e-6 &&
+             Math.abs(layout[id].y - d[id].y) < 1e-6 &&
+             Math.abs(layout[id].s - d[id].s) < 1e-6;
+    });
+  }
+  function scaleOf(id) { return normScale(layout[id] && layout[id].s); }
+
+  // ---------- ledger ----------
+
+  function loadLedger() {
+    try {
+      var v = JSON.parse(localStorage.getItem('giftwrap.ledger') || '[]');
+      return Array.isArray(v) ? v : [];
+    } catch (e) { return []; }
+  }
+  function saveLedger() {
+    try { localStorage.setItem('giftwrap.ledger', JSON.stringify(ledger)); } catch (e) {}
+  }
+  function codeAlreadySent(code) {
+    var needle = String(code || '').trim().toUpperCase();
+    if (!needle) return false;
+    return ledger.some(function (r) { return (r.code || '').toUpperCase() === needle; });
+  }
+
+  // =====================================================================
+  //  Links — mirrors RedeemLinkBuilder.swift
+  // =====================================================================
+
+  function trimmedCode() { return draft.code.trim().toUpperCase(); }
+  function requiresCode() { return draft.kind !== 'directLink'; }
+  function hasExpiry() { return draft.kind !== 'directLink'; }
+
+  function numericID(text) {
+    var s = String(text || '').trim();
+    if (/^\d+$/.test(s)) return s;
+    // The query item wins over the path, so an app slug containing "id123456" can't.
+    var q = s.match(/[?&]id=(\d+)/i);
+    if (q) return q[1];
+    var m = s.match(/\/id(\d{5,})/) || s.match(/\bid=?(\d{5,})/);
+    return m ? m[1] : '';
+  }
+
+  function parseLink(text) {
+    var id = numericID(text);
+    if (!id) return null;
+    var out = { appleID: id, kind: '', code: '', pt: '', ct: '' };
+    var ctx = String(text).match(/[?&]ctx=(offercodes|apps)\b/i);
+    if (ctx) out.kind = ctx[1].toLowerCase() === 'apps' ? 'appPromoCode' : 'offerCode';
+    var code = String(text).match(/[?&]code=([^&\s]+)/i);
+    if (code) out.code = decodeURIComponent(code[1]).toUpperCase();
+    var pt = String(text).match(/[?&]pt=([^&\s]+)/i);
+    if (pt) out.pt = decodeURIComponent(pt[1]);
+    var ct = String(text).match(/[?&]ct=([^&\s]+)/i);
+    if (ct) out.ct = decodeURIComponent(ct[1]);
+    return out;
+  }
+
+  function inferredKind(explicit, isFree, codePresent) {
+    if (explicit) return explicit;
+    if (!isFree) return 'appPromoCode';
+    return codePresent ? 'offerCode' : 'directLink';
+  }
+
+  function redeemURL() {
+    if (!draft.app) return '';
+    var base;
+    if (draft.kind === 'directLink') {
+      base = draft.app.productURL || ('https://apps.apple.com/app/id' + draft.app.id);
+    } else {
+      if (!trimmedCode()) return '';
+      var ctx = draft.kind === 'appPromoCode' ? 'apps' : 'offercodes';
+      base = 'https://apps.apple.com/redeem?ctx=' + ctx +
+             '&id=' + draft.app.id + '&code=' + encodeURIComponent(trimmedCode());
+    }
+    var extra = [];
+    if (draft.pt.trim()) extra.push('pt=' + encodeURIComponent(draft.pt.trim()));
+    if (draft.ct.trim()) extra.push('ct=' + encodeURIComponent(draft.ct.trim()));
+    if (!extra.length) return base;
+    return base + (base.indexOf('?') >= 0 ? '&' : '?') + extra.join('&');
+  }
+
+  function b64url(text) {
+    var bytes = new TextEncoder().encode(text), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function giftPayload() {
+    var url = redeemURL();
+    var p = { v: 1 };
+    if (draft.app) {
+      p.n = draft.app.name;
+      if (draft.app.developer) p.d = draft.app.developer;
+      if (draft.app.icon) p.i = draft.app.icon;
+      if (draft.app.productURL) p.p = draft.app.productURL;
+    }
+    if (url) p.u = url;
+    if (requiresCode() && trimmedCode()) p.c = trimmedCode();
+    p.o = draft.occasion.trim() || cardText().defaultOccasion;
+    if (draft.message.trim()) p.m = draft.message.trim();
+    if (draft.sender.trim()) p.f = draft.sender.trim();
+    if (draft.recipient.trim()) p.r = draft.recipient.trim();
+    var th = THEMES[draft.theme];
+    p.g = th.stops.map(function (h) { return h.replace('#', ''); });
+    p.b = th.blooms.map(function (h) { return h.replace('#', ''); });
+    p.q = !!(draft.showQR && url);
+    p.k = !!(draft.showCode && requiresCode() && trimmedCode());
+    if (draft.expiry && hasExpiry()) p.e = draft.expiry;
+    p.lg = draft.cardLang;
+    p.st = draft.style;
+    return p;
+  }
+
+  function giftLink() {
+    if (!draft.app) return '';
+    return GIFT_PAGE + '?d=' + b64url(JSON.stringify(giftPayload()));
+  }
+
+  function isReady() {
+    if (!draft.app) return false;
+    return requiresCode() ? !!trimmedCode() : true;
+  }
+
+  /** The text you paste into a messenger. Mirrors GiftExporter.messageText. */
+  function messageText() {
+    var W = cardText();
+    var lines = [];
+    var wrapped = giftLink();
+    if (draft.recipient.trim()) lines.push(W.toHonorific(draft.recipient.trim()));
+    if (wrapped) {
+      lines.push('');
+      lines.push(W.giftArrived);
+      lines.push(wrapped);
+    } else {
+      if (draft.message.trim()) lines.push(draft.message.trim());
+      if (draft.app) { lines.push(''); lines.push('🎁 ' + draft.app.name); }
+      lines.push(redeemURL());
+      if (requiresCode() && trimmedCode()) {
+        lines.push(W.codeLine(trimmedCode()));
+        lines.push(W.manualRedeem);
+      }
+    }
+    if (draft.expiry && hasExpiry()) {
+      var p = draft.expiry.split('-');
+      if (p.length === 3) lines.push(W.usableUntil(p[0], +p[1], +p[2]));
+    }
+    if (draft.sender.trim()) { lines.push(''); lines.push('— ' + draft.sender.trim()); }
+    return lines.join('\n');
+  }
+
+  // =====================================================================
+  //  App Store lookup
+  // =====================================================================
+
+  function lookup() {
+    var raw = $('query').value.trim();
+    if (!raw) return;
+    var parsed = parseLink(raw);
+    if (!parsed) { $('appStatus').textContent = t().lookupBadInput; return; }
+
+    $('appStatus').textContent = t().lookingUp;
+    var store = $('storefront').value;
+
+    function fetchIn(country) {
+      return fetch('https://itunes.apple.com/lookup?id=' + encodeURIComponent(parsed.appleID) +
+        (country ? '&country=' + country : '') + '&entity=software')
+        .then(function (r) { return r.json(); });
+    }
+
+    fetchIn(store)
+      .then(function (d) { return d.resultCount ? d : fetchIn(''); })
+      .then(function (d) {
+        if (!d.resultCount) throw new Error('not found');
+        var r = d.results[0];
+        draft.app = {
+          id: r.trackId,
+          name: r.trackName,
+          developer: r.artistName,
+          icon: (r.artworkUrl512 || r.artworkUrl100 || '').replace(/\/\d+x\d+bb/, '/512x512bb'),
+          formattedPrice: r.formattedPrice || '',
+          isFree: (r.price === 0 || r.formattedPrice === 'Free' || r.formattedPrice === '무료'),
+          productURL: r.trackViewUrl || ''
+        };
+        applyParsed(parsed);
+        $('appStatus').textContent = t().resolved(
+          draft.app.name, draft.app.formattedPrice || (draft.app.isFree ? t().free : '')
+        );
+        loadIcon(draft.app.icon);
+        syncForm();
+        render();
+      })
+      .catch(function (err) {
+        draft.app = null;
+        iconImg = null;
+        $('appStatus').textContent =
+          String(err && err.message) === 'not found' ? t().lookupNotFound : t().lookupFailed;
+        render();
+      });
+  }
+
+  /** Pours the pasted link into the form, the way ComposerModel.apply does. */
+  function applyParsed(parsed) {
+    var filled = [];
+    if (parsed.code && parsed.code !== trimmedCode()) { draft.code = parsed.code; filled.push(t().codeField); }
+    if (parsed.pt && parsed.pt !== draft.pt) { draft.pt = parsed.pt; filled.push('pt'); }
+    if (parsed.ct && parsed.ct !== draft.ct) { draft.ct = parsed.ct; filled.push('ct'); }
+
+    // An explicit ctx= is a fresh statement of intent and outranks an earlier manual pick.
+    if (parsed.kind || !kindChosenManually) {
+      var resolved = inferredKind(parsed.kind, draft.app.isFree, !!trimmedCode());
+      if (resolved !== draft.kind) {
+        draft.kind = resolved;
+        filled.unshift(t()['kind' + resolved.charAt(0).toUpperCase() + resolved.slice(1)]);
+      }
+      kindChosenManually = false;
+    }
+    $('autoFill').textContent = filled.length ? t().autoFilled(filled.join(' · ')) : '';
+  }
+
+  function loadIcon(src) {
+    if (!src) { iconImg = null; return; }
+    var img = new Image();
+    img.crossOrigin = 'anonymous';   // so the canvas stays exportable
+    img.onload = function () { iconImg = img; render(); };
+    img.onerror = function () { iconImg = null; render(); };
+    img.src = src;
+  }
+
+  // =====================================================================
+  //  The card — mirrors GiftCardView.swift
+  // =====================================================================
+
+  var SANS = '"SF Pro Rounded", "Apple SD Gothic Neo", -apple-system, system-ui, sans-serif';
+  var MONO = 'ui-monospace, "SF Mono", Menlo, monospace';
+
+  function st() { return STYLES[draft.style]; }
+
+  /** A font size at the card scale × the style's scale × the block's own scale. */
+  function fs(base, id) {
+    var s = st();
+    var emphasis = id === 'occasion' ? s.headlineScale : 1;
+    return Math.round(base * TYPE_SCALE * s.typeScale * emphasis * scaleOf(id));
+  }
+  /** Spacing that hangs off the type, so a resized block grows as a piece. */
+  function sp(base, id) { return base * scaleOf(id); }
+
+  function roundRect(c, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+  }
+
+  function tracked(c, text, x, y, spacing) {
+    if ('letterSpacing' in c) {
+      c.letterSpacing = spacing + 'px';
+      c.fillText(text, x, y);
+      c.letterSpacing = '0px';
+      return;
+    }
+    var cx = x;
+    for (var i = 0; i < text.length; i++) {
+      c.fillText(text[i], cx, y);
+      cx += c.measureText(text[i]).width + spacing;
+    }
+  }
+  function measureTracked(c, text, spacing) {
+    if ('letterSpacing' in c) {
+      c.letterSpacing = spacing + 'px';
+      var w = c.measureText(text).width;
+      c.letterSpacing = '0px';
+      return w;
+    }
+    return c.measureText(text).width + spacing * Math.max(0, text.length - 1);
+  }
+
+  /**
+   * Wraps to a width, honouring explicit newlines and breaking mid-word when a word
+   * doesn't fit. The mid-word break is what makes this work for Korean, which often
+   * gives a whole clause with no space in it to break on.
+   */
+  function wrapText(c, text, maxW, maxLines) {
+    var out = [];
+    String(text).split('\n').forEach(function (para) {
+      var line = '';
+      var words = para.split(/(\s+)/);
+      words.forEach(function (piece) {
+        if (out.length >= maxLines) return;
+        var test = line + piece;
+        if (c.measureText(test).width <= maxW || !line.trim()) {
+          // A single piece wider than the box still has to be broken somewhere.
+          if (c.measureText(test).width > maxW && !line.trim()) {
+            var buf = '';
+            for (var i = 0; i < piece.length; i++) {
+              if (c.measureText(buf + piece[i]).width > maxW && buf) {
+                out.push(buf);
+                if (out.length >= maxLines) return;
+                buf = piece[i];
+              } else buf += piece[i];
+            }
+            line = buf;
+          } else line = test;
+        } else {
+          out.push(line.replace(/\s+$/, ''));
+          line = piece.replace(/^\s+/, '');
+        }
+      });
+      if (out.length < maxLines && line.trim()) out.push(line.replace(/\s+$/, ''));
+    });
+    return out.slice(0, maxLines);
+  }
+
+  function hexA(hex, a) {
+    var v = parseInt(hex.slice(1), 16);
+    return 'rgba(' + ((v >> 16) & 255) + ',' + ((v >> 8) & 255) + ',' + (v & 255) + ',' + a + ')';
+  }
+
+  /** Everything on the card, measured, so the editor can hit-test what it draws. */
+  function buildBlocks(c) {
+    var s = st();
+    var W = cardText();
+    var ink = '#fff';
+    var blocks = [];
+    var alignCentre = s.centered;
+
+    function push(id, w, h, draw) {
+      if (!layout[id]) return;
+      blocks.push({ id: id, w: w, h: h, draw: draw,
+                    x: layout[id].x * CANVAS.w, y: layout[id].y * CANVAS.h });
+    }
+
+    // ---- occasion
+    var occText = (draft.occasion.trim() || W.defaultOccasion).toUpperCase();
+    var occFont = '700 ' + fs(15, 'occasion') + 'px ' + SANS;
+    var occTrack = 4.5 * scaleOf('occasion') * (draft.style === 'poster' ? 0.30 : 1);
+    c.font = occFont;
+    var occLines = s.headlineMaxWidth
+      ? wrapText(c, occText, s.headlineMaxWidth, 2)
+      : [occText];
+    var occLead = fs(15, 'occasion') * 1.25;
+    var occW = 0;
+    occLines.forEach(function (l) { occW = Math.max(occW, measureTracked(c, l, occTrack)); });
+    push('occasion', occW, occLines.length * occLead, function (g) {
+      g.fillStyle = ink; g.globalAlpha = 0.85; g.font = occFont;
+      occLines.forEach(function (l, i) {
+        var x = alignCentre ? (occW - measureTracked(g, l, occTrack)) / 2 : 0;
+        tracked(g, l, x, i * occLead, occTrack);
+      });
+      g.globalAlpha = 1;
+    });
+
+    // ---- badge
+    var badgeFont = '600 ' + fs(14, 'badge') + 'px ' + SANS;
+    c.font = badgeFont;
+    var badgeW = c.measureText(W.badge).width + sp(16, 'badge') * 2;
+    var badgeH = fs(14, 'badge') * 1.25 + sp(8, 'badge') * 2;
+    push('badge', badgeW, badgeH, function (g) {
+      g.strokeStyle = 'rgba(255,255,255,.45)';
+      g.lineWidth = 1.2;
+      roundRect(g, 0, 0, badgeW, badgeH, badgeH / 2);
+      g.stroke();
+      g.fillStyle = ink; g.globalAlpha = 0.75; g.font = badgeFont;
+      g.fillText(W.badge, sp(16, 'badge'), badgeH / 2 - fs(14, 'badge') * 0.62 + fs(14, 'badge') * 0.15);
+      g.globalAlpha = 1;
+    });
+
+    // ---- logo
+    var side = 152 * scaleOf('logo');
+    var radius = 34 * scaleOf('logo');
+    push('logo', side, side, function (g) {
+      g.save();
+      roundRect(g, 0, 0, side, side, radius);
+      g.clip();
+      if (iconImg) {
+        g.drawImage(iconImg, 0, 0, side, side);
+      } else {
+        g.fillStyle = 'rgba(255,255,255,.22)';
+        g.fillRect(0, 0, side, side);
+        g.fillStyle = 'rgba(255,255,255,.7)';
+        g.font = '700 ' + fs(64, 'logo') + 'px ' + SANS;
+        g.textAlign = 'center';
+        g.fillText((draft.app ? draft.app.name : '?').trim().charAt(0) || '?',
+                   side / 2, side / 2 - fs(64, 'logo') * 0.42);
+        g.textAlign = 'left';
+      }
+      g.restore();
+      g.strokeStyle = 'rgba(255,255,255,.3)'; g.lineWidth = 1;
+      roundRect(g, 0, 0, side, side, radius);
+      g.stroke();
+    });
+
+    // ---- title
+    var nameFont = '700 ' + fs(44, 'title') + 'px ' + SANS;
+    var devFont = '500 ' + fs(20, 'title') + 'px ' + SANS;
+    var nameText = draft.app ? draft.app.name : W.placeholderApp;
+    var devText = draft.app ? (draft.app.developer || '') : W.placeholderDev;
+    var titleBoxW = s.titleMaxWidth * scaleOf('title');
+    c.font = nameFont;
+    var nameLines = wrapText(c, nameText, titleBoxW, 2);
+    var nameLead = fs(44, 'title') * 1.15;
+    var titleH = nameLines.length * nameLead + (devText ? sp(8, 'title') + fs(20, 'title') * 1.3 : 0);
+    push('title', titleBoxW, titleH, function (g) {
+      g.fillStyle = ink; g.font = nameFont;
+      nameLines.forEach(function (l, i) {
+        var x = alignCentre ? (titleBoxW - g.measureText(l).width) / 2 : 0;
+        g.fillText(l, x, i * nameLead);
+      });
+      if (!devText) return;
+      g.font = devFont; g.globalAlpha = 0.78;
+      var dx = alignCentre ? (titleBoxW - g.measureText(devText).width) / 2 : 0;
+      g.fillText(devText, dx, nameLines.length * nameLead + sp(8, 'title'));
+      g.globalAlpha = 1;
+    });
+
+    // ---- message
+    if (draft.message.trim()) {
+      var msgFont = '400 ' + fs(25, 'message') + 'px ' + SANS;
+      var msgBoxW = s.messageMaxWidth * scaleOf('message');
+      c.font = msgFont;
+      var msgLines = wrapText(c, draft.message.trim(), msgBoxW, 3);
+      var msgLead = fs(25, 'message') * 1.28 + sp(7, 'message');
+      push('message', msgBoxW, msgLines.length * msgLead, function (g) {
+        g.fillStyle = ink; g.globalAlpha = 0.95; g.font = msgFont;
+        msgLines.forEach(function (l, i) {
+          var x = alignCentre ? (msgBoxW - g.measureText(l).width) / 2 : 0;
+          g.fillText(l, x, i * msgLead);
+        });
+        g.globalAlpha = 1;
+      });
+    }
+
+    // ---- people
+    var rows = [];
+    if (draft.recipient.trim()) rows.push({ text: W.to(draft.recipient.trim()), size: 19, weight: '600', alpha: 0.9 });
+    if (draft.sender.trim()) rows.push({ text: W.from(draft.sender.trim()), size: 17, weight: '500', alpha: 0.78 });
+    if (draft.expiry && hasExpiry()) {
+      var e = draft.expiry.split('-');
+      if (e.length === 3) rows.push({ text: W.validUntil(e[0], +e[1], +e[2]), size: 14, weight: '500', alpha: 0.65, gap: true });
+    }
+    if (rows.length) {
+      var peopleW = 0, peopleH = 0;
+      rows.forEach(function (r) {
+        c.font = r.weight + ' ' + fs(r.size, 'people') + 'px ' + SANS;
+        peopleW = Math.max(peopleW, c.measureText(r.text).width);
+        peopleH += fs(r.size, 'people') * 1.3 + sp(6, 'people') + (r.gap ? sp(4, 'people') : 0);
+      });
+      push('people', peopleW, peopleH, function (g) {
+        var y = 0;
+        g.fillStyle = ink;
+        rows.forEach(function (r) {
+          if (r.gap) y += sp(4, 'people');
+          g.globalAlpha = r.alpha;
+          g.font = r.weight + ' ' + fs(r.size, 'people') + 'px ' + SANS;
+          g.fillText(r.text, 0, y);
+          y += fs(r.size, 'people') * 1.3 + sp(6, 'people');
+        });
+        g.globalAlpha = 1;
+      });
+    }
+
+    // ---- code
+    if (draft.showCode && requiresCode() && trimmedCode()) {
+      var codeFont = '500 ' + fs(18, 'code') + 'px ' + MONO;
+      var codeTrack = sp(2, 'code');
+      c.font = codeFont;
+      var codeW = measureTracked(c, trimmedCode(), codeTrack) + sp(20, 'code') * 2;
+      var codeH = fs(18, 'code') * 1.3 + sp(13, 'code') * 2;
+      push('code', codeW, codeH, function (g) {
+        g.strokeStyle = 'rgba(255,255,255,.6)';
+        g.lineWidth = 1.4;
+        g.setLineDash([6, 5]);
+        roundRect(g, 0, 0, codeW, codeH, sp(16, 'code'));
+        g.stroke();
+        g.setLineDash([]);
+        g.fillStyle = ink; g.font = codeFont;
+        tracked(g, trimmedCode(), sp(20, 'code'), codeH / 2 - fs(18, 'code') * 0.56, codeTrack);
+      });
+    }
+
+    // ---- qr
+    var url = redeemURL();
+    if (draft.showQR && url && window.QR) {
+      var q = 104 * scaleOf('qr');
+      var pad = 9 * scaleOf('qr');
+      var box = q + pad * 2;
+      push('qr', box, box, function (g) {
+        g.fillStyle = '#fff';
+        roundRect(g, 0, 0, box, box, 16 * scaleOf('qr'));
+        g.fill();
+        var m = window.QR.matrix(url, 'M');
+        var n = m.length;
+        var cell = q / n;
+        g.fillStyle = '#000';
+        for (var r = 0; r < n; r++) {
+          for (var col = 0; col < n; col++) {
+            if (m[r][col]) g.fillRect(pad + col * cell, pad + r * cell, Math.ceil(cell), Math.ceil(cell));
+          }
+        }
+      });
+    }
+
+    return blocks;
+  }
+
+  /**
+   * Draws the card alone — no backdrop — at `scale`, and returns the canvas.
+   *
+   * The preview and the export are this one function at two scales, so what you
+   * arrange is what ships. The notches are cut with destination-out afterwards, which
+   * leaves real holes: over the preview's backdrop here, and transparent in the PNG.
+   */
+  function renderCard(scale, blocksOut) {
+    var s = st();
+    var cv = document.createElement('canvas');
+    cv.width = Math.round(CANVAS.w * scale);
+    cv.height = Math.round(CANVAS.h * scale);
+    var c = cv.getContext('2d');
+    c.scale(scale, scale);
+    c.textBaseline = 'top';
+
+    var theme = THEMES[draft.theme];
+
+    c.save();
+    roundRect(c, 0, 0, CANVAS.w, CANVAS.h, s.cornerRadius);
+    c.clip();
+
+    // base gradient, bottom-left to top-right
+    var g = c.createLinearGradient(0, CANVAS.h, CANVAS.w, 0);
+    g.addColorStop(0, theme.stops[0]);
+    g.addColorStop(0.5, theme.stops[1]);
+    g.addColorStop(1, theme.stops[2]);
+    c.fillStyle = g;
+    c.fillRect(0, 0, CANVAS.w, CANVAS.h);
+
+    // the two soft blooms
+    [[-40, 85, 500, theme.blooms[0], 0.55], [830, 565, 560, theme.blooms[1], 0.5]]
+      .forEach(function (b) {
+        var rg = c.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+        rg.addColorStop(0, hexA(b[3], b[4] * s.bloom));
+        rg.addColorStop(1, hexA(b[3], 0));
+        c.fillStyle = rg;
+        c.fillRect(0, 0, CANVAS.w, CANVAS.h);
+      });
+
+    if (s.sheen > 0) {
+      var sw = c.createLinearGradient(0, 0, CANVAS.w * 0.62, CANVAS.h * 0.55);
+      sw.addColorStop(0, 'rgba(255,255,255,' + s.sheen + ')');
+      sw.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = sw;
+      c.fillRect(0, 0, CANVAS.w, CANVAS.h);
+    }
+
+    if (s.frame) {
+      c.strokeStyle = 'rgba(255,255,255,.32)';
+      c.lineWidth = 1.6;
+      roundRect(c, 30, 30, CANVAS.w - 60, CANVAS.h - 60, Math.max(4, s.cornerRadius - 22));
+      c.stroke();
+    }
+
+    if (s.perforation) {
+      var px = CANVAS.w * PERFORATION_X;
+      c.strokeStyle = 'rgba(255,255,255,.5)';
+      c.lineWidth = 2.5;
+      c.lineCap = 'round';
+      c.setLineDash([9, 11]);
+      c.beginPath();
+      c.moveTo(px, 26);
+      c.lineTo(px, CANVAS.h - 26);
+      c.stroke();
+      c.setLineDash([]);
+      c.lineCap = 'butt';
+    }
+
+    var blocks = buildBlocks(c);
+    blocks.forEach(function (b) {
+      c.save();
+      c.translate(b.x, b.y);
+      b.draw(c);
+      c.restore();
+    });
+    if (blocksOut) blocks.forEach(function (b) { blocksOut.push(b); });
+
+    c.restore();
+
+    if (s.perforation) {
+      var nx = CANVAS.w * PERFORATION_X;
+      c.save();
+      c.globalCompositeOperation = 'destination-out';
+      c.fillStyle = '#000';
+      [0, CANVAS.h].forEach(function (y) {
+        c.beginPath();
+        c.arc(nx, y, 22, 0, Math.PI * 2);
+        c.fill();
+      });
+      c.restore();
+    }
+
+    return cv;
+  }
+
+  // =====================================================================
+  //  Preview and the drag editor
+  // =====================================================================
+
+  var CARD_RECT = { x: 0, y: 0, w: 0, h: 0, scale: 1 };
+  var hitBlocks = [];
+  var editor = { hover: null, sel: null, drag: null, resize: null, guides: [] };
+  var HANDLE = 13;
+
+  function render() {
+    var cv = $('card');
+    var c = cv.getContext('2d');
+    var W = cv.width, H = cv.height;
+    c.clearRect(0, 0, W, H);
+
+    // A wash of the card's own colours, so it reads as an object on a surface.
+    var theme = THEMES[draft.theme];
+    var back = c.createLinearGradient(0, 0, W, H);
+    back.addColorStop(0, hexA(theme.stops[0], 0.14));
+    back.addColorStop(1, hexA(theme.stops[2], 0.20));
+    c.fillStyle = '#f0f0f2';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = back;
+    c.fillRect(0, 0, W, H);
+
+    var scale = Math.min((W - 160) / CANVAS.w, (H - 160) / CANVAS.h);
+    var cw = CANVAS.w * scale, ch = CANVAS.h * scale;
+    var cx = (W - cw) / 2, cy = (H - ch) / 2;
+    CARD_RECT = { x: cx, y: cy, w: cw, h: ch, scale: scale };
+
+    var blocks = [];
+    // Draw at device resolution so the preview isn't soft on a retina screen.
+    var card = renderCard(scale * (window.devicePixelRatio || 1), blocks);
+
+    c.save();
+    c.shadowColor = 'rgba(20,16,40,.30)';
+    c.shadowBlur = 60;
+    c.shadowOffsetY = 24;
+    c.drawImage(card, cx, cy, cw, ch);
+    c.restore();
+
+    hitBlocks = blocks.map(function (b) {
+      return { id: b.id, rect: { x: cx + b.x * scale, y: cy + b.y * scale,
+                                 w: b.w * scale, h: b.h * scale } };
+    });
+
+    drawOverlay(c);
+    syncLinks();
+    // Dragging changes whether there's anything to reset, and only a render knows.
+    $('resetLayout').disabled = layoutIsDefault();
+    // Here, not at the call sites: the hint reports on `hitBlocks`, which only exists
+    // once the card has been drawn. Called before a render it describes the previous
+    // card — which is how a collision in one style came to be announced under another.
+    updateHint();
+  }
+
+  function findBlock(id) {
+    for (var i = 0; i < hitBlocks.length; i++) if (hitBlocks[i].id === id) return hitBlocks[i];
+    return null;
+  }
+  function handleRect(b) {
+    if (!b) return null;
+    var r = b.rect, m = 8;
+    return { x: r.x + r.w + m - HANDLE / 2, y: r.y + r.h + m - HANDLE / 2, w: HANDLE, h: HANDLE };
+  }
+  function hitsHandle(p, b) {
+    var h = handleRect(b);
+    if (!h) return false;
+    var k = 5;
+    return p.x >= h.x - k && p.x <= h.x + h.w + k && p.y >= h.y - k && p.y <= h.y + h.h + k;
+  }
+
+  /** Pairs of blocks whose boxes run into each other — the export would bake it in. */
+  function collisions() {
+    var out = [];
+    for (var i = 0; i < hitBlocks.length; i++) {
+      for (var j = i + 1; j < hitBlocks.length; j++) {
+        var a = hitBlocks[i].rect, b = hitBlocks[j].rect, k = 3 * CARD_RECT.scale;
+        if (a.x + k < b.x + b.w - k && b.x + k < a.x + a.w - k &&
+            a.y + k < b.y + b.h - k && b.y + k < a.y + a.h - k) {
+          out.push([hitBlocks[i].id, hitBlocks[j].id]);
+        }
+      }
+    }
+    return out;
+  }
+
+  function drawOverlay(c) {
+    editor.guides.forEach(function (g) {
+      c.save();
+      c.strokeStyle = 'rgba(0,113,227,.85)';
+      c.lineWidth = 1;
+      c.setLineDash([6, 4]);
+      c.beginPath();
+      if (g.axis === 'x') { c.moveTo(g.at, CARD_RECT.y - 14); c.lineTo(g.at, CARD_RECT.y + CARD_RECT.h + 14); }
+      else { c.moveTo(CARD_RECT.x - 14, g.at); c.lineTo(CARD_RECT.x + CARD_RECT.w + 14, g.at); }
+      c.stroke();
+      c.restore();
+    });
+
+    var hit = {};
+    collisions().forEach(function (pair) { hit[pair[0]] = 1; hit[pair[1]] = 1; });
+    Object.keys(hit).forEach(function (id) {
+      var b = findBlock(id);
+      if (!b) return;
+      c.save();
+      c.strokeStyle = 'rgba(255,149,0,.95)';
+      c.fillStyle = 'rgba(255,149,0,.14)';
+      c.lineWidth = 2;
+      c.setLineDash([4, 3]);
+      roundRect(c, b.rect.x - 8, b.rect.y - 8, b.rect.w + 16, b.rect.h + 16, 9);
+      c.fill();
+      c.stroke();
+      c.restore();
+    });
+
+    [[editor.hover, false], [editor.sel, true]].forEach(function (pair) {
+      var b = pair[0] && findBlock(pair[0]);
+      if (!b) return;
+      var strong = pair[1], r = b.rect, m = 8;
+      c.save();
+      c.strokeStyle = strong ? 'rgba(0,113,227,1)' : 'rgba(0,113,227,.5)';
+      c.lineWidth = strong ? 2 : 1.5;
+      if (!strong) c.setLineDash([6, 4]);
+      roundRect(c, r.x - m, r.y - m, r.w + m * 2, r.h + m * 2, 10);
+      c.stroke();
+      if (strong) {
+        var grip = handleRect(b);
+        c.fillStyle = '#fff';
+        c.strokeStyle = 'rgba(0,113,227,1)';
+        c.lineWidth = 2;
+        roundRect(c, grip.x, grip.y, grip.w, grip.h, 3);
+        c.fill(); c.stroke();
+
+        var label = (t().blocks[b.id] || b.id) + '  ' + Math.round(scaleOf(b.id) * 100) + '%';
+        c.font = '600 15px ' + SANS;
+        var tw = c.measureText(label).width;
+        var lx = r.x - m, ly = r.y - m - 24;
+        if (ly < 4) ly = r.y + r.h + m + 4;
+        c.fillStyle = 'rgba(0,113,227,1)';
+        roundRect(c, lx, ly, tw + 18, 22, 7);
+        c.fill();
+        c.fillStyle = '#fff';
+        c.textBaseline = 'top';
+        c.fillText(label, lx + 9, ly + 3);
+      }
+      c.restore();
+    });
+  }
+
+  function toCanvasPoint(e) {
+    var cv = $('card'), r = cv.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return { x: (e.clientX - r.left) * cv.width / r.width,
+             y: (e.clientY - r.top) * cv.height / r.height };
+  }
+  function blockAt(p) {
+    for (var i = hitBlocks.length - 1; i >= 0; i--) {
+      var r = hitBlocks[i].rect;
+      if (p.x >= r.x - 6 && p.x <= r.x + r.w + 6 && p.y >= r.y - 6 && p.y <= r.y + r.h + 6) return hitBlocks[i];
+    }
+    return null;
+  }
+
+  /** Snap to the padding lines, the card centre, and the other blocks' edges. */
+  function snapTo(id, x, y, w, h) {
+    var TH = 7, s = CARD_RECT.scale;
+    var xs = [PADDING * s, CARD_RECT.w - PADDING * s - w, (CARD_RECT.w - w) / 2];
+    var ys = [PADDING * s, CARD_RECT.h - PADDING * s - h, (CARD_RECT.h - h) / 2];
+    hitBlocks.forEach(function (b) {
+      if (b.id === id) return;
+      var bx = b.rect.x - CARD_RECT.x, by = b.rect.y - CARD_RECT.y;
+      xs.push(bx, bx + b.rect.w - w);
+      ys.push(by, by + b.rect.h - h);
+    });
+    var guides = [];
+    function nearest(v, targets) {
+      var best = null;
+      targets.forEach(function (tv) {
+        var d = Math.abs(v - tv);
+        if (d < TH && (!best || d < best.d)) best = { d: d, v: tv };
+      });
+      return best;
+    }
+    var hx = nearest(x, xs);
+    if (hx) { x = hx.v; guides.push({ axis: 'x', at: CARD_RECT.x + x }); }
+    var hy = nearest(y, ys);
+    if (hy) { y = hy.v; guides.push({ axis: 'y', at: CARD_RECT.y + y }); }
+    editor.guides = guides;
+    return { x: x, y: y };
+  }
+
+  function moveBlock(id, x, y, w, h, withSnap) {
+    x = clamp(x, 0, CARD_RECT.w - w);
+    y = clamp(y, 0, CARD_RECT.h - h);
+    if (withSnap) {
+      var sn = snapTo(id, x, y, w, h);
+      x = clamp(sn.x, 0, CARD_RECT.w - w);
+      y = clamp(sn.y, 0, CARD_RECT.h - h);
+    } else editor.guides = [];
+    // Write the fields rather than replacing the entry, or a nudge would drop the scale.
+    layout[id].x = x / CARD_RECT.w;
+    layout[id].y = y / CARD_RECT.h;
+  }
+
+  function keepInside(id) {
+    var b = findBlock(id);
+    if (!b) return false;
+    var x = b.rect.x - CARD_RECT.x, y = b.rect.y - CARD_RECT.y;
+    var nx = clamp(x, 0, Math.max(0, CARD_RECT.w - b.rect.w));
+    var ny = clamp(y, 0, Math.max(0, CARD_RECT.h - b.rect.h));
+    if (Math.abs(nx - x) < 1e-6 && Math.abs(ny - y) < 1e-6) return false;
+    layout[id].x = nx / CARD_RECT.w;
+    layout[id].y = ny / CARD_RECT.h;
+    return true;
+  }
+
+  function updateHint() {
+    var hint = $('editorHint');
+    var pairs = collisions();
+    if (pairs.length) {
+      hint.textContent = t().collide(t().blocks[pairs[0][0]] || pairs[0][0],
+                                     t().blocks[pairs[0][1]] || pairs[0][1]);
+      hint.className = 'sub warn';
+      return;
+    }
+    hint.className = 'sub';
+    if (editor.sel) hint.textContent = t().editorSelected(t().blocks[editor.sel] || editor.sel);
+    else if (!layoutIsDefault()) hint.textContent = t().editorChanged;
+    else hint.textContent = t().editorIdle;
+  }
+
+  function bindEditor() {
+    var cv = $('card');
+
+    cv.addEventListener('pointerdown', function (e) {
+      var p = toCanvasPoint(e);
+      if (!p) return;
+      var sel = editor.sel && findBlock(editor.sel);
+      if (sel && hitsHandle(p, sel)) {
+        editor.resize = { id: sel.id, baseW: sel.rect.w / scaleOf(sel.id), ox: sel.rect.x };
+        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+        return;
+      }
+      var hit = blockAt(p);
+      editor.sel = hit ? hit.id : null;
+      if (hit) {
+        editor.drag = { id: hit.id, w: hit.rect.w, h: hit.rect.h,
+                        dx: p.x - hit.rect.x, dy: p.y - hit.rect.y };
+        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      }
+      cv.focus();
+      render();
+    });
+
+    cv.addEventListener('pointermove', function (e) {
+      var p = toCanvasPoint(e);
+      if (!p) return;
+      if (editor.resize) {
+        var z = editor.resize;
+        var want = (p.x - z.ox) / z.baseW;
+        if (!e.altKey) want = Math.round(want * 20) / 20;   // 5% steps, Alt to go free
+        layout[z.id].s = clamp(want, SCALE_MIN, SCALE_MAX);
+        render();
+        if (keepInside(z.id)) render();
+        return;
+      }
+      if (editor.drag) {
+        var d = editor.drag;
+        moveBlock(d.id, p.x - d.dx - CARD_RECT.x, p.y - d.dy - CARD_RECT.y, d.w, d.h, !e.altKey);
+        render();
+        return;
+      }
+      var selected = editor.sel && findBlock(editor.sel);
+      if (selected && hitsHandle(p, selected)) {
+        cv.style.cursor = 'nwse-resize';
+        if (editor.hover !== selected.id) { editor.hover = selected.id; render(); }
+        return;
+      }
+      var hit = blockAt(p);
+      var id = hit ? hit.id : null;
+      cv.style.cursor = id ? 'move' : 'default';
+      if (id !== editor.hover) { editor.hover = id; render(); }
+    });
+
+    cv.addEventListener('pointerleave', function () {
+      if (editor.drag) return;
+      if (editor.hover) { editor.hover = null; render(); }
+    });
+
+    function endDrag() {
+      if (!editor.drag && !editor.resize) return;
+      editor.drag = null; editor.resize = null; editor.guides = [];
+      saveLayout();
+      render();
+    }
+    cv.addEventListener('pointerup', endDrag);
+    cv.addEventListener('pointercancel', endDrag);
+
+    cv.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { editor.sel = null; render(); return; }
+      var ZOOM = { '+': 1, '=': 1, '-': -1, '_': -1 };
+      if (editor.sel && ZOOM[e.key]) {
+        e.preventDefault();
+        layout[editor.sel].s = clamp(scaleOf(editor.sel) + ZOOM[e.key] * (e.shiftKey ? 0.2 : 0.05),
+                                     SCALE_MIN, SCALE_MAX);
+        render();
+        if (keepInside(editor.sel)) render();
+        saveLayout();
+        return;
+      }
+      var STEPS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      var step = STEPS[e.key];
+      if (!step || !editor.sel) return;
+      var b = findBlock(editor.sel);
+      if (!b) return;
+      e.preventDefault();
+      var n = (e.shiftKey ? 10 : 1) * CARD_RECT.scale;
+      moveBlock(editor.sel, b.rect.x - CARD_RECT.x + step[0] * n,
+                b.rect.y - CARD_RECT.y + step[1] * n, b.rect.w, b.rect.h, false);
+      saveLayout();
+      render();
+    });
+  }
+
+  /** Renders without the selection chrome, so exports never bake in the editor UI. */
+  function exportPNG(scale, cb) {
+    renderCard(scale || 3).toBlob(cb);
+  }
+
+  /**
+   * A filesystem-safe stem for an export.
+   *
+   * `\p{L}` rather than `A-Za-z`, so a Korean app name survives instead of being
+   * reduced to the digits in it — which is what Swift's CharacterSet.alphanumerics
+   * does on the app side, and the two should agree.
+   */
+  function fileStem() {
+    var app = (draft.app && draft.app.name) || 'gift';
+    var who = draft.recipient.trim() || trimmedCode();
+    var raw = who ? app + '-' + who : app;
+    return raw.replace(/[^\p{L}\p{N}\-_]+/gu, '-')
+              .replace(/-+/g, '-')
+              .replace(/^-|-$/g, '')
+              .toLowerCase() || 'gift';
+  }
+
+  function download(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function flash(msg) {
+    $('status').textContent = msg;
+    clearTimeout(flash.timer);
+    flash.timer = setTimeout(function () { $('status').textContent = ''; }, 3600);
+  }
+
+  // =====================================================================
+  //  Form wiring
+  // =====================================================================
+
+  function syncLinks() {
+    var url = redeemURL();
+    $('linkLine').hidden = !url;
+    $('redeemLink').textContent = url;
+    var ready = isReady();
+    ['copyGift', 'copyRedeem', 'copyMessage', 'copyImage', 'savePNG', 'previewGift', 'addLedger']
+      .forEach(function (id) { $(id).disabled = !ready; });
+  }
+
+  /** Pushes the model back into the controls — used after a lookup and on language change. */
+  function syncForm() {
+    $('query').value = $('query').value;
+    [].forEach.call($('kindSeg').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.kind === draft.kind));
+    });
+    $('kindWhy').textContent = t()['kind' + draft.kind.charAt(0).toUpperCase() + draft.kind.slice(1) + 'Why'];
+    $('codeArea').hidden = !requiresCode();
+    $('code').value = draft.code;
+    $('codeUsed').hidden = !(requiresCode() && codeAlreadySent(draft.code));
+    $('codeUsed').textContent = t().codeAlreadySent;
+    $('showCode').disabled = !requiresCode();
+
+    [].forEach.call($('cardLangSeg').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.lang === draft.cardLang));
+    });
+    [].forEach.call($('stylePicker').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.style === draft.style));
+    });
+    [].forEach.call($('themePicker').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.theme === draft.theme));
+    });
+    $('occasion').placeholder = cardText().defaultOccasion;
+    $('resetLayout').disabled = layoutIsDefault();
+  }
+
+  function buildStylePicker() {
+    var host = $('stylePicker');
+    host.innerHTML = '';
+    STYLE_IDS.forEach(function (id) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pick';
+      b.dataset.style = id;
+      b.setAttribute('aria-pressed', String(id === draft.style));
+
+      var thumb = document.createElement('span');
+      thumb.className = 'thumb';
+      var theme = THEMES[draft.theme];
+      thumb.style.background = 'linear-gradient(38deg,' + theme.stops.join(',') + ')';
+      if (id === 'minimal') thumb.style.opacity = '.8';
+      (THUMBS[id] || []).forEach(function (m) {
+        var bar = document.createElement('span');
+        bar.className = 'mark' + (m[4] ? ' strong' : '');
+        bar.style.left = (m[0] * 100) + '%';
+        bar.style.top = (m[1] * 100) + '%';
+        bar.style.width = (m[2] * 100) + '%';
+        bar.style.height = (m[3] * 100) + '%';
+        bar.style.borderRadius = m[4] ? '2.5px' : '1px';
+        thumb.appendChild(bar);
+      });
+      if (STYLES[id].perforation) {
+        var perf = document.createElement('span');
+        perf.className = 'perf';
+        perf.style.left = (PERFORATION_X * 100) + '%';
+        perf.style.top = '13%';
+        perf.style.height = '74%';
+        thumb.appendChild(perf);
+      }
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = t()['style' + id.charAt(0).toUpperCase() + id.slice(1)];
+
+      b.appendChild(thumb);
+      b.appendChild(name);
+      b.addEventListener('click', function () {
+        if (draft.style === id) return;
+        saveLayout();                       // keep what was arranged in the old style
+        draft.style = id;
+        setPref('giftwrap.style', id);
+        layout = loadLayout(id);
+        editor.sel = null;
+        buildStylePicker();
+        syncForm();
+        render();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function buildThemePicker() {
+    var host = $('themePicker');
+    host.innerHTML = '';
+    THEME_IDS.forEach(function (id) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.theme = id;
+      b.setAttribute('aria-pressed', String(id === draft.theme));
+      b.title = id;
+      b.style.background = 'linear-gradient(38deg,' + THEMES[id].stops.join(',') + ')';
+      b.addEventListener('click', function () {
+        draft.theme = id;
+        setPref('giftwrap.theme', id);
+        buildStylePicker();               // the thumbnails wear the theme too
+        syncForm();
+        render();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  function bindForm() {
+    $('lookupBtn').addEventListener('click', lookup);
+    $('query').addEventListener('keydown', function (e) { if (e.key === 'Enter') lookup(); });
+    $('storefront').addEventListener('change', function () { if (draft.app) lookup(); });
+
+    [].forEach.call($('kindSeg').children, function (b) {
+      b.addEventListener('click', function () {
+        if (draft.kind === b.dataset.kind) return;
+        draft.kind = b.dataset.kind;
+        kindChosenManually = true;
+        $('autoFill').textContent = '';
+        syncForm();
+        render();
+      });
+    });
+
+    [].forEach.call($('cardLangSeg').children, function (b) {
+      b.addEventListener('click', function () {
+        if (draft.cardLang === b.dataset.lang) return;
+        draft.cardLang = b.dataset.lang;
+        setPref('giftwrap.cardLang', draft.cardLang);   // the default for later cards
+        syncForm();
+        render();
+      });
+    });
+
+    var text = {
+      code: 'code', occasion: 'occasion', recipient: 'recipient',
+      sender: 'sender', message: 'message', pt: 'pt', ct: 'ct'
+    };
+    Object.keys(text).forEach(function (id) {
+      $(id).addEventListener('input', function () {
+        draft[text[id]] = this.value;
+        if (id === 'code') {
+          $('codeUsed').hidden = !codeAlreadySent(this.value);
+        }
+        render();
+      });
+    });
+
+    $('hasExpiry').addEventListener('change', function () {
+      $('expiryField').hidden = !this.checked;
+      if (this.checked && !$('expiry').value) {
+        var d = new Date();
+        d.setDate(d.getDate() + 28);
+        $('expiry').value = d.toISOString().slice(0, 10);
+      }
+      draft.expiry = this.checked ? $('expiry').value : '';
+      render();
+    });
+    $('expiry').addEventListener('change', function () {
+      draft.expiry = $('hasExpiry').checked ? this.value : '';
+      render();
+    });
+
+    $('showCode').addEventListener('change', function () { draft.showCode = this.checked; render(); });
+    $('showQR').addEventListener('change', function () { draft.showQR = this.checked; render(); });
+
+    $('resetLayout').addEventListener('click', function () {
+      layout = defaultLayout(draft.style);
+      saveLayout();
+      editor.sel = null;
+      syncForm();
+      render();
+      flash(t().layoutReset);
+    });
+
+    $('openRedeem').addEventListener('click', function () {
+      var u = redeemURL();
+      if (u) window.open(u, '_blank', 'noopener');
+    });
+    $('previewGift').addEventListener('click', function () {
+      var u = giftLink();
+      if (u) window.open(u, '_blank', 'noopener');
+    });
+
+    $('copyGift').addEventListener('click', function () {
+      copy(giftLink(), t().copiedGiftLink);
+    });
+    $('copyRedeem').addEventListener('click', function () {
+      copy(redeemURL(), t().copiedRedeemLink);
+    });
+    $('copyMessage').addEventListener('click', function () {
+      copy(messageText(), t().copiedMessage);
+    });
+
+    $('copyImage').addEventListener('click', function () {
+      if (!window.ClipboardItem) { flash(t().noImageCopy); return; }
+      exportPNG(3, function (blob) {
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+          .then(function () { flash(t().copiedImage); })
+          .catch(function () { flash(t().noImageCopy); });
+      });
+    });
+
+    $('savePNG').addEventListener('click', function () {
+      exportPNG(3, function (blob) {
+        var name = fileStem() + '.png';
+        download(blob, name);
+        flash(t().saved(name));
+      });
+    });
+
+    $('addLedger').addEventListener('click', function () {
+      if (!isReady()) return;
+      recordGift(trimmedCode(), draft.recipient.trim());
+      flash(t().recorded);
+      renderLedger();
+    });
+  }
+
+  /**
+   * Copies text, with a fallback for where the async clipboard isn't allowed.
+   *
+   * `navigator.clipboard` needs a secure context, and a file:// page isn't one — which
+   * is exactly how someone is most likely to open this, by double-clicking the file.
+   * The old execCommand path still works there, so it's worth keeping around.
+   */
+  function copy(text, okMessage) {
+    if (!text) return;
+    var fallback = function () {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      flash(ok ? okMessage : t().copyFailed);
+    };
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { fallback(); return; }
+    navigator.clipboard.writeText(text).then(function () { flash(okMessage); }, fallback);
+  }
+
+  function recordGift(code, who) {
+    ledger.unshift({
+      id: String(Date.now()) + Math.round(Math.random() * 1e6),
+      issuedAt: new Date().toISOString(),
+      appName: draft.app ? draft.app.name : '',
+      appleID: draft.app ? draft.app.id : '',
+      kind: draft.kind,
+      code: code || '',
+      recipient: who || '',
+      link: giftLink() || redeemURL(),
+      expiry: draft.expiry || '',
+      redeemed: false
+    });
+    saveLedger();
+  }
+
+  // =====================================================================
+  //  Batch
+  // =====================================================================
+
+  function batchEntries() {
+    return $('batchInput').value.split('\n').map(function (line) {
+      var parts = line.split(',');
+      var code = (parts[0] || '').trim().toUpperCase();
+      if (!code) return null;
+      return { code: code, recipient: (parts[1] || '').trim() };
+    }).filter(Boolean);
+  }
+
+  /** Runs `fn` with the draft temporarily set to one batch entry, then puts it back. */
+  function withEntry(entry, fn) {
+    var keepCode = draft.code, keepWho = draft.recipient;
+    draft.code = entry.code;
+    if (entry.recipient) draft.recipient = entry.recipient;
+    try { return fn(); }
+    finally { draft.code = keepCode; draft.recipient = keepWho; }
+  }
+
+  function renderBatchPreview() {
+    var cv = $('batchCard');
+    var c = cv.getContext('2d');
+    c.clearRect(0, 0, cv.width, cv.height);
+    var entries = batchEntries();
+    $('batchCount').textContent = t().batchRecognised(entries.length);
+
+    var draw = function () {
+      var scale = Math.min((cv.width - 160) / CANVAS.w, (cv.height - 160) / CANVAS.h);
+      var cw = CANVAS.w * scale, ch = CANVAS.h * scale;
+      var card = renderCard(scale * (window.devicePixelRatio || 1));
+      c.fillStyle = '#f0f0f2';
+      c.fillRect(0, 0, cv.width, cv.height);
+      c.save();
+      c.shadowColor = 'rgba(20,16,40,.30)';
+      c.shadowBlur = 60;
+      c.shadowOffsetY = 24;
+      c.drawImage(card, (cv.width - cw) / 2, (cv.height - ch) / 2, cw, ch);
+      c.restore();
+    };
+    if (entries.length) withEntry(entries[0], draw); else draw();
+  }
+
+  function batchRows() {
+    return batchEntries().map(function (e) {
+      return withEntry(e, function () {
+        return { code: e.code, recipient: e.recipient, gift: giftLink(), redeem: redeemURL() };
+      });
+    });
+  }
+
+  function bindBatch() {
+    $('batchInput').addEventListener('input', renderBatchPreview);
+
+    $('batchCSV').addEventListener('click', function () {
+      if (!isReadyForBatch()) return;
+      var rows = [['code', 'recipient', 'gift_link', 'redeem_link']];
+      batchRows().forEach(function (r) { rows.push([r.code, r.recipient, r.gift, r.redeem]); });
+      var csv = rows.map(function (r) {
+        return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\n');
+      download(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), 'giftwrap-batch.csv');
+
+      var entries = batchEntries();
+      entries.forEach(function (e) { withEntry(e, function () { recordGift(e.code, e.recipient); }); });
+      renderLedger();
+      $('batchStatus').textContent = t().batchAdded(entries.length);
+    });
+
+    $('batchPNG').addEventListener('click', function () {
+      if (!isReadyForBatch()) return;
+      var entries = batchEntries();
+      var i = 0;
+      (function next() {
+        if (i >= entries.length) { $('batchStatus').textContent = t().batchDone(entries.length); return; }
+        var e = entries[i++];
+        $('batchStatus').textContent = t().batchDownloading(i, entries.length);
+        withEntry(e, function () {
+          var name = fileStem() + '.png';
+          exportPNG(3, function (blob) {
+            download(blob, name);
+            setTimeout(next, 260);   // browsers throttle back-to-back downloads
+          });
+        });
+      })();
+    });
+  }
+
+  function isReadyForBatch() {
+    if (!draft.app) { $('batchStatus').textContent = t().needApp; return false; }
+    if (!batchEntries().length) { $('batchStatus').textContent = t().needCode; return false; }
+    return true;
+  }
+
+  // =====================================================================
+  //  Ledger
+  // =====================================================================
+
+  function renderLedger() {
+    var body = $('ledgerBody');
+    body.innerHTML = '';
+    var q = $('ledgerSearch').value.trim().toLowerCase();
+    var shown = ledger.filter(function (r) {
+      if (!q) return true;
+      return (r.appName + ' ' + r.recipient + ' ' + r.code).toLowerCase().indexOf(q) >= 0;
+    });
+
+    $('ledgerCount').textContent = t().ledgerCount(ledger.length);
+    $('ledgerEmpty').textContent = ledger.length ? '' : t().ledgerEmpty;
+    $('ledgerCSV').disabled = !ledger.length;
+    $('ledgerClear').disabled = !ledger.length;
+
+    shown.forEach(function (r) {
+      var tr = document.createElement('tr');
+      if (r.redeemed) tr.className = 'done';
+
+      function cell(text, cls) {
+        var td = document.createElement('td');
+        if (cls) td.className = cls;
+        td.textContent = text;
+        tr.appendChild(td);
+        return td;
+      }
+      cell((r.issuedAt || '').slice(0, 10));
+      cell(r.appName || '—');
+      cell(r.recipient || '—');
+      cell(r.code || '—', 'code');
+      cell(t()['kind' + r.kind.charAt(0).toUpperCase() + r.kind.slice(1)] || r.kind);
+
+      var tdDone = document.createElement('td');
+      var box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = !!r.redeemed;
+      box.addEventListener('change', function () {
+        r.redeemed = box.checked;
+        saveLedger();
+        renderLedger();
+      });
+      tdDone.appendChild(box);
+      tr.appendChild(tdDone);
+
+      var tdAct = document.createElement('td');
+      var link = document.createElement('button');
+      link.className = 'mini';
+      link.textContent = t().copyLink;
+      link.addEventListener('click', function () { copy(r.link, t().copiedGiftLink); });
+      tdAct.appendChild(link);
+      tr.appendChild(tdAct);
+
+      body.appendChild(tr);
+    });
+  }
+
+  function bindLedger() {
+    $('ledgerSearch').addEventListener('input', renderLedger);
+    $('ledgerCSV').addEventListener('click', function () {
+      var rows = [['issued_at', 'app', 'apple_id', 'kind', 'code', 'recipient', 'link', 'expiry', 'redeemed']];
+      ledger.forEach(function (r) {
+        rows.push([r.issuedAt, r.appName, r.appleID, r.kind, r.code,
+                   r.recipient, r.link, r.expiry, r.redeemed ? 'yes' : 'no']);
+      });
+      var csv = rows.map(function (r) {
+        return r.map(function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\n');
+      download(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), 'giftwrap-ledger.csv');
+    });
+    $('ledgerClear').addEventListener('click', function () {
+      if (!confirm(t().confirmClear)) return;
+      ledger = [];
+      saveLedger();
+      renderLedger();
+    });
+  }
+
+  // =====================================================================
+  //  Language and tabs
+  // =====================================================================
+
+  function applyUILanguage() {
+    document.documentElement.lang = LANG;
+    var attrs = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-ph', function (el, v) { el.placeholder = v; }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }]
+    ];
+    attrs.forEach(function (pair) {
+      document.querySelectorAll('[' + pair[0] + ']').forEach(function (node) {
+        var v = t()[node.getAttribute(pair[0])];
+        if (v !== undefined) pair[1](node, v);
+      });
+    });
+    [].forEach.call($('uiLang').children, function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.lang === LANG));
+    });
+    buildStylePicker();
+    syncForm();
+    renderLedger();
+    renderBatchPreview();
+    render();
+  }
+
+  function bindChrome() {
+    [].forEach.call($('uiLang').children, function (b) {
+      b.addEventListener('click', function () {
+        if (b.dataset.lang === LANG) return;
+        LANG = b.dataset.lang;
+        setPref('giftwrap.uiLang', LANG);
+        applyUILanguage();
+      });
+    });
+
+    document.querySelectorAll('.tabs button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.tabs button').forEach(function (b) {
+          b.setAttribute('aria-selected', String(b === btn));
+        });
+        ['compose', 'batch', 'ledger'].forEach(function (name) {
+          $('tab-' + name).hidden = name !== btn.dataset.tab;
+        });
+        if (btn.dataset.tab === 'ledger') renderLedger();
+        if (btn.dataset.tab === 'batch') renderBatchPreview();
+        if (btn.dataset.tab === 'compose') render();
+      });
+    });
+  }
+
+  // ---------- boot ----------
+  buildThemePicker();
+  buildStylePicker();
+  bindEditor();
+  bindForm();
+  bindBatch();
+  bindLedger();
+  bindChrome();
+  applyUILanguage();
+})();
+</script>
+</body>
+</html>

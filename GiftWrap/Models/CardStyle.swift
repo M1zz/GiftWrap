@@ -97,7 +97,14 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
     var messageMaxWidth: CGFloat {
         switch self {
         case .ticket:   return 600
-        case .centered: return 700   // centred by its placement, at x 0.15
+        // 600, centred at x 200, so the column stops at 800 — clear of the QR, which
+        // centred puts in the bottom-right corner at 822. At the usual 700 the two
+        // boxes overlap by 28 points and the export bakes it in.
+        case .centered: return 600
+        // Poster's message sits low, level with the code chip at x 560 rather than
+        // well above it as in the other styles. At the usual 700 the box runs under
+        // the chip — which the editor flags, but the card shouldn't start out wrong.
+        case .poster:   return 480
         default:        return 700
         }
     }
@@ -167,7 +174,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
          *   title    262 …361     message 376 …466
          *   code     478 …525     people 490 …573 (left)   qr 452 …574 (right)
          *
-         * Title and message are centred as boxes — 640 and 700 wide, placed at
+         * Title and message are centred as boxes — 640 and 600 wide, placed at
          * (1000 − width) / 2 — so the text centred inside them lands on the card's
          * middle whatever it says. The blocks that hug their own text can't do that;
          * their x assumes a usual length and drifts a little on an unusual one.
@@ -178,7 +185,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.badge.rawValue:    BlockPlacement(x: 0.7670, y: 0.0762),
                 CardBlock.logo.rawValue:     BlockPlacement(x: 0.4240, y: 0.1524),
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.1800, y: 0.4159),
-                CardBlock.message.rawValue:  BlockPlacement(x: 0.1500, y: 0.5968),
+                CardBlock.message.rawValue:  BlockPlacement(x: 0.2000, y: 0.5968),
                 CardBlock.code.rawValue:     BlockPlacement(x: 0.4000, y: 0.7587),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7778),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8220, y: 0.7175)
@@ -207,7 +214,8 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
          * the way so the type has the width. Budgeted around a headline at 88pt,
          * which draws about 106 tall:
          *   logo 56…140 (small) · occasion 160…266 (huge) · title 290…389
-         *   message 405…475 · people 490…573 · code 470…517 · qr 440…562
+         *   message 395…465 (480 wide, clear of the chip) · people 490…573
+         *   code 470…517 · qr 440…562
          */
         case .poster:
             return [
@@ -215,7 +223,7 @@ enum CardStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable 
                 CardBlock.badge.rawValue:    BlockPlacement(x: 0.7670, y: 0.0984),
                 CardBlock.occasion.rawValue: BlockPlacement(x: 0.0560, y: 0.2540),
                 CardBlock.title.rawValue:    BlockPlacement(x: 0.0560, y: 0.4603),
-                CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.6429),
+                CardBlock.message.rawValue:  BlockPlacement(x: 0.0560, y: 0.6270),
                 CardBlock.people.rawValue:   BlockPlacement(x: 0.0560, y: 0.7778),
                 CardBlock.code.rawValue:     BlockPlacement(x: 0.5600, y: 0.7460),
                 CardBlock.qr.rawValue:       BlockPlacement(x: 0.8060, y: 0.6984)

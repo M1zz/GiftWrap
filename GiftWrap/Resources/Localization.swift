@@ -60,6 +60,54 @@ enum AppLanguage: String, CaseIterable, Codable, Identifiable, Sendable {
     static func persist(_ language: AppLanguage) {
         UserDefaults.standard.set(language.rawValue, forKey: storeKey)
     }
+
+    // MARK: The card's language, remembered separately
+
+    private static let cardStoreKey = "GiftWrap.cardLanguage"
+
+    /// The language new cards are composed in.
+    ///
+    /// Kept apart from the interface language and remembered on its own. Someone who
+    /// works in Korean but sends to English readers would otherwise re-pick English on
+    /// every single card, and the one they forgot is the one that goes out wrong.
+    ///
+    /// Falls back to the interface language the first time, which is right for the
+    /// commoner case of sending to people who read what you read.
+    static var currentCard: AppLanguage {
+        guard let raw = UserDefaults.standard.string(forKey: cardStoreKey),
+              let language = AppLanguage(rawValue: raw)
+        else { return current }
+        return language
+    }
+
+    static func persistCard(_ language: AppLanguage) {
+        UserDefaults.standard.set(language.rawValue, forKey: cardStoreKey)
+    }
+}
+
+/// Korean particles that change shape with the word in front of them.
+///
+/// "메시지과 코드가" is wrong twice over — it should be "메시지와 코드가", and with the
+/// words the other way round "코드와 메시지가". Which form is right depends on whether
+/// the preceding syllable ends in a consonant, so any sentence built from block names
+/// at runtime has to work it out rather than guess.
+enum Particle {
+
+    static func waGwa(_ word: String) -> String { endsInConsonant(word) ? "과" : "와" }
+    static func iGa(_ word: String) -> String { endsInConsonant(word) ? "이" : "가" }
+    static func eulReul(_ word: String) -> String { endsInConsonant(word) ? "을" : "를" }
+
+    /// Whether the last syllable carries a final consonant (받침).
+    ///
+    /// Hangul syllables are laid out so that the final consonant is the remainder of
+    /// (code − 0xAC00) mod 28 — zero means there isn't one. Anything else, "QR" being
+    /// the one that actually comes up here, is read aloud in Korean ending in a
+    /// consonant, which is also the safer default.
+    private static func endsInConsonant(_ word: String) -> Bool {
+        guard let last = word.unicodeScalars.last else { return true }
+        guard (0xAC00...0xD7A3).contains(last.value) else { return true }
+        return (last.value - 0xAC00) % 28 != 0
+    }
 }
 
 /// One label in both languages.
@@ -152,8 +200,8 @@ enum T {
     )
     static let cardLanguage  = Loc(ko: "카드 언어", en: "Card language")
     static let cardLanguageHint = Loc(
-        ko: "받는 사람이 보는 카드·선물 페이지·전송 문구의 언어입니다.",
-        en: "The language of the card, the gift page and the message the recipient gets."
+        ko: "받는 사람이 보는 카드·선물 페이지·전송 문구의 언어입니다. 다음 카드도 이 언어로 시작합니다.",
+        en: "The language of the card, the gift page and the message the recipient gets. Later cards start here too."
     )
     static let occasionField = Loc(ko: "문구 (예: 생일 축하해요)", en: "Headline (e.g. Happy birthday)")
     static let recipient     = Loc(ko: "받는 사람", en: "To")
@@ -193,11 +241,14 @@ enum T {
     // MARK: Collision banner
 
     static func collisionOne(_ a: String, _ b: String) -> Loc {
-        Loc(ko: "\(a)과 \(b)가 겹칩니다", en: "\(a) and \(b) overlap")
+        Loc(
+            ko: "\(a)\(Particle.waGwa(a)) \(b)\(Particle.iGa(b)) 겹칩니다",
+            en: "\(a) and \(b) overlap"
+        )
     }
     static func collisionMany(_ a: String, _ b: String, count: Int) -> Loc {
         Loc(
-            ko: "\(a)과 \(b)를 비롯해 \(count)곳이 겹칩니다",
+            ko: "\(a)\(Particle.waGwa(a)) \(b)\(Particle.eulReul(b)) 비롯해 \(count)곳이 겹칩니다",
             en: "\(a) and \(b), and \(count) places in all, overlap"
         )
     }

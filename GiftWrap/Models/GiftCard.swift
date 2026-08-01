@@ -270,7 +270,16 @@ extension CardLayout {
         return layout
     }
 
+    /// Saves the arrangement, or forgets it when nothing has been moved.
+    ///
+    /// Not storing the untouched case matters: switching styles saves the outgoing one,
+    /// so merely visiting a style would otherwise pin whatever its defaults were that
+    /// day, and a later correction to the design would never reach anyone who had looked.
     func save() {
+        guard !isDefault else {
+            UserDefaults.standard.removeObject(forKey: CardLayout.storeKey(style))
+            return
+        }
         let stored = Stored(version: CardLayout.storeVersion, placements: placements)
         guard let data = try? JSONEncoder().encode(stored) else { return }
         UserDefaults.standard.set(data, forKey: CardLayout.storeKey(style))
@@ -339,7 +348,7 @@ struct GiftDraft: Codable, Hashable {
     /// The language the recipient reads — the card, the gift page, and the message that
     /// carries the link. A separate choice from the interface language, because a sender
     /// working in Korean may be sending to someone who doesn't.
-    var cardLanguage: AppLanguage = .current
+    var cardLanguage: AppLanguage = .currentCard
     var theme: GiftTheme = .sunrise
     var expiry: Date? = nil
     var showCodeOnCard: Bool = true

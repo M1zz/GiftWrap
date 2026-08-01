@@ -267,11 +267,15 @@
   .card.s-centered .b-title,
   .card.s-centered .b-message { text-align: center; }
   .card.s-centered .b-title { width: 64cqw; }
-  .card.s-centered .b-message { width: 70cqw; max-width: none; }
+  /* 60cqw, not 70 — the wider column reaches the QR in the bottom-right corner. */
+  .card.s-centered .b-message { width: 60cqw; max-width: none; }
 
   /* Ticket — the text has to stop short of the perforation at 70%. */
   .card.s-ticket .b-title { max-width: 43cqw; }
   .card.s-ticket .b-message { max-width: 60cqw; }
+
+  /* Poster — the message sits level with the code chip, so it stops short of it. */
+  .card.s-poster .b-message { max-width: 48cqw; }
 
   /* Minimal — no sheen, softer blooms, a hairline frame, and smaller type (the scale
      itself is applied in JS, alongside the app's). */
@@ -1000,7 +1004,7 @@
     centered: {
       occasion: [0.4550, 0.0889], badge: [0.7670, 0.0762],
       logo:     [0.4240, 0.1524], title: [0.1800, 0.4159],
-      message:  [0.1500, 0.5968], code:  [0.4000, 0.7587],
+      message:  [0.2000, 0.5968], code:  [0.4000, 0.7587],
       people:   [0.0560, 0.7778], qr:    [0.8220, 0.7175]
     },
     ticket: {
@@ -1012,7 +1016,7 @@
     poster: {
       logo:     [0.0560, 0.0889, 0.55], badge: [0.7670, 0.0984],
       occasion: [0.0560, 0.2540], title: [0.0560, 0.4603],
-      message:  [0.0560, 0.6429], people: [0.0560, 0.7778],
+      message:  [0.0560, 0.6270], people: [0.0560, 0.7778],
       code:     [0.5600, 0.7460], qr:    [0.8060, 0.6984]
     },
     minimal: {
