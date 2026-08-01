@@ -959,9 +959,24 @@
     $('appStatus').textContent = t().lookingUp;
     var store = $('storefront').value;
 
+    /*
+     * The nonce is not cache-busting for freshness — it's for CORS.
+     *
+     * Apple's lookup endpoint answers `Access-Control-Allow-Origin` with the Origin
+     * that asked, and its CDN caches the response *including that header*, without a
+     * `Vary: Origin`. So whoever warms a given URL decides which origin may read it:
+     * a request from a localhost copy of this page leaves behind
+     * `Access-Control-Allow-Origin: http://127.0.0.1:8931`, and every other site
+     * asking for the same URL is then refused by the browser.
+     *
+     * A per-request token gives each caller its own cache entry, and so its own
+     * header. Lookups happen on an explicit press, not per keystroke, so the cache
+     * this gives up was never doing much.
+     */
     function fetchIn(country) {
+      var nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
       return fetch('https://itunes.apple.com/lookup?id=' + encodeURIComponent(parsed.appleID) +
-        (country ? '&country=' + country : '') + '&entity=software')
+        (country ? '&country=' + country : '') + '&entity=software&cb=' + nonce)
         .then(function (r) { return r.json(); });
     }
 
