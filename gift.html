@@ -926,9 +926,11 @@
   /** The stand-in gift, in whichever language the page is speaking. */
   function demoFor(lang) {
     var demo = {
+      // Written in the slim shape a real link now uses — app ID and kind of code, with
+      // the store links left for the page to assemble. The sample is what gets opened
+      // when the design changes, so it should exercise the same path a gift does.
       n: '실수 100', d: 'devkoan', c: 'ABCDEFGHIJKL',
-      u: 'https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=ABCDEFGHIJKL',
-      p: 'https://apps.apple.com/kr/app/id6759643878',
+      a: 6759643878, x: 'offercodes',
       e: '2026-08-26',
       g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'],
       q: true, k: true
@@ -1208,20 +1210,57 @@
     paintBlocks();
   }
 
-  /** The Apple ID, read back out of whichever link carries it. */
+  /**
+   * The store links, assembled here rather than carried.
+   *
+   * Links used to spell out the icon (`i`), the product page (`p`) and the redeem URL
+   * (`u`). Together those three were more than half the payload — around 300 of 550
+   * bytes — and pushed the whole link past 750 characters, which is where iMessage's
+   * link detection gives up: it linkified the head and dropped the tail into the
+   * message as plain text, so the gift arrived in two pieces and opened as neither.
+   *
+   * All three can be rebuilt from the app ID (`a`), the kind of code (`x`) and the
+   * code itself (`c`), so the link now carries the pieces and the page does the
+   * assembly. Links made before this state them outright, and a stated value always
+   * wins — those links are out in chat histories and can't be reissued.
+   */
   function appleID() {
+    if (gift.a) return String(gift.a);
     var m = /(?:\/id|[?&]id=)(\d{5,})/.exec((gift.u || '') + ' ' + (gift.p || ''));
     return m ? m[1] : null;
+  }
+
+  /** The app's own store page — where "open the app" goes once the code is used. */
+  function productURL() {
+    if (gift.p) return gift.p;
+    var id = appleID();
+    // No locale and no `uo=4`: Apple redirects this to the recipient's own storefront,
+    // which is the one they can actually redeem in.
+    return id ? 'https://apps.apple.com/app/id' + id : '';
+  }
+
+  /**
+   * Where the redeem button goes. A gift with no code is just a link to the app, so
+   * the store page stands in.
+   */
+  function redeemURL() {
+    if (gift.u) return gift.u;
+    var id = appleID();
+    if (id && gift.x && gift.c) {
+      return 'https://apps.apple.com/redeem?ctx=' + encodeURIComponent(gift.x) +
+             '&id=' + id + '&code=' + encodeURIComponent(gift.c);
+    }
+    return productURL();
   }
 
   /**
    * The icon.
    *
-   * Normally the link states it (`i`), same as it states the store links, and it draws
-   * on the first paint. Older links and any payload that left it out fall back to
-   * asking Apple for it by app ID: the monogram goes up first and the icon replaces it
-   * when the lookup answers. If it never does — offline, blocked, an app that's been
-   * pulled — the monogram is what stays.
+   * The link no longer states it — at 160 characters it was the single biggest thing
+   * in the payload — so the monogram goes up first and Apple's lookup replaces it by
+   * app ID when it answers. Links made before the slimming still state it (`i`) and
+   * draw the real icon on the first paint. If the lookup never answers — offline,
+   * blocked, an app that's been pulled — the monogram is what stays.
    */
   function placeLogo() {
     if (gift.i) {
@@ -1312,8 +1351,9 @@
 
     if (gift.k && gift.c) place('code', node('div', '', gift.c));
 
-    if (gift.q && (gift.u || gift.p)) {
-      var svg = qrSVG(gift.u || gift.p);
+    var scanTarget = redeemURL();
+    if (gift.q && scanTarget) {
+      var svg = qrSVG(scanTarget);
       if (svg) {
         var box = node('div');
         box.appendChild(svg);
@@ -1375,9 +1415,9 @@
     $('openApp').textContent = S.openApp;
     $('backMsg').textContent = gift.f ? S.backFrom(gift.f) : S.back;
 
-    var redeem = gift.u || gift.p || '';
+    var redeem = redeemURL();
     $('cta').href = redeem || '#';
-    $('openApp').href = gift.p || redeem || '#';
+    $('openApp').href = productURL() || redeem || '#';
 
     $('howto').hidden = !gift.c;
     $('code').textContent = gift.c || '';

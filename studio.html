@@ -917,16 +917,29 @@
     return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
+  /**
+   * What rides in the link.
+   *
+   * Kept deliberately small. The icon URL, the product page and the redeem URL used to
+   * be spelled out here and came to more than half the payload, which put the finished
+   * link past 750 characters — long enough that iMessage linkifies only part of it and
+   * drops the rest into the message as plain text. gift.html rebuilds all three from
+   * the app ID (`a`), the kind of code (`x`) and the code, so they no longer travel.
+   *
+   * The one thing that can't be rebuilt is campaign tracking: `pt`/`ct` are the
+   * sender's own parameters and nothing else in the payload implies them, so a link
+   * that carries them states its redeem URL in full.
+   */
   function giftPayload() {
     var url = redeemURL();
     var p = { v: 1 };
     if (draft.app) {
       p.n = draft.app.name;
       if (draft.app.developer) p.d = draft.app.developer;
-      if (draft.app.icon) p.i = draft.app.icon;
-      if (draft.app.productURL) p.p = draft.app.productURL;
+      p.a = Number(draft.app.id) || draft.app.id;
     }
-    if (url) p.u = url;
+    if (requiresCode() && trimmedCode()) p.x = draft.kind === 'appPromoCode' ? 'apps' : 'offercodes';
+    if (url && (draft.pt.trim() || draft.ct.trim())) p.u = url;
     if (requiresCode() && trimmedCode()) p.c = trimmedCode();
     p.o = draft.occasion.trim() || cardText().defaultOccasion;
     if (draft.message.trim()) p.m = draft.message.trim();
