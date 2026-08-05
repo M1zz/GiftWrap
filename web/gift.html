@@ -1425,7 +1425,7 @@
                   'comets', 'ribbons', 'snow', 'hearts', 'rays', 'goldDust'];
 
   var cv = $('fx'), cx = cv.getContext && cv.getContext('2d');
-  var W = 0, H = 0, parts = [], raf = 0, started = 0, fade = 1;
+  var W = 0, H = 0, parts = [], raf = 0, started = 0, fade = 1, wind = 0;
 
   // Snow and petals would still be falling when the clock runs out, so everything
   // dims out over the last stretch rather than blinking away mid-air.
@@ -1451,6 +1451,23 @@
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function pick(a) { return a[(Math.random() * a.length) | 0]; }
 
+  /**
+   * A theme has five colours, which over two hundred pieces of paper reads as five
+   * pieces of paper repeated. Nudging each one toward white or black keeps the palette
+   * but stops the flatness — the same trick as tinting a flat colour to fake a light.
+   */
+  function tint(hex, amt) {
+    var h = hex.replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    var n = parseInt(h, 16);
+    if (isNaN(n)) return hex;
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255, t = amt > 0 ? 255 : 0;
+    var k = Math.abs(amt);
+    r = Math.round(r + (t - r) * k); g = Math.round(g + (t - g) * k); b = Math.round(b + (t - b) * k);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  function shade(C) { return tint(pick(C), rnd(-0.22, 0.28)); }
+
   /// Every particle is this shape; effects just fill it in differently.
   function P(o) {
     o.age = 0;
@@ -1460,7 +1477,30 @@
     o.rot = o.rot || 0; o.vr = o.vr || 0;
     o.sway = o.sway || 0; o.swayF = o.swayF || 0.05;
     o.alpha = o.alpha == null ? 1 : o.alpha;
+    o.z = o.z == null ? 1 : o.z;
+    // Each piece turns at its own rate and starts at its own angle. Without this the
+    // whole field flutters in step, which reads as blinking rather than falling.
+    o.flut = o.flut || rnd(0.07, 0.19);
+    o.flutP = o.flutP || rnd(0, 6.28);
+    o.vt = o.vt || 0;              // terminal velocity; paper stops accelerating
+    o.wind = o.wind == null ? 0 : o.wind;
     return o;
+  }
+
+  /**
+   * Depth. A piece further away is smaller, slower, paler and drawn behind the near
+   * ones, which is what turns a flat spray into something with room in it.
+   */
+  function depth(p, lo, hi) {
+    var z = rnd(lo, hi);
+    p.z = z;
+    if (p.r) p.r *= z;
+    if (p.w) p.w *= z;
+    if (p.h) p.h *= z;
+    if (p.len) p.len *= z;
+    p.vx *= z; p.vy *= z;
+    p.alpha *= 0.45 + z * 0.55;
+    return p;
   }
 
   /* ---------- shapes ---------- */
@@ -1502,9 +1542,14 @@
     }
   }
 
+  // Light adds up; paper doesn't. Sparks, dust and stars are light, so they brighten
+  // where they overlap instead of stacking flatly on top of one another.
+  var GLOW = { dust: 1, star: 1, star5: 1, ray: 1, ring: 1, streak: 1 };
+
   function draw(p) {
     var A = Math.max(0, p.alpha) * fade;
     cx.save();
+    if (GLOW[p.shape]) cx.globalCompositeOperation = 'lighter';
     cx.globalAlpha = A;
     cx.translate(p.x, p.y);
     if (p.rot) cx.rotate(p.rot);
@@ -1512,8 +1557,12 @@
 
     switch (p.shape) {
       case 'rect':
-        // Flutter: the paper turns edge-on as it falls, so it thins and fattens.
-        cx.scale(1, Math.abs(Math.cos(p.age * 0.12)) * 0.85 + 0.15);
+        // Flutter: the paper turns edge-on as it falls, so it thins and fattens. Its
+        // own rate and phase, or the whole field would blink together.
+        var f = Math.cos(p.age * p.flut + p.flutP);
+        cx.scale(1, Math.abs(f) * 0.86 + 0.14);
+        // Edge-on, the back of the paper catches less light.
+        if (f < 0) cx.globalAlpha = A * 0.72;
         cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         break;
       case 'circle':
@@ -1576,7 +1625,11 @@
         cx.closePath(); cx.fill();
         break;
       case 'dust':
-        cx.shadowBlur = p.r * 4; cx.shadowColor = p.color;
+        // Glow without shadowBlur, which is far too slow at these counts: a soft wide
+        // disc under a tight core. Added, not stacked, so overlaps burn brighter.
+        cx.globalAlpha = A * 0.3;
+        cx.beginPath(); cx.arc(0, 0, p.r * 2.8, 0, 6.284); cx.fill();
+        cx.globalAlpha = A;
         cx.beginPath(); cx.arc(0, 0, p.r, 0, 6.284); cx.fill();
         break;
     }
@@ -1591,32 +1644,47 @@
     // 콘페티 — two cannons from the lower corners, plus a burst at the box.
     confetti: function (C) {
       var out = [], i;
+
+      /// Real confetti is cut in a few shapes at once — squares, oblongs, and the
+      /// long thin strips that fall slowest and turn most.
+      function paper() {
+        var k = Math.random();
+        if (k < 0.18) return { w: rnd(3, 5), h: rnd(16, 30), vr: rnd(-0.34, 0.34) };  // strip
+        if (k < 0.34) return { w: rnd(7, 11), h: rnd(7, 11), vr: rnd(-0.24, 0.24) };  // square
+        return { w: rnd(6, 12), h: rnd(9, 17), vr: rnd(-0.2, 0.2) };                  // oblong
+      }
+
       function cannon(x, dir) {
         for (i = 0; i < 46; i++) {
-          var a = rnd(-1.5, -0.55) + dir * rnd(0, 0.5);
-          var sp = rnd(11, 21);
-          out.push(P({ shape: 'rect', color: pick(C), x: x, y: H + 10,
+          var a = rnd(-1.5, -0.55) + dir * rnd(0, 0.5), sp = rnd(12, 23), s = paper();
+          out.push(depth(P({ shape: 'rect', color: shade(C), x: x, y: H + 10,
             vx: Math.cos(a) * sp * dir, vy: Math.sin(a) * sp,
-            w: rnd(6, 12), h: rnd(9, 16), g: 0.34, drag: 0.985,
-            rot: rnd(0, 6.28), vr: rnd(-0.3, 0.3), life: rnd(110, 165) }));
+            w: s.w, h: s.h, g: 0.34, drag: 0.985, vt: rnd(3.4, 6),
+            wind: rnd(0.5, 1.3), rot: rnd(0, 6.28), vr: s.vr,
+            life: rnd(150, 230) }), 0.65, 1.3));
         }
       }
       cannon(W * 0.06, 1); cannon(W * 0.94, -1);
-      for (i = 0; i < 40; i++) {
-        var a2 = rnd(0, 6.284), s2 = rnd(3, 13);
-        out.push(P({ shape: 'rect', color: pick(C), x: W / 2, y: H * 0.44,
+
+      for (i = 0; i < 44; i++) {
+        var a2 = rnd(0, 6.284), s2 = rnd(3, 14), sp2 = paper();
+        out.push(depth(P({ shape: 'rect', color: shade(C), x: W / 2, y: H * 0.44,
           vx: Math.cos(a2) * s2, vy: Math.sin(a2) * s2 - 3,
-          w: rnd(6, 11), h: rnd(8, 15), g: 0.3, drag: 0.982,
-          rot: rnd(0, 6.28), vr: rnd(-0.35, 0.35), life: rnd(95, 150) }));
+          w: sp2.w, h: sp2.h, g: 0.3, drag: 0.982, vt: rnd(3.2, 5.6),
+          wind: rnd(0.5, 1.3), rot: rnd(0, 6.28), vr: sp2.vr,
+          life: rnd(140, 220) }), 0.7, 1.35));
       }
+
       // The burst is over in a second and the card only lands at 950ms, so paper keeps
       // coming down in front of it — otherwise the celebration ends as the gift arrives.
-      for (i = 0; i < 80; i++) {
-        out.push(P({ shape: 'rect', color: pick(C),
-          x: rnd(-20, W + 20), y: rnd(-160, -20), delay: (i * 3) | 0,
-          vy: rnd(1.8, 4.2), vx: rnd(-0.7, 0.7),
-          w: rnd(6, 12), h: rnd(8, 15), sway: rnd(0.6, 1.8), swayF: rnd(0.02, 0.06),
-          rot: rnd(0, 6.28), vr: rnd(-0.16, 0.16), life: 999, until: H + 60 }));
+      for (i = 0; i < 90; i++) {
+        var sp3 = paper();
+        out.push(depth(P({ shape: 'rect', color: shade(C),
+          x: rnd(-20, W + 20), y: rnd(-200, -20), delay: (i * 3) | 0,
+          vy: rnd(1.8, 4.2), vx: rnd(-0.5, 0.5), vt: rnd(2.6, 5),
+          w: sp3.w, h: sp3.h, sway: rnd(0.5, 1.5), swayF: rnd(0.02, 0.06),
+          wind: rnd(0.6, 1.5), rot: rnd(0, 6.28), vr: sp3.vr,
+          life: 999, until: H + 60 }), 0.55, 1.3));
       }
       return out;
     },
@@ -1629,18 +1697,49 @@
       function shell(delay) {
         var tx = rnd(W * 0.2, W * 0.8), ty = rnd(H * 0.16, H * 0.46);
         var col = pick(C);
-        return P({ shape: 'dust', color: col, x: tx, y: H + 10, r: 2.6,
+        return P({ shape: 'dust', color: tint(col, 0.35), x: tx, y: H + 10, r: 2.4,
           vy: -rnd(13, 17), g: 0.16, life: 999, delay: delay,
           stopAt: ty,
+
+          // Embers falling off the climb, dimmer and slower than the shell itself.
+          emit: function (p) {
+            if (p.age % 2) return null;
+            return [P({ shape: 'dust', color: tint(col, 0.15),
+              x: p.x + rnd(-1.5, 1.5), y: p.y + rnd(0, 6), r: rnd(0.7, 1.6),
+              vy: rnd(0.4, 1.4), vx: rnd(-0.35, 0.35), g: 0.02,
+              alpha: 0.75, life: rnd(16, 30) })];
+          },
+
           onDeath: function (p) {
-            var burst = [], k, cnt = 46;
-            for (k = 0; k < cnt; k++) {
-              var a = (6.284 / cnt) * k + rnd(-0.05, 0.05);
-              var sp = rnd(4, 10);
-              burst.push(P({ shape: 'dust', color: Math.random() < 0.25 ? '#fff' : col,
+            var burst = [], k, a, sp;
+
+            // The flash. One frame of white where the shell was, then it's gone.
+            burst.push(P({ shape: 'ring', color: '#fff', x: p.x, y: p.y,
+              r: 4, grow: 13, w: 5, life: 12 }));
+
+            // Fast thin shell — the leading edge, gone quickly.
+            for (k = 0; k < 40; k++) {
+              a = (6.284 / 40) * k + rnd(-0.04, 0.04); sp = rnd(9, 13);
+              burst.push(P({ shape: 'dust', color: Math.random() < 0.3 ? '#fff' : tint(col, 0.3),
+                x: p.x, y: p.y, r: rnd(1.3, 2.3),
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                g: 0.1, drag: 0.94, life: rnd(34, 52) }));
+            }
+            // Slower heavier stars that hang and fall — this is the part you watch.
+            for (k = 0; k < 34; k++) {
+              a = rnd(0, 6.284); sp = rnd(2.5, 7);
+              burst.push(P({ shape: 'dust', color: tint(col, rnd(-0.1, 0.4)),
                 x: p.x, y: p.y, r: rnd(1.6, 3.2),
                 vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-                g: 0.13, drag: 0.955, life: rnd(55, 85) }));
+                g: 0.14, drag: 0.965, vt: 3.4, twinkle: rnd(0.08, 0.22),
+                life: rnd(70, 115) }));
+            }
+            // Crackle: a few that pop late, after you think it's over.
+            for (k = 0; k < 12; k++) {
+              a = rnd(0, 6.284); sp = rnd(1, 4);
+              burst.push(P({ shape: 'dust', color: '#fff', x: p.x, y: p.y, r: rnd(0.9, 1.8),
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 0.1, drag: 0.97,
+                delay: (rnd(30, 70)) | 0, twinkle: rnd(0.2, 0.4), life: rnd(20, 40) }));
             }
             return burst;
           } });
@@ -1653,11 +1752,11 @@
       var out = [];
       // Staggered, so it keeps catching the light instead of flaring once.
       for (var i = 0; i < 150; i++) {
-        out.push(P({ shape: 'star', color: Math.random() < 0.3 ? '#fff' : pick(C),
+        out.push(depth(P({ shape: 'star', color: Math.random() < 0.3 ? '#fff' : tint(pick(C), rnd(0.05, 0.5)),
           x: rnd(0, W), y: rnd(H * 0.1, H), r: rnd(4, 12),
           vy: -rnd(0.4, 1.6), vx: rnd(-0.4, 0.4), delay: (rnd(0, 250)) | 0,
-          rot: rnd(0, 6.28), vr: rnd(-0.05, 0.05),
-          twinkle: rnd(0.06, 0.16), life: rnd(90, 160) }));
+          rot: rnd(0, 6.28), vr: rnd(-0.05, 0.05), wind: rnd(0.3, 1),
+          twinkle: rnd(0.06, 0.16), life: rnd(90, 160) }), 0.5, 1.3));
       }
       return out;
     },
@@ -1666,11 +1765,11 @@
     balloons: function (C) {
       var out = [];
       for (var i = 0; i < 20; i++) {
-        out.push(P({ shape: 'balloon', color: pick(C),
+        out.push(depth(P({ shape: 'balloon', color: shade(C),
           x: rnd(W * 0.06, W * 0.94), y: H + rnd(30, 300),
-          r: rnd(16, 34), vy: -rnd(1.9, 3.6),
+          r: rnd(16, 34), vy: -rnd(1.9, 3.6), wind: rnd(0.4, 1.1),
           sway: rnd(0.6, 1.7), swayF: rnd(0.02, 0.05),
-          rot: rnd(-0.12, 0.12), life: 999, until: -80 }));
+          rot: rnd(-0.12, 0.12), life: 999, until: -80 }), 0.6, 1.3));
       }
       return out;
     },
@@ -1678,12 +1777,12 @@
     // 꽃잎 — petals tumbling down, turning as they go.
     petals: function (C) {
       var out = [];
-      for (var i = 0; i < 70; i++) {
-        out.push(P({ shape: 'petal', color: pick(C),
-          x: rnd(-40, W + 40), y: rnd(-H * 0.6, -10),
-          r: rnd(6, 14), vy: rnd(1.4, 3.2), vx: rnd(-0.6, 0.6),
-          sway: rnd(0.8, 2.2), swayF: rnd(0.02, 0.06),
-          rot: rnd(0, 6.28), vr: rnd(-0.06, 0.06), life: 999, until: H + 60 }));
+      for (var i = 0; i < 80; i++) {
+        out.push(depth(P({ shape: 'petal', color: shade(C),
+          x: rnd(-40, W + 40), y: rnd(-H * 0.7, -10),
+          r: rnd(6, 14), vy: rnd(1.4, 3.2), vx: rnd(-0.6, 0.6), vt: rnd(2.4, 4),
+          sway: rnd(0.8, 2.2), swayF: rnd(0.02, 0.06), wind: rnd(0.7, 1.7),
+          rot: rnd(0, 6.28), vr: rnd(-0.06, 0.06), life: 999, until: H + 60 }), 0.55, 1.35));
       }
       return out;
     },
@@ -1692,10 +1791,10 @@
     bubbles: function (C) {
       var out = [];
       for (var i = 0; i < 46; i++) {
-        out.push(P({ shape: 'bubble', color: pick(C),
+        out.push(depth(P({ shape: 'bubble', color: tint(pick(C), rnd(0.05, 0.45)),
           x: rnd(0, W), y: H + rnd(10, 420), r: rnd(7, 26),
           vy: -rnd(1.2, 3), sway: rnd(0.7, 2), swayF: rnd(0.03, 0.07),
-          life: 999, until: -60 }));
+          wind: rnd(0.5, 1.4), life: 999, until: -60 }), 0.55, 1.3));
       }
       return out;
     },
@@ -1706,7 +1805,7 @@
       // They arrive a few at a time over the whole stretch, the way real ones do.
       for (i = 0; i < 34; i++) {
         var sp = rnd(15, 26);
-        out.push(P({ shape: 'streak', color: Math.random() < 0.35 ? '#fff' : pick(C),
+        out.push(P({ shape: 'streak', color: Math.random() < 0.35 ? '#fff' : tint(pick(C), rnd(0.1, 0.5)),
           x: rnd(-W * 0.4, W), y: rnd(-60, H * 0.7),
           vx: sp, vy: sp * 0.55, len: rnd(60, 190), w: rnd(1.6, 3.6),
           rot: Math.atan2(0.55, 1), delay: (rnd(0, 290)) | 0, life: rnd(60, 100) }));
@@ -1722,12 +1821,12 @@
     // 리본 — long curling streamers, the wave travelling along each one.
     ribbons: function (C) {
       var out = [];
-      for (var i = 0; i < 30; i++) {
-        out.push(P({ shape: 'ribbon', color: pick(C),
-          x: rnd(0, W), y: rnd(-H * 0.7, -20),
+      for (var i = 0; i < 34; i++) {
+        out.push(depth(P({ shape: 'ribbon', color: shade(C),
+          x: rnd(0, W), y: rnd(-H * 0.8, -20),
           len: rnd(45, 130), amp: rnd(6, 18), w: rnd(3, 7), seed: rnd(0, 6.28),
-          vy: rnd(2.2, 4.6), vx: rnd(-0.8, 0.8),
-          rot: rnd(-0.5, 0.5), vr: rnd(-0.012, 0.012), life: 999, until: H + 120 }));
+          vy: rnd(2.2, 4.6), vx: rnd(-0.8, 0.8), vt: rnd(3, 4.8), wind: rnd(0.6, 1.5),
+          rot: rnd(-0.5, 0.5), vr: rnd(-0.012, 0.012), life: 999, until: H + 120 }), 0.6, 1.3));
       }
       return out;
     },
@@ -1735,12 +1834,13 @@
     // 눈 — soft flakes, slow and quiet.
     snow: function (C) {
       var out = [];
-      for (var i = 0; i < 110; i++) {
-        out.push(P({ shape: 'flake', color: Math.random() < 0.6 ? '#fff' : pick(C),
+      for (var i = 0; i < 120; i++) {
+        out.push(depth(P({ shape: 'flake', color: Math.random() < 0.6 ? '#fff' : tint(pick(C), 0.45),
           x: rnd(0, W), y: rnd(-H, -10), r: rnd(3, 9),
-          vy: rnd(0.8, 2.2), sway: rnd(0.5, 1.6), swayF: rnd(0.015, 0.04),
+          vy: rnd(0.8, 2.2), vt: rnd(1.4, 2.6),
+          sway: rnd(0.5, 1.6), swayF: rnd(0.015, 0.04), wind: rnd(0.8, 2),
           rot: rnd(0, 6.28), vr: rnd(-0.02, 0.02), alpha: rnd(0.55, 1),
-          life: 999, until: H + 40 }));
+          life: 999, until: H + 40 }), 0.5, 1.3));
       }
       return out;
     },
@@ -1749,10 +1849,11 @@
     hearts: function (C) {
       var out = [];
       for (var i = 0; i < 44; i++) {
-        out.push(P({ shape: 'heart', color: pick(C),
+        out.push(depth(P({ shape: 'heart', color: shade(C),
           x: rnd(W * 0.08, W * 0.92), y: H + rnd(10, 320), r: rnd(9, 22),
           vy: -rnd(1.5, 3.4), sway: rnd(0.8, 2.2), swayF: rnd(0.03, 0.07),
-          rot: rnd(-0.25, 0.25), beat: rnd(0.08, 0.15), life: 999, until: -70 }));
+          wind: rnd(0.4, 1.2), rot: rnd(-0.25, 0.25), beat: rnd(0.08, 0.15),
+          life: 999, until: -70 }), 0.55, 1.3));
       }
       return out;
     },
@@ -1761,17 +1862,17 @@
     rays: function (C) {
       var out = [], i, cxp = W / 2, cyp = H * 0.44;
       for (i = 0; i < 18; i++) {
-        out.push(P({ shape: 'ray', color: pick(C), x: cxp, y: cyp,
+        out.push(P({ shape: 'ray', color: tint(pick(C), rnd(0, 0.45)), x: cxp, y: cyp,
           rot: (6.284 / 18) * i, vr: 0.006,
           len: 0, grow: rnd(14, 26), w: rnd(8, 20), life: 70 }));
       }
       for (i = 0; i < 3; i++) {
-        out.push(P({ shape: 'ring', color: pick(C), x: cxp, y: cyp,
+        out.push(P({ shape: 'ring', color: tint(pick(C), rnd(0.1, 0.5)), x: cxp, y: cyp,
           r: 10, grow: rnd(7, 11), w: rnd(2, 5), delay: i * 12, life: 60 }));
       }
       for (i = 0; i < 50; i++) {
         var a = rnd(0, 6.284), sp = rnd(5, 15);
-        out.push(P({ shape: 'dust', color: pick(C), x: cxp, y: cyp, r: rnd(1.5, 3.5),
+        out.push(P({ shape: 'dust', color: shade(C), x: cxp, y: cyp, r: rnd(1.5, 3.5),
           vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 0.94, g: 0.05,
           life: rnd(50, 80) }));
       }
@@ -1790,11 +1891,13 @@
     // 금가루 — fine glowing dust settling down through the light.
     goldDust: function (C) {
       var out = [];
-      for (var i = 0; i < 130; i++) {
-        out.push(P({ shape: 'dust', color: Math.random() < 0.5 ? '#FFD86E' : pick(C),
-          x: rnd(0, W), y: rnd(-H * 0.8, -5), r: rnd(1, 3.4),
-          vy: rnd(0.9, 2.6), sway: rnd(0.4, 1.4), swayF: rnd(0.02, 0.06),
-          twinkle: rnd(0.05, 0.14), life: 999, until: H + 30 }));
+      for (var i = 0; i < 140; i++) {
+        out.push(depth(P({ shape: 'dust',
+          color: Math.random() < 0.5 ? tint('#FFD86E', rnd(-0.15, 0.35)) : shade(C),
+          x: rnd(0, W), y: rnd(-H * 0.9, -5), r: rnd(1, 3.4),
+          vy: rnd(0.9, 2.6), vt: rnd(1.6, 3),
+          sway: rnd(0.4, 1.4), swayF: rnd(0.02, 0.06), wind: rnd(0.6, 1.6),
+          twinkle: rnd(0.05, 0.14), life: 999, until: H + 30 }), 0.5, 1.3));
       }
       return out;
     }
@@ -1812,7 +1915,10 @@
 
     p.vy += p.g;
     p.vx *= p.drag; p.vy *= p.drag;
-    p.x += p.vx + (p.sway ? Math.sin(p.age * p.swayF) * p.sway : 0);
+    // Paper reaches a speed and keeps it. Without this the late arrivals fall like
+    // stones while the early ones are still drifting.
+    if (p.vt && p.vy > p.vt) p.vy = p.vt;
+    p.x += p.vx + (p.sway ? Math.sin(p.age * p.swayF) * p.sway : 0) + wind * p.wind * p.z;
     p.y += p.vy;
     p.rot += p.vr;
 
@@ -1831,13 +1937,22 @@
   function frame() {
     var t = Date.now() - started;
     fade = t > FX_END - FX_FADE ? Math.max(0, (FX_END - t) / FX_FADE) : 1;
+    // One gust for the whole field. Two slow waves so it never repeats visibly —
+    // everything drifts together, which is what makes it read as air and not noise.
+    wind = Math.sin(t * 0.00062) * 0.62 + Math.sin(t * 0.00017) * 0.4;
 
     cx.clearRect(0, 0, W, H);
     var next = [], born = [], i, p;
     for (i = 0; i < parts.length; i++) {
       p = parts[i];
-      if (step(p)) { if (p.delay <= 0) draw(p); next.push(p); }
-      else if (p.onDeath) { born = born.concat(p.onDeath(p)); }
+      if (step(p)) {
+        if (p.delay <= 0) {
+          draw(p);
+          // A shell that leaves nothing behind is a moving dot; the trail is the climb.
+          if (p.emit) { var e = p.emit(p); if (e) born = born.concat(e); }
+        }
+        next.push(p);
+      } else if (p.onDeath) { born = born.concat(p.onDeath(p)); }
     }
     parts = next.concat(born);
 
@@ -1852,7 +1967,9 @@
     sizeCanvas();
     var fn = EFFECTS[name] || EFFECTS.confetti;
     parts = fn(palette());
-    started = Date.now();
+    // Far to near, once — depth doesn't change, so there's nothing to re-sort.
+    parts.sort(function (a, b) { return a.z - b.z; });
+    started = Date.now(); wind = 0;
     if (!raf) raf = requestAnimationFrame(frame);
   }
 
