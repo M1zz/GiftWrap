@@ -393,6 +393,12 @@
 - [x] README 파일맵에 빠져 있던 `web/studio.html`, `web/qr.js` 추가
 - [x] README의 낡은 설명 수정 — 페이로드는 `#`이 아니라 `?d=`
       (메신저가 `#`에서 잘라먹어 옮겨간 것). 그 대가와 `no-referrer` 완화책까지 기술
+- [x] README 전체를 한국어로. '보내는 흐름' 3번의 낡은 안내(HTML 내보내 Pages에 올리기)도
+      링크 복사로 정정
+- [x] `web/index.html` — 루트가 404이던 자리에 소개 페이지. `선물하러 가기` → studio.html.
+      gift.html 그라디언트 + studio.html UI 팔레트, 의존성 없음, 다크 모드·reduced-motion 대응
+- [x] 실서비스에서 검증 — 루트 200, 버튼이 Studio로 이동, 자동 배포 3회 모두 성공
+      (변경 없을 땐 no-op, `web/` 아닌 커밋은 워크플로 미실행)
 
 ## 결정 대기
 
