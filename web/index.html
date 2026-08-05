@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GiftWrap — App Store 앱을 선물처럼</title>
+<meta name="description" content="App Store 링크와 프로모션·오퍼 코드를 카드와 선물 페이지로 포장해 보내는 도구. 설치 없이 브라우저에서 동작합니다.">
+<!--
+  이 저장소의 얼굴. gh-pages 루트가 404이던 자리를 메운다.
+
+  색은 gift.html의 그라디언트를, 활자와 아래쪽 면은 studio.html의 회색 UI를 그대로
+  가져왔다. 방문자가 여기서 Studio로 넘어갔을 때 다른 사이트처럼 보이지 않게 하려는 것.
+  의존성 없음 — 저장소의 다른 파일과 같은 규칙이다.
+-->
+<style>
+  :root {
+    /* gift.html이 포장을 그릴 때 쓰는 바로 그 색 */
+    --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;
+    --b1: #8AF0FF; --b2: #B08CFF;
+    /* studio.html의 UI 팔레트 */
+    --bg: #f5f5f7; --panel: #fff; --ink: #1d1d1f; --ink-2: #6e6e73;
+    --line: #d2d2d7; --accent: #0071e3; --radius: 12px;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+          "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;      /* 한국어 줄바꿈이 단어 중간에서 끊기지 않게 */
+  }
+  .wrap { width: min(100% - 40px, 940px); margin-inline: auto; }
+
+  /* ── 히어로 ─────────────────────────────────────────────── */
+  .hero {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3));
+    color: #fff;
+    padding: clamp(64px, 12vw, 120px) 0 clamp(56px, 10vw, 104px);
+    text-align: center;
+  }
+  /* 배경의 부드러운 빛덩이 — 카드 뒤에 깔리는 것과 같은 처리 */
+  .hero::before, .hero::after {
+    content: ""; position: absolute; border-radius: 50%;
+    filter: blur(70px); opacity: .5; pointer-events: none;
+  }
+  .hero::before { width: 420px; height: 420px; background: var(--b1); top: -160px; left: -120px; }
+  .hero::after  { width: 380px; height: 380px; background: var(--b2); bottom: -180px; right: -100px; }
+  .hero > .wrap { position: relative; }
+
+  .gift {                                   /* CSS로 그린 선물 상자 — 앱 아이콘과 같은 모양 */
+    width: 88px; height: 88px; margin: 0 auto 26px; position: relative;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.34);
+    border-radius: 16px;
+    backdrop-filter: blur(6px);
+    animation: bob 4.5s var(--ease) infinite;
+  }
+  .gift::before, .gift::after {             /* 리본 */
+    content: ""; position: absolute; background: rgba(255,255,255,.9);
+  }
+  .gift::before { left: 50%; top: 0; bottom: 0; width: 10px; margin-left: -5px; }
+  .gift::after  { top: 50%; left: 0; right: 0; height: 10px; margin-top: -5px; }
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+
+  .hero h1 {
+    margin: 0 0 14px; font-size: clamp(34px, 6.4vw, 56px);
+    letter-spacing: -.03em; line-height: 1.15; font-weight: 700;
+  }
+  .hero p.lead {
+    margin: 0 auto 34px; max-width: 30em; font-size: clamp(16px, 2.3vw, 19px);
+    color: rgba(255,255,255,.92);
+  }
+
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 15px 30px; border-radius: 999px;
+    font-size: 17px; font-weight: 600; text-decoration: none;
+    transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+  }
+  .btn-primary {
+    background: #fff; color: #1a1a2e;
+    box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+  .btn-ghost {
+    color: #fff; border: 1px solid rgba(255,255,255,.55);
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,.14); transform: translateY(-2px); }
+  .hero small { display: block; margin-top: 20px; color: rgba(255,255,255,.75); font-size: 13.5px; }
+
+  /* ── 본문 ───────────────────────────────────────────────── */
+  section { padding: clamp(52px, 8vw, 84px) 0; }
+  h2 {
+    font-size: clamp(23px, 3.4vw, 30px); letter-spacing: -.02em;
+    margin: 0 0 10px; line-height: 1.3;
+  }
+  .sub { color: var(--ink-2); margin: 0 0 34px; font-size: 16px; }
+
+  .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 24px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.01em; }
+  .card p { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .num {
+    display: grid; place-items: center; width: 30px; height: 30px; margin-bottom: 14px;
+    border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 14.5px; font-weight: 700;
+  }
+
+  /* 두 페이지 구분 — 이 사이트에서 가장 헷갈리는 지점이라 따로 세운다 */
+  .split { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .side {
+    border-radius: var(--radius); padding: 26px; border: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .side.mine { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,.1); }
+  .tag {
+    display: inline-block; margin-bottom: 12px; padding: 4px 11px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .01em;
+  }
+  .tag.a { background: rgba(0,113,227,.12); color: var(--accent); }
+  .tag.b { background: rgba(122,91,255,.14); color: #6b46e0; }
+  .side h3 { margin: 0 0 10px; font-size: 19px; letter-spacing: -.01em; }
+  .side p { margin: 0 0 14px; color: var(--ink-2); font-size: 15px; }
+  .side code {
+    display: block; padding: 10px 12px; border-radius: 8px; background: var(--bg);
+    border: 1px solid var(--line); color: var(--ink);
+    font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .side .verdict { margin: 14px 0 0; font-size: 14.5px; font-weight: 600; color: var(--ink); }
+
+  ul.feat { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  ul.feat li {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px; font-size: 15px; color: var(--ink-2);
+  }
+  ul.feat b { color: var(--ink); display: block; margin-bottom: 3px; font-size: 15.5px; }
+
+  .closing { text-align: center; }
+  .note {
+    margin: 34px auto 0; max-width: 46em; padding: 18px 22px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); color: var(--ink-2); font-size: 14px; text-align: left;
+  }
+  footer {
+    border-top: 1px solid var(--line); padding: 30px 0 44px;
+    color: var(--ink-2); font-size: 14px; text-align: center;
+  }
+  a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000; --panel: #1c1c1e; --ink: #f5f5f7; --ink-2: #98989d;
+      --line: #38383a; --accent: #0a84ff;
+    }
+    .btn-primary { background: #fff; color: #1a1a2e; }
+    .tag.b { background: rgba(176,140,255,.18); color: #c4a8ff; }
+    .side.mine { box-shadow: 0 0 0 3px rgba(10,132,255,.16); }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="gift" aria-hidden="true"></div>
+    <h1>앱을 선물처럼<br>포장해서 보냅니다</h1>
+    <p class="lead">
+      App Store Connect는 코드를 주지만 포장지는 주지 않습니다.
+      GiftWrap은 앱 링크와 코드를 카드와 선물 페이지로 바꿔 줍니다.
+    </p>
+    <div class="cta">
+      <a class="btn btn-primary" href="studio.html">선물하러 가기</a>
+      <a class="btn btn-ghost" href="gift.html">받는 화면 구경하기</a>
+    </div>
+    <small>설치도 가입도 없습니다. 브라우저에서 바로 동작합니다.</small>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>세 단계면 끝납니다</h2>
+    <p class="sub">앱 링크 하나와 코드만 있으면 됩니다.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="num">1</div>
+        <h3>링크를 붙여 넣습니다</h3>
+        <p>App Store 주소나 숫자 ID를 넣으면 앱 이름과 아이콘, 전달 방식까지 알아서 읽어 냅니다.</p>
+      </div>
+      <div class="card">
+        <div class="num">2</div>
+        <h3>카드를 꾸밉니다</h3>
+        <p>받는 사람과 메시지를 적고 디자인을 고릅니다. 카드 위 요소는 원하는 자리로 끌어다 놓으면 됩니다.</p>
+      </div>
+      <div class="card">
+        <div class="num">3</div>
+        <h3>링크를 보냅니다</h3>
+        <p>복사한 링크를 보내면 상대는 포장을 풀고 App Store에서 바로 받습니다. 코드는 미리 채워져 있습니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2>페이지는 두 개이고, 서로 다릅니다</h2>
+    <p class="sub">여기서 가장 많이 헷갈립니다. 남에게 건네는 건 그중 하나뿐입니다.</p>
+    <div class="split">
+      <div class="side mine">
+        <span class="tag a">내가 쓰는 곳</span>
+        <h3>Studio</h3>
+        <p>카드를 만드는 작업 도구입니다. 작성 중인 내용과 보낸 기록은 내 브라우저에만 남습니다.</p>
+        <code>/studio.html</code>
+        <p class="verdict">→ 절대 남에게 보내지 않습니다</p>
+      </div>
+      <div class="side">
+        <span class="tag b">상대가 받는 곳</span>
+        <h3>선물 페이지</h3>
+        <p>포장된 선물 그 자체입니다. 선물 전체가 URL 안에 실려 오므로 서버도 데이터베이스도 없습니다.</p>
+        <code>/gift.html?d=eyJ2IjoxLCJuIjoi…</code>
+        <p class="verdict">→ 이 링크를 보냅니다</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2>그 밖에</h2>
+    <p class="sub">한 명에게 보내든 500명에게 보내든 같은 도구로 처리합니다.</p>
+    <ul class="feat">
+      <li><b>여러 장 한 번에</b>App Store Connect의 코드 CSV를 그대로 끌어다 놓으면 사람 수만큼 링크와 카드가 나옵니다.</li>
+      <li><b>보낸 기록</b>어떤 코드가 누구에게 갔는지 남고, 같은 코드를 또 쓰려 하면 경고합니다.</li>
+      <li><b>다섯 가지 디자인</b>카드마다 색과 배치를 고를 수 있고, 배치한 그대로 상대 화면에 나옵니다.</li>
+      <li><b>QR 코드</b>인쇄해서 건네야 할 때를 위해 카드에 QR을 얹을 수 있습니다.</li>
+      <li><b>한국어와 영어</b>보내는 사람이 고른 언어로 선물 페이지가 열립니다.</li>
+      <li><b>macOS 앱도 있습니다</b>같은 일을 하는 네이티브 앱이 저장소에 함께 들어 있습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="closing" style="padding-top:0">
+  <div class="wrap">
+    <h2>선물할 앱이 있나요</h2>
+    <p class="sub">링크 하나면 시작할 수 있습니다.</p>
+    <a class="btn btn-primary" href="studio.html"
+       style="background:var(--accent);color:#fff;box-shadow:0 10px 30px rgba(0,113,227,.3)">선물하러 가기</a>
+    <p class="note">
+      <b style="color:var(--ink)">알아 두세요.</b> App Store 프로모션·오퍼 코드는 Apple 약관상
+      판매할 수 없습니다. 증정, 리뷰어 배포, 워크숍과 행사용입니다. 그리고 선물 링크는 그 안의
+      코드와 같은 급으로 다루세요 — 추측할 수 없는 값이지, 비밀은 아닙니다.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    만든 것 · <a href="https://github.com/M1zz/GiftWrap">github.com/M1zz/GiftWrap</a>
+  </div>
+</footer>
+
+</body>
+</html>
