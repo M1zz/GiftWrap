@@ -327,6 +327,16 @@ enum GiftLinkKind: String, Codable, CaseIterable, Identifiable {
 
     var requiresCode: Bool { self != .directLink }
 
+    /// The `ctx` value Apple's redeem URL takes. Nil for the kind that carries no code
+    /// and so has no redeem flow to name.
+    var redeemContext: String? {
+        switch self {
+        case .directLink:   return nil
+        case .appPromoCode: return "apps"
+        case .offerCode:    return "offercodes"
+        }
+    }
+
     /// Whether this kind can carry an expiry date worth printing on the card.
     var hasExpiry: Bool { self != .directLink }
 }

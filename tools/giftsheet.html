@@ -1025,12 +1025,15 @@
     return out;
   }
 
+  function standardRedeem(ctx, id, code) {
+    return 'https://apps.apple.com/redeem?ctx=' + ctx + '&id=' + id + '&code=' + code;
+  }
+
   function redeemURL(entry) {
     if (entry.url) return entry.url;
     var id = app.id || entry.id;
     if (!id) return '';
-    return 'https://apps.apple.com/redeem?ctx=' + (app.ctx || 'offercodes') +
-      '&id=' + id + '&code=' + entry.code;
+    return standardRedeem(app.ctx || 'offercodes', id, entry.code);
   }
 
   function ingest(text, label) {
@@ -2053,11 +2056,25 @@
 
     // `lg` states the card language, so the gift page opens in it rather than guessing
     // from the recipient's browser. Same key the macOS app writes.
-    var payload = { v: 1, u: url, c: entry.code, q: true, k: true, lg: CARD_LANG };
+    var payload = { v: 1, c: entry.code, q: true, k: true, lg: CARD_LANG };
+
+    // The app ID and the kind of code, not the three links they imply. gift.html
+    // rebuilds the icon, the store page and the redeem URL from these, which keeps the
+    // link a few hundred characters shorter — past roughly 750 iMessage linkifies only
+    // the head and drops the tail into the message as text. A redeem URL that isn't
+    // the plain shape (a CSV row carrying campaign parameters, say) still travels whole.
+    var idm = /[?&]id=(\d+)/.exec(url);
+    var ctxm = /[?&]ctx=(offercodes|apps)\b/i.exec(url);
+    if (idm && ctxm && url === standardRedeem(ctxm[1].toLowerCase(), idm[1], entry.code)) {
+      payload.a = Number(idm[1]);
+      payload.x = ctxm[1].toLowerCase();
+    } else {
+      payload.u = url;
+      if (app.id) payload.a = Number(app.id);
+    }
+
     if (app.name) payload.n = app.name;
     if (app.developer) payload.d = app.developer;
-    if (app.icon) payload.i = app.icon;
-    if (app.id) payload.p = 'https://apps.apple.com/app/id' + app.id;
     if (s.value) payload.o = s.value;
     if (s.message) payload.m = s.message;
     if (s.sender) payload.f = s.sender;

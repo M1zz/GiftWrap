@@ -22,10 +22,10 @@ enum RedeemLinkBuilder {
         switch kind {
         case .directLink:
             base = fallback ?? URL(string: "https://apps.apple.com/app/id\(appleID)")
-        case .appPromoCode:
-            base = redeemURL(context: "apps", appleID: appleID, code: code)
-        case .offerCode:
-            base = redeemURL(context: "offercodes", appleID: appleID, code: code)
+        case .appPromoCode, .offerCode:
+            base = kind.redeemContext.flatMap {
+                redeemURL(context: $0, appleID: appleID, code: code)
+            }
         }
         guard let base else { return nil }
         return appendingCampaign(to: base, providerToken: providerToken, campaignCode: campaignCode)
@@ -177,17 +177,29 @@ enum GiftLinkBuilder {
     /// were dragged around arrives in the standard arrangement; the PNG and the printed
     /// sheet still carry the custom placement.
     ///
-    /// The icon URL does travel, spelled out like the store links beside it. The page
-    /// can look it up from the Apple ID instead — and still does when `i` is missing —
-    /// but a link that states its own icon draws it on the first paint, with nothing to
-    /// go wrong between the recipient and Apple's lookup endpoint.
+    /// The icon URL, the product page and the redeem URL don't travel either. They used
+    /// to, and together they were over half the payload — a finished link ran past 750
+    /// characters, which is where iMessage's link detection stops: it linkified the head
+    /// and dropped the tail into the message as plain text, so the gift arrived in two
+    /// pieces and opened as neither. All three follow from the Apple ID and the code, so
+    /// the link carries those and the page does the assembly. The cost is the icon: it
+    /// arrives a beat late, as a monogram until Apple's lookup answers.
     struct Payload: Codable, Equatable {
         var v = 1
         var n: String?          // app name
         var d: String?          // developer
-        var i: String?          // icon URL
-        var u: String?          // redeem URL
-        var p: String?          // product page, for the "open the app" button afterwards
+        var a: Int?             // Apple ID — the page rebuilds the three links below from it
+        var x: String?          // "apps" / "offercodes", which redeem flow the code belongs to
+        /// The icon URL. No longer sent — at ~160 characters it was the largest thing in
+        /// the payload, and the page can ask Apple for it by `a`. Kept so links made
+        /// before the slimming still draw their icon on the first paint.
+        var i: String?
+        /// The redeem URL, in full. Sent only when `a` + `x` + `c` can't rebuild it —
+        /// campaign tracking (`pt`/`ct`) is the sender's own and nothing else implies it.
+        var u: String?
+        /// The product page, for the "open the app" button afterwards. Derived from `a`
+        /// now; still read on older links.
+        var p: String?
         var c: String?          // code, for the manual fallback
         var o: String?          // headline (the occasion line)
         var m: String?          // message
@@ -219,10 +231,23 @@ enum GiftLinkBuilder {
         var payload = Payload()
         payload.n = draft.app?.name
         payload.d = nonEmpty(draft.app?.developer)
-        payload.i = draft.app?.artworkURL?.absoluteString
-        payload.u = draft.redeemURL?.absoluteString
-        payload.p = draft.app?.productURL?.absoluteString
         payload.c = draft.kind.requiresCode ? nonEmpty(draft.trimmedCode) : nil
+
+        // The pieces, not the three links they imply. Spelled out, the icon URL, the
+        // product page and the redeem URL came to more than half the payload and pushed
+        // the finished link past 750 characters — long enough that iMessage linkifies
+        // only the head and leaves the tail in the message as plain text, which arrives
+        // as a gift split in two and opens as neither. The page rebuilds all three from
+        // the app ID, the kind of code, and the code.
+        payload.a = draft.app?.id
+        payload.x = payload.c == nil ? nil : draft.kind.redeemContext
+
+        // Campaign tracking is the one thing the pieces can't imply, so a link carrying
+        // it states its redeem URL in full.
+        let tracked = !draft.providerToken.trimmingCharacters(in: .whitespaces).isEmpty
+            || !draft.campaignCode.trimmingCharacters(in: .whitespaces).isEmpty
+        payload.u = tracked ? draft.redeemURL?.absoluteString : nil
+
         payload.o = nonEmpty(draft.occasion) ?? C.defaultOccasion.text(draft.cardLanguage)
         payload.m = nonEmpty(draft.message)
         payload.f = nonEmpty(draft.sender)
