@@ -1,15 +1,95 @@
-# GiftWrap — App Store gift card composer for macOS
+# GiftWrap — App Store gift card composer
 
 Turns an App Store link plus a promo/offer code into something that looks like a gift:
-a rendered card image, a shareable message, and a standalone HTML gift page.
+a rendered card image, a shareable message, and a link the recipient can unwrap.
 
 Built for the workflow where App Store Connect gives you codes but no wrapping paper.
 
 ---
 
+## Two pages, and they are not the same page
+
+This trips people up, so it comes first. There is a page **you** use to make gifts and a
+page **they** open to receive one. They are different files, and only one of them is
+meant to be handed out.
+
+| | You (the sender) | Them (the recipient) |
+|---|---|---|
+| **Where** | [**studio.html**](https://m1zz.github.io/GiftWrap/studio.html) | [**gift.html**](https://m1zz.github.io/GiftWrap/gift.html) |
+| **What it is** | The composer — the client you work in | The gift itself, wrapped |
+| **You open it** | Yes, this is your tool | Only to preview |
+| **You send it** | Never | Yes — this is the link you send |
+| **Holds a gift?** | No. Your drafts and ledger stay in your browser | Yes — the whole gift rides in the URL |
+
+```
+   ┌─────────────────────────────┐
+   │  studio.html                │   ← 당신이 여는 곳. 카드를 만든다.
+   │  (or the macOS app)         │     보내지 않는다.
+   └──────────────┬──────────────┘
+                  │  "선물 페이지 링크 복사" / 앱의 "공유"
+                  ▼
+   gift.html?d=eyJ2IjoxLCJuIjoi7Iuk...     ← 이 링크만 보낸다
+                  │
+                  ▼
+   ┌─────────────────────────────┐
+   │  gift.html                  │   ← 받는 사람이 여는 곳.
+   │  포장을 풀고 → App Store    │     선물이 URL 안에 들어 있다.
+   └─────────────────────────────┘
+```
+
+`studio.html` never appears in a link you send. `gift.html` is never useful on its own —
+open it bare and it just shows a demo gift, which is how you preview a design change.
+
+**One page, every gift.** `gift.html` is a single static file that is uploaded once. It
+holds no gifts and no database; each gift arrives inside its own URL. Sending a hundred
+gifts means a hundred links to the same file, not a hundred uploads.
+
+---
+
+## Getting started in a browser (no Xcode)
+
+The fastest path — nothing to install, nothing to build:
+
+1. Open **<https://m1zz.github.io/GiftWrap/studio.html>**
+2. Paste your App Store link or numeric ID into **App Store 링크 또는 ID**. The app name,
+   icon, and the delivery kind are read out of the link.
+3. Under **전달 방식**, confirm the kind — **다운로드 링크** (no code, just the store page)
+   · **앱 프로모션 코드** · **인앱 오퍼 코드**. Paste the code, if there is one.
+4. Fill in **받는 사람** / **보내는 사람** / **메시지**, pick a design, and drag the pieces
+   of the card where you want them.
+5. **받는 화면 미리보기** opens the recipient's page so you can check it before sending.
+6. Press **선물 페이지 링크 복사**. That is the `gift.html` URL — **this is what you send.**
+   **문구 복사** gives you the message to send with it, and **PNG 저장** the card image
+   to attach.
+7. **보낸 기록에 추가** records which code went to whom, so the next gift can warn you if
+   you reuse it.
+
+The other copy button, **프로모션 링크만 복사**, gives the bare `apps.apple.com/redeem`
+URL with no wrapping — useful when you just want the code to work, with no gift page in
+front of it.
+
+The Studio has the same three tabs as the macOS app:
+
+| Tab | What it's for |
+|---|---|
+| **카드 만들기** | One gift at a time — compose, arrange, copy the link |
+| **여러 장 만들기** | Drop App Store Connect's `OfferCodeOneTimeUseCodes….csv` straight in, or type one code per line (`코드, 이름` also works). Duplicates and blank lines are dropped and counted. Then **CSV 내보내기** for the links, **PNG 전부 저장** for the cards. The design comes from the 카드 만들기 tab — only the code and the recipient change per row |
+| **보낸 기록** | Which code went to whom, per-row **링크 복사**, duplicate-code warning, **CSV 내보내기** |
+
+Your drafts, card arrangement, and the ledger live in that browser's `localStorage`
+(`giftwrap.layout.*`, `giftwrap.ledger`). Nothing is uploaded, and nothing syncs to
+another machine — **기록 지우기** wipes it. The macOS app keeps its own ledger separately
+in Application Support; the two do not share.
+
+---
+
 ## What it does
 
-| Step | In the app |
+The macOS app and the Studio do the same job; use whichever you prefer. The app renders
+the PNG through the same view it previews, so exports are pixel-exact; the Studio needs
+no Xcode.
+
+| Step | In the app or the Studio |
 |---|---|
 | Resolve the app | Paste an App Store URL or numeric ID → the delivery kind, code and campaign params come out of the link too |
 | Pick the delivery | Direct link · app promo code (`ctx=apps`) · offer code (`ctx=offercodes`) — preselected from what you pasted |
@@ -99,9 +179,13 @@ re-colour it — the ribbon geometry is all in one 1024pt design space.
 ## File map
 
 ```
-web/
-└── gift.html                  받는 사람이 여는 선물 페이지 — 포장을 풀고 받기 버튼을 냄
-                               (정적 파일 하나로 모든 선물을 처리, 값은 URL 프래그먼트로)
+web/                           ← 그대로 gh-pages 로 배포되어 m1zz.github.io/GiftWrap/ 이 됨
+├── gift.html                  받는 사람이 여는 선물 페이지 — 포장을 풀고 받기 버튼을 냄
+│                              (정적 파일 하나로 모든 선물을 처리, 선물은 URL 안에)
+├── studio.html                보내는 사람이 쓰는 브라우저 composer — 카드/여러 장/보낸 기록
+│                              (macOS 앱과 같은 일, 설치 없이. 저장은 localStorage)
+└── qr.js                      QR 인코더 — studio.html 이 옆 파일로 불러 씀
+                               (gift.html 은 같은 코드를 인라인으로 품어 단일 파일 유지)
 tools/
 ├── giftsheet.html             CSV → A4 인쇄 시트 + 전송용 문구 (브라우저만 있으면 동작)
 ├── qr.js                      의존성 없는 QR 인코더 — Vision으로 500개 전량 검증
@@ -145,10 +229,11 @@ you see is exactly what ships.
 ribbon and their name on it — and only after they tap does it unwrap into the card, the
 message, and the **App Store에서 받기** button.
 
-It's already published from this repo's `gh-pages` branch:
+It's already published, alongside the Studio:
 
 ```
-https://m1zz.github.io/GiftWrap/gift.html
+https://m1zz.github.io/GiftWrap/gift.html      ← 받는 사람
+https://m1zz.github.io/GiftWrap/studio.html    ← 보내는 사람
 ```
 
 There is nothing to configure. The address is a constant (`GiftLinkBuilder.pageURL`), not
@@ -162,14 +247,14 @@ Hosting your own copy is a one-line change to that constant.
 The image is the wrapping paper, the link is the thing that works.
 
 ```
-https://your.host/gift.html#eyJ2IjoxLCJuIjoi7Iuk7IiYIDEwMCIsIm0iOi...
+https://your.host/gift.html?d=eyJ2IjoxLCJuIjoi7Iuk7IiYIDEwMCIsIm0iOi...
 ```
 
 **The page draws the card you composed**, not one of its own. The link carries the block
 arrangement — each piece's position and size — plus the QR and code-chip toggles, and the
 page lays the card out on the same 1000 × 630 grid scaled to the screen. Move the QR in
-the composer and it moves on the phone. The QR itself is drawn in-page by `tools/qr.js`,
-inlined so the file stays standalone.
+the composer and it moves on the phone. The QR itself is drawn in-page by the `qr.js`
+encoder, inlined into `gift.html` so that file stays standalone — one file, no requests.
 
 It is a reproduction, not the exported PNG: fonts and shadows render as the browser draws
 them, so it is very close but not pixel-identical. The app composes in SF Rounded and SF
@@ -181,12 +266,24 @@ clamping anything that would still leave the card. Arrangement in, arrangement o
 If you host a rendered card somewhere, put its URL in the payload's `img` and the page
 shows that instead. There's a reason it isn't the default — see below.
 
-Three things worth knowing about the design:
+Four things worth knowing about the design:
 
-- **Everything rides in the fragment (`#`), not the query string.** A fragment is never
-  sent to the server, so the redeem code and the recipient's name stay out of access
-  logs, referrers, and any proxy in between. The page stays a plain static file: one
-  upload serves every gift.
+- **Everything rides in the URL (`?d=`), so the page stays a plain static file** — one
+  upload serves every gift, and there is no server or database holding anyone's code.
+
+  It used to ride in the fragment (`#`), which browsers never send to the server, keeping
+  the code and the recipient's name out of access logs and referrers. Messengers broke
+  that: some linkify only up to the `#`, and the fragment *was* the gift, so the
+  recipient tapped a link that had lost everything in it. A gift that doesn't arrive
+  beats a gift that arrives privately, so it moved to the query string. Fragments are
+  still read, so links already sent keep working.
+
+  What that costs, and what it doesn't: whoever hosts `gift.html` can now see the gift in
+  their request logs — on GitHub Pages, that's GitHub. It does not go further. The page
+  sends `Referrer-Policy: no-referrer`, so the URL is not handed to Apple or to the icon
+  CDN on the way out, and `noindex` keeps it out of search. Treat a gift link like the
+  code inside it: it is unguessable, not secret. **If that trade isn't right for you,
+  host `gift.html` yourself** — it's one static file, and then the only log is yours.
 - **The message stops teasing.** When a gift-page link is used, the copied message drops
   the app name and the code — printing them in the chat would spoil the thing the page
   is about to unwrap. The code and the manual App Store instructions live on the page,
@@ -194,15 +291,42 @@ Three things worth knowing about the design:
 - **There's always an escape.** "그냥 바로 받기" skips the animation, and
   `prefers-reduced-motion` skips it automatically. Nobody has to unwrap to get their code.
 - **The card image is never uploaded.** A PNG is far too big for a link, and hosting one
-  per gift would put the recipient's name and message on a public URL — exactly what the
-  fragment exists to prevent. The card travels as coordinates instead. The share sheet
-  still sends the real PNG alongside the link, so the recipient sees it in the chat.
+  per gift would leave the recipient's name and message sitting on a public URL after the
+  gift is over. The card travels as coordinates instead. The share sheet still sends the
+  real PNG alongside the link, so the recipient sees it in the chat.
 
 When the recipient comes back from the App Store, the page notices and offers **앱 열기**
 along with the sender's name — the one place the giver survives the handoff to Apple.
 
-The page has no build step and no dependencies. Open it with no fragment and it renders a
+The page has no build step and no dependencies. Open it with no payload and it renders a
 demo gift, which is also how you preview a design change.
+
+---
+
+## Publishing
+
+`web/` on `main` is the only copy to edit. Pushing it publishes it:
+
+```
+web/ on main  ──push──▶  .github/workflows/pages.yml  ──▶  gh-pages  ──▶  m1zz.github.io/GiftWrap/
+```
+
+`gh-pages` is a build output. It shares no history with `main` and **nothing should be
+committed to it by hand** — the next publish overwrites it to match `web/` exactly,
+deletions included. It used to be maintained by hand, which meant every web change had
+to be committed twice and the two copies could quietly drift.
+
+To publish without touching `web/`, run the **Publish web/ to gh-pages** workflow from
+the Actions tab. To check what's actually live:
+
+```bash
+git fetch origin gh-pages
+git diff origin/gh-pages main:web --stat    # empty = the site matches main
+```
+
+Hosting it yourself is just uploading `web/` somewhere — three static files, no build.
+Point the macOS app at your copy by changing `GiftLinkBuilder.pageURL`, and the Studio by
+changing its `GIFT_PAGE` constant.
 
 ## Sending flow
 

@@ -1,0 +1,58 @@
+# Publishes web/ to the gh-pages branch, which is what GitHub Pages serves.
+#
+# gh-pages is a build output, not a place to work. Before this workflow it was a
+# hand-maintained orphan branch holding byte-identical copies of web/, which meant
+# every web change had to be committed twice and could silently drift. Edit web/ on
+# main; this puts it live.
+name: Publish web/ to gh-pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Pushing to gh-pages is a write to the repository.
+permissions:
+  contents: write
+
+# Two runs pushing the same branch would race.
+concurrency:
+  group: publish-gh-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gh-pages shares no history with main, so it has to be fetched too.
+          fetch-depth: 0
+
+      - name: Publish web/ to gh-pages
+        run: |
+          set -euo pipefail
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin gh-pages
+          git worktree add -B gh-pages ../pages origin/gh-pages
+
+          # Mirror web/ exactly: a file deleted from web/ has to leave the site too.
+          # .git is a file in a worktree, not a directory — either way, don't delete it.
+          find ../pages -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R web/. ../pages/
+
+          cd ../pages
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "gh-pages already matches web/ — nothing to publish."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "Publish web/ from ${GITHUB_SHA:0:7}"
+          git push origin gh-pages

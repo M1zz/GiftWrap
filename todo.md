@@ -382,6 +382,18 @@
 - 이 CSV는 **실제로 사용 가능한 1회용 코드 500개**입니다. 테스트에 쓴 사본은 지웠고,
   대화에도 코드를 출력하지 않았습니다. 저장소에 커밋하지 마세요
 
+## 브랜치 정리 · 문서화 (완료)
+
+- [x] `gh-pages`가 GitHub Pages 실서빙 브랜치임을 확인 (`source: gh-pages /`) — 지우지 않음
+- [x] `gh-pages`의 gift/studio/qr.js가 `main:web/`과 **바이트 단위 동일** 확인 → 머지할 내용 없음
+- [x] `.github/workflows/pages.yml` — `main`의 `web/` push → `gh-pages` 자동 배포.
+      추가·수정·삭제 모두 미러링, 변경 없으면 커밋 생략. 실제 클론에서 3가지 경로 검증
+- [x] README — **보내는 페이지(studio.html) / 받는 페이지(gift.html)** 구분을 맨 앞에 명시
+- [x] README — 브라우저 빠른 시작, Studio 3개 탭, localStorage 저장 위치 문서화
+- [x] README 파일맵에 빠져 있던 `web/studio.html`, `web/qr.js` 추가
+- [x] README의 낡은 설명 수정 — 페이로드는 `#`이 아니라 `?d=`
+      (메신저가 `#`에서 잘라먹어 옮겨간 것). 그 대가와 `no-referrer` 완화책까지 기술
+
 ## 결정 대기
 
 - [ ] 실물 제작 방식 확정 — (A) 집프린터 N-up 재단 / (B) 풀 링크 + 동일 카드 인쇄 / (C) 인쇄소 카드 + 라벨 스티커
