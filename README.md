@@ -1,30 +1,29 @@
-# GiftWrap — App Store gift card composer
+# GiftWrap — App Store 기프트 카드 컴포저
 
-Turns an App Store link plus a promo/offer code into something that looks like a gift:
-a rendered card image, a shareable message, and a link the recipient can unwrap.
+App Store 링크와 프로모션·오퍼 코드를 선물처럼 보이는 것으로 바꿔 줍니다.
+카드 이미지, 함께 보낼 문구, 그리고 받는 사람이 풀어 볼 수 있는 링크가 나옵니다.
 
-Built for the workflow where App Store Connect gives you codes but no wrapping paper.
+App Store Connect는 코드를 주지만 포장지는 주지 않는다는 데서 출발한 도구입니다.
 
 ---
 
-## Two pages, and they are not the same page
+## 페이지는 두 개이고, 서로 다릅니다
 
-This trips people up, so it comes first. There is a page **you** use to make gifts and a
-page **they** open to receive one. They are different files, and only one of them is
-meant to be handed out.
+여기서 가장 많이 헷갈리므로 맨 앞에 둡니다. **내가** 선물을 만드는 페이지와
+**상대가** 선물을 받는 페이지는 서로 다른 파일이고, 남에게 건네는 건 그중 하나뿐입니다.
 
-| | You (the sender) | Them (the recipient) |
+| | 나 (보내는 쪽) | 상대 (받는 쪽) |
 |---|---|---|
-| **Where** | [**studio.html**](https://m1zz.github.io/GiftWrap/studio.html) | [**gift.html**](https://m1zz.github.io/GiftWrap/gift.html) |
-| **What it is** | The composer — the client you work in | The gift itself, wrapped |
-| **You open it** | Yes, this is your tool | Only to preview |
-| **You send it** | Never | Yes — this is the link you send |
-| **Holds a gift?** | No. Your drafts and ledger stay in your browser | Yes — the whole gift rides in the URL |
+| **주소** | [**studio.html**](https://m1zz.github.io/GiftWrap/studio.html) | [**gift.html**](https://m1zz.github.io/GiftWrap/gift.html) |
+| **정체** | 카드를 만드는 작업 도구 | 포장된 선물 그 자체 |
+| **내가 연다** | 그렇습니다. 내 도구입니다 | 미리보기 때만 |
+| **내가 보낸다** | 절대 아닙니다 | 그렇습니다. 이 링크를 보냅니다 |
+| **선물이 들었나** | 아니요. 작성 중인 내용과 보낸 기록은 내 브라우저에만 | 그렇습니다. 선물 전체가 URL 안에 |
 
 ```
    ┌─────────────────────────────┐
-   │  studio.html                │   ← 당신이 여는 곳. 카드를 만든다.
-   │  (or the macOS app)         │     보내지 않는다.
+   │  studio.html                │   ← 내가 여는 곳. 카드를 만든다.
+   │  (또는 macOS 앱)            │     보내지 않는다.
    └──────────────┬──────────────┘
                   │  "선물 페이지 링크 복사" / 앱의 "공유"
                   ▼
@@ -37,152 +36,149 @@ meant to be handed out.
    └─────────────────────────────┘
 ```
 
-`studio.html` never appears in a link you send. `gift.html` is never useful on its own —
-open it bare and it just shows a demo gift, which is how you preview a design change.
+`studio.html`은 내가 보내는 링크에 절대 등장하지 않습니다. `gift.html`은 그 자체로는
+쓸모가 없습니다 — 아무것도 붙이지 않고 열면 데모 선물이 나오는데, 디자인을 바꿨을 때
+확인하는 용도가 바로 그것입니다.
 
-**One page, every gift.** `gift.html` is a single static file that is uploaded once. It
-holds no gifts and no database; each gift arrives inside its own URL. Sending a hundred
-gifts means a hundred links to the same file, not a hundred uploads.
-
----
-
-## Getting started in a browser (no Xcode)
-
-The fastest path — nothing to install, nothing to build:
-
-1. Open **<https://m1zz.github.io/GiftWrap/studio.html>**
-2. Paste your App Store link or numeric ID into **App Store 링크 또는 ID**. The app name,
-   icon, and the delivery kind are read out of the link.
-3. Under **전달 방식**, confirm the kind — **다운로드 링크** (no code, just the store page)
-   · **앱 프로모션 코드** · **인앱 오퍼 코드**. Paste the code, if there is one.
-4. Fill in **받는 사람** / **보내는 사람** / **메시지**, pick a design, and drag the pieces
-   of the card where you want them.
-5. **받는 화면 미리보기** opens the recipient's page so you can check it before sending.
-6. Press **선물 페이지 링크 복사**. That is the `gift.html` URL — **this is what you send.**
-   **문구 복사** gives you the message to send with it, and **PNG 저장** the card image
-   to attach.
-7. **보낸 기록에 추가** records which code went to whom, so the next gift can warn you if
-   you reuse it.
-
-The other copy button, **프로모션 링크만 복사**, gives the bare `apps.apple.com/redeem`
-URL with no wrapping — useful when you just want the code to work, with no gift page in
-front of it.
-
-The Studio has the same three tabs as the macOS app:
-
-| Tab | What it's for |
-|---|---|
-| **카드 만들기** | One gift at a time — compose, arrange, copy the link |
-| **여러 장 만들기** | Drop App Store Connect's `OfferCodeOneTimeUseCodes….csv` straight in, or type one code per line (`코드, 이름` also works). Duplicates and blank lines are dropped and counted. Then **CSV 내보내기** for the links, **PNG 전부 저장** for the cards. The design comes from the 카드 만들기 tab — only the code and the recipient change per row |
-| **보낸 기록** | Which code went to whom, per-row **링크 복사**, duplicate-code warning, **CSV 내보내기** |
-
-Your drafts, card arrangement, and the ledger live in that browser's `localStorage`
-(`giftwrap.layout.*`, `giftwrap.ledger`). Nothing is uploaded, and nothing syncs to
-another machine — **기록 지우기** wipes it. The macOS app keeps its own ledger separately
-in Application Support; the two do not share.
+**페이지 하나로 모든 선물을 처리합니다.** `gift.html`은 한 번만 올려 두는 정적 파일
+하나입니다. 선물도 데이터베이스도 그 안에 없고, 선물은 저마다 자기 URL에 실려 옵니다.
+100명에게 보낸다는 건 같은 파일을 가리키는 링크 100개이지, 업로드 100번이 아닙니다.
 
 ---
 
-## What it does
+## 브라우저로 바로 시작하기 (Xcode 없이)
 
-The macOS app and the Studio do the same job; use whichever you prefer. The app renders
-the PNG through the same view it previews, so exports are pixel-exact; the Studio needs
-no Xcode.
+설치도 빌드도 필요 없는 가장 빠른 길입니다.
 
-| Step | In the app or the Studio |
+1. **<https://m1zz.github.io/GiftWrap/studio.html>** 를 엽니다.
+2. **App Store 링크 또는 ID** 칸에 App Store 링크나 숫자 ID를 붙여 넣습니다. 앱 이름과
+   아이콘, 전달 방식까지 링크에서 읽어 냅니다.
+3. **전달 방식**에서 종류를 확인합니다 — **다운로드 링크**(코드 없이 스토어 페이지로)
+   · **앱 프로모션 코드** · **인앱 오퍼 코드**. 코드가 있다면 붙여 넣습니다.
+4. **받는 사람** / **보내는 사람** / **메시지**를 채우고, 디자인을 고르고, 카드의 각
+   요소를 원하는 자리로 끌어다 놓습니다.
+5. **받는 화면 미리보기**로 상대가 볼 페이지를 열어 보내기 전에 확인합니다.
+6. **선물 페이지 링크 복사**를 누릅니다. 이게 `gift.html` 주소이고, **이것을 보냅니다.**
+   함께 보낼 문구는 **문구 복사**, 첨부할 카드 이미지는 **PNG 저장**에서 나옵니다.
+7. **보낸 기록에 추가**를 누르면 어떤 코드가 누구에게 갔는지 남아, 다음에 같은 코드를
+   또 쓰려 하면 경고해 줍니다.
+
+나머지 복사 버튼인 **프로모션 링크만 복사**는 포장 없이 `apps.apple.com/redeem` 주소만
+줍니다. 선물 페이지를 앞에 두지 않고 코드만 바로 쓰게 하고 싶을 때 씁니다.
+
+Studio의 탭 구성은 macOS 앱과 같습니다.
+
+| 탭 | 하는 일 |
 |---|---|
-| Resolve the app | Paste an App Store URL or numeric ID → the delivery kind, code and campaign params come out of the link too |
-| Pick the delivery | Direct link · app promo code (`ctx=apps`) · offer code (`ctx=offercodes`) — preselected from what you pasted |
-| Compose | Recipient, sender, occasion, message, theme, optional code chip and QR |
-| Arrange | Drag any piece of the card where you want it; resize the icon and the QR |
-| Export | PNG (3000×1890) · message text · redeem link · self-contained HTML page |
-| Track | Local ledger of which code went to whom, duplicate-code warning, CSV export |
-| Batch | Paste 100 codes → 100 PNGs + 100 HTML pages + `gifts.csv` manifest in one folder |
+| **카드 만들기** | 한 번에 한 장 — 작성하고, 배치하고, 링크를 복사 |
+| **여러 장 만들기** | App Store Connect에서 받은 `OfferCodeOneTimeUseCodes….csv`를 그대로 끌어다 놓거나, 한 줄에 코드 하나씩 입력(`코드, 이름` 형식도 됩니다). 중복과 빈 줄은 세어서 걸러 냅니다. 그다음 링크는 **CSV 내보내기**, 카드는 **PNG 전부 저장**. 디자인은 카드 만들기 탭 설정을 그대로 쓰고 줄마다 코드와 받는 사람만 달라집니다 |
+| **보낸 기록** | 어떤 코드가 누구에게 갔는지, 줄마다 **링크 복사**, 중복 코드 경고, **CSV 내보내기** |
 
-## Arranging the card
+작성 중인 내용과 카드 배치, 보낸 기록은 그 브라우저의 `localStorage`에 저장됩니다
+(`giftwrap.layout.*`, `giftwrap.ledger`). 어디로도 올라가지 않고 다른 기기와 동기화되지도
+않으며, **기록 지우기**로 지웁니다. macOS 앱은 Application Support에 자기 기록을 따로
+두므로 **둘은 서로 공유되지 않습니다.**
 
-The preview is the editor. Click a piece to select it, then:
+---
 
-- **Drag** to move. It snaps to the padding lines, the card centre, and the edges of the
-  other pieces, with guides showing what it caught. Hold **Option** to move freely.
-- **Arrow keys** nudge by 1pt, **Shift + arrows** by 10.
-- **Everything resizes** — drag the grip on the corner of the selection, or press
-  **+** / **−** (5% a step, 20% with Shift). The size shows as a percentage on the
-  selection label. Artwork scales its frame; text scales its font, along with the
-  spacing and wrap width that hang off it, so a resized line grows as a piece instead
-  of just changing point size.
-- **Esc** deselects, **배치 초기화** returns everything to the composed default.
+## 무엇을 하는 도구인가
 
-Resizing grows a piece down and to the right from where it sits, so after a big change
-you'll usually want to nudge its neighbours. Nothing can be pushed off the card — a
-piece that would leave the canvas is pulled back in.
+macOS 앱과 Studio는 같은 일을 합니다. 편한 쪽을 쓰면 됩니다. 앱은 미리보기와 똑같은
+뷰로 PNG를 렌더링해 결과가 픽셀 단위로 일치하고, Studio는 Xcode가 필요 없습니다.
 
-The arrangement is saved between launches and is used by the PNG export and the batch
-run, so what you arrange is what ships. The standalone HTML gift page has its own fixed
-layout and is not affected.
+| 단계 | 앱과 Studio에서 |
+|---|---|
+| 앱 지정 | App Store URL이나 숫자 ID를 붙여 넣으면 → 전달 방식·코드·캠페인 파라미터까지 링크에서 함께 나옵니다 |
+| 전달 방식 선택 | 다운로드 링크 · 앱 프로모션 코드(`ctx=apps`) · 인앱 오퍼 코드(`ctx=offercodes`) — 붙여 넣은 내용에서 미리 골라 둡니다 |
+| 작성 | 받는 사람, 보내는 사람, 상황, 메시지, 디자인, 코드 칩과 QR 표시 여부 |
+| 배치 | 카드의 어떤 요소든 원하는 자리로 끌어다 놓고, 아이콘과 QR 크기를 조절 |
+| 내보내기 | PNG(3000×1890) · 전송 문구 · 리딤 링크 · 단독 실행되는 HTML 페이지 |
+| 기록 | 어떤 코드가 누구에게 갔는지 로컬 대장에, 중복 코드 경고, CSV 내보내기 |
+| 여러 장 | 코드 100개를 붙여 넣으면 → PNG 100장 + HTML 100개 + `gifts.csv` 명세가 한 폴더에 |
 
-The redeem URL follows Apple's format:
+## 카드 배치하기
+
+미리보기가 곧 편집기입니다. 요소를 클릭해 선택한 다음:
+
+- **끌어서** 옮깁니다. 여백선과 카드 중앙, 다른 요소의 모서리에 달라붙으며 무엇에
+  걸렸는지 가이드선으로 보여 줍니다. **Option**을 누르면 자유롭게 움직입니다.
+- **방향키**로 1pt씩, **Shift + 방향키**로 10pt씩 미세 조정합니다.
+- **모든 요소의 크기를 바꿀 수 있습니다** — 선택 상자 모서리의 손잡이를 끌거나
+  **+** / **−** 를 누릅니다(한 번에 5%, Shift와 함께면 20%). 현재 배율은 선택 이름표에
+  퍼센트로 표시됩니다. 그림은 틀이 커지고, 글자는 폰트 크기와 함께 거기 딸린 자간·줄바꿈
+  폭까지 같이 커져서, 크기를 바꾼 줄이 단순히 글자만 커지는 게 아니라 덩어리째 자랍니다.
+- **Esc**로 선택을 풀고, **배치 초기화**로 처음 상태로 되돌립니다.
+
+크기를 키우면 지금 자리에서 오른쪽 아래로 자라므로, 크게 바꾼 뒤에는 대개 옆 요소를
+조금씩 밀어 줘야 합니다. 무엇도 카드 밖으로 나가지 않습니다 — 화면을 벗어날 요소는
+안으로 다시 당겨집니다.
+
+배치는 앱을 다시 켜도 유지되고 PNG 내보내기와 여러 장 만들기에도 그대로 쓰이므로,
+배치한 대로 나갑니다. 단독 HTML 선물 페이지는 자기 고정 레이아웃을 쓰므로 영향받지
+않습니다.
+
+리딤 URL은 Apple의 형식을 따릅니다.
 
 ```
 https://apps.apple.com/redeem?ctx=offercodes&id={APPLE_ID}&code={CODE}
 https://apps.apple.com/redeem?ctx=apps&id={APPLE_ID}&code={CODE}
 ```
 
-Optional `pt` / `ct` campaign parameters are appended when filled in.
+`pt` / `ct` 캠페인 파라미터는 채워 넣으면 뒤에 붙습니다.
 
 ---
 
-## Setup
+## 설치
 
-Requires **macOS 14+** and Xcode 15+.
+**macOS 14 이상**과 Xcode 15 이상이 필요합니다.
 
 ```bash
 open GiftWrap.xcodeproj
 ```
 
-Press ⌘R. The scheme, sandbox entitlements, and asset catalog are already wired up.
+⌘R을 누릅니다. 스킴과 샌드박스 entitlement, 에셋 카탈로그는 이미 연결되어 있습니다.
 
-Two things to change before you ship anything:
+배포 전에 바꿔야 할 두 가지:
 
-- **Bundle identifier** — currently `com.devkoan.GiftWrap`, in target → Signing & Capabilities
-- **Team** — set your own; local runs work fine with "Sign to Run Locally"
+- **번들 식별자** — 현재 `com.devkoan.GiftWrap`, 타깃 → Signing & Capabilities에서
+- **Team** — 본인 것으로. 로컬 실행은 "Sign to Run Locally"로도 잘 됩니다
 
-Entitlements in use (`GiftWrap/GiftWrap.entitlements`):
+쓰고 있는 entitlement (`GiftWrap/GiftWrap.entitlements`):
 
-| Entitlement | Why |
+| Entitlement | 이유 |
 |---|---|
-| `com.apple.security.app-sandbox` | Standard sandbox |
-| `com.apple.security.network.client` | iTunes Lookup API + icon download |
-| `com.apple.security.files.user-selected.read-write` | Save panels for PNG / HTML / CSV |
+| `com.apple.security.app-sandbox` | 기본 샌드박스 |
+| `com.apple.security.network.client` | iTunes Lookup API + 아이콘 내려받기 |
+| `com.apple.security.files.user-selected.read-write` | PNG / HTML / CSV 저장 패널 |
 
-No API key, no App Store Connect credentials — the lookup endpoint is public.
+API 키도 App Store Connect 자격 증명도 필요 없습니다. 조회 엔드포인트는 공개되어 있습니다.
 
-Command-line build, if you'd rather:
+명령줄로 빌드하려면:
 
 ```bash
 xcodebuild -project GiftWrap.xcodeproj -scheme GiftWrap -configuration Debug build
 ```
 
-The app icon is generated, not hand-drawn — a wrapped present in the `sunrise` palette the
-cards use, so the icon and its output are visibly the same product:
+앱 아이콘은 손으로 그린 게 아니라 생성한 것입니다. 카드가 쓰는 `sunrise` 팔레트로 그린
+포장된 선물이라, 아이콘과 그 결과물이 눈에 띄게 같은 제품으로 보입니다.
 
 ```bash
 swift tools/appicon.swift
 ```
 
-That fills `Assets.xcassets/AppIcon.appiconset` with `icon_16` … `icon_1024`. Pass a
-directory to write somewhere else. Edit the constants at the top of the script to
-re-colour it — the ribbon geometry is all in one 1024pt design space.
+이걸 실행하면 `Assets.xcassets/AppIcon.appiconset`이 `icon_16` … `icon_1024`로 채워집니다.
+다른 곳에 쓰려면 디렉터리를 인자로 넘기면 됩니다. 색을 바꾸려면 스크립트 맨 위 상수를
+고치면 됩니다 — 리본 형상은 전부 1024pt 설계 공간 하나 안에 들어 있습니다.
 
 ---
 
-## File map
+## 파일 지도
 
 ```
 web/                           ← 그대로 gh-pages 로 배포되어 m1zz.github.io/GiftWrap/ 이 됨
 ├── gift.html                  받는 사람이 여는 선물 페이지 — 포장을 풀고 받기 버튼을 냄
 │                              (정적 파일 하나로 모든 선물을 처리, 선물은 URL 안에)
-├── studio.html                보내는 사람이 쓰는 브라우저 composer — 카드/여러 장/보낸 기록
+├── studio.html                보내는 사람이 쓰는 브라우저 컴포저 — 카드/여러 장/보낸 기록
 │                              (macOS 앱과 같은 일, 설치 없이. 저장은 localStorage)
 └── qr.js                      QR 인코더 — studio.html 이 옆 파일로 불러 씀
                                (gift.html 은 같은 코드를 인라인으로 품어 단일 파일 유지)
@@ -191,161 +187,160 @@ tools/
 ├── qr.js                      의존성 없는 QR 인코더 — Vision으로 500개 전량 검증
 ├── appicon.swift              선물 상자 앱 아이콘 생성기 (CoreGraphics, 16~1024px)
 └── README.md
-GiftWrap.xcodeproj/            Ready to open — shared scheme included
+GiftWrap.xcodeproj/            열면 바로 실행 — 공유 스킴 포함
 GiftWrap/
-├── GiftWrapApp.swift              App entry, ledger injection
-├── GiftWrap.entitlements          Sandbox: network client + user-selected files
-├── Assets.xcassets/               AppIcon + accent color placeholders
+├── GiftWrapApp.swift              앱 진입점, 대장 주입
+├── GiftWrap.entitlements          샌드박스: 네트워크 클라이언트 + 사용자 선택 파일
+├── Assets.xcassets/               AppIcon + 강조색
 ├── Models/
-│   ├── AppStoreApp.swift          Product metadata + lookup decoding
+│   ├── AppStoreApp.swift          제품 메타데이터 + 조회 결과 디코딩
 │   ├── GiftCard.swift             GiftDraft, GiftLinkKind, GiftRecord,
-│   │                              CardLayout — block placement, snapping, persistence
-│   └── GiftTheme.swift            Five palettes + hex bridge for HTML
+│   │                              CardLayout — 블록 배치·스냅·저장
+│   └── GiftTheme.swift            다섯 가지 팔레트 + HTML용 hex 변환
 ├── Services/
-│   ├── AppStoreLookupService.swift  iTunes Lookup + artwork fetch
-│   ├── RedeemLinkBuilder.swift      Redeem URLs, campaign params, ID parsing
-│   ├── GiftExporter.swift           ImageRenderer, pasteboard, save panels, message text
-│   ├── GiftLedger.swift             JSON persistence in Application Support
+│   ├── AppStoreLookupService.swift  iTunes Lookup + 아트워크 받기
+│   ├── RedeemLinkBuilder.swift      리딤 URL, 캠페인 파라미터, ID 파싱
+│   ├── GiftExporter.swift           ImageRenderer, 클립보드, 저장 패널, 전송 문구
+│   ├── GiftLedger.swift             Application Support에 JSON으로 저장
 │   └── QRCodeRenderer.swift         CoreImage QR
 ├── Resources/
-│   └── GiftPageTemplate.swift     Standalone HTML gift page
+│   └── GiftPageTemplate.swift     단독 HTML 선물 페이지
 └── Views/
-    ├── ContentView.swift          Composer form + live preview + action bar
-    ├── ComposerModel.swift        State, lookup, exports, batch
-    ├── GiftCardView.swift         The card on a fixed 1000×630 canvas, every piece
-    │                              placed from CardLayout + EditableCardPreview (the editor)
-    ├── BatchView.swift            Many codes at once
-    └── LedgerView.swift           Issued-gift table
+    ├── ContentView.swift          작성 폼 + 실시간 미리보기 + 액션 바
+    ├── ComposerModel.swift        상태, 조회, 내보내기, 여러 장
+    ├── GiftCardView.swift         1000×630 고정 캔버스 위의 카드. 모든 요소를
+    │                              CardLayout에서 배치 + EditableCardPreview (편집기)
+    ├── BatchView.swift            코드 여러 개를 한 번에
+    └── LedgerView.swift           보낸 선물 표
 ```
 
-The card preview and the exported PNG are the same view at different scales, so what
-you see is exactly what ships.
+카드 미리보기와 내보낸 PNG는 배율만 다른 같은 뷰입니다. 보이는 그대로 나갑니다.
 
 ---
 
-## The gift page
+## 선물 페이지
 
-`web/gift.html` is what the recipient opens. It arrives closed — a wrapped tile with a
-ribbon and their name on it — and only after they tap does it unwrap into the card, the
-message, and the **App Store에서 받기** button.
+`web/gift.html`이 받는 사람이 여는 페이지입니다. 닫힌 채로 도착합니다 — 리본이 달리고
+받는 사람 이름이 적힌 포장 타일이고, 두드려야 비로소 카드와 메시지,
+**App Store에서 받기** 버튼으로 풀립니다.
 
-It's already published, alongside the Studio:
+Studio와 함께 이미 게시되어 있습니다.
 
 ```
 https://m1zz.github.io/GiftWrap/gift.html      ← 받는 사람
 https://m1zz.github.io/GiftWrap/studio.html    ← 보내는 사람
 ```
 
-There is nothing to configure. The address is a constant (`GiftLinkBuilder.pageURL`), not
-a setting — the app would only be asking you to type back something it already knows, and
-a typo there would break links for the people you send them to. **공유** hands the share
-sheet the message (carrying the wrapped link) and the card image in one action; **더보기 →
-선물 링크 복사** gives you just the URL.
+설정할 것은 없습니다. 주소는 설정값이 아니라 상수(`GiftLinkBuilder.pageURL`)입니다 —
+앱이 이미 아는 값을 사용자에게 다시 입력받을 이유가 없고, 거기서 오타가 나면 받는
+사람들의 링크가 통째로 깨지기 때문입니다. **공유**는 (포장된 링크를 실은) 문구와 카드
+이미지를 공유 시트에 한 번에 넘기고, **더보기 → 선물 링크 복사**는 주소만 줍니다.
 
-Hosting your own copy is a one-line change to that constant.
+직접 호스팅하려면 그 상수 한 줄만 바꾸면 됩니다.
 
-The image is the wrapping paper, the link is the thing that works.
+이미지는 포장지이고, 실제로 동작하는 것은 링크입니다.
 
 ```
 https://your.host/gift.html?d=eyJ2IjoxLCJuIjoi7Iuk7IiYIDEwMCIsIm0iOi...
 ```
 
-**The page draws the card you composed**, not one of its own. The link carries the block
-arrangement — each piece's position and size — plus the QR and code-chip toggles, and the
-page lays the card out on the same 1000 × 630 grid scaled to the screen. Move the QR in
-the composer and it moves on the phone. The QR itself is drawn in-page by the `qr.js`
-encoder, inlined into `gift.html` so that file stays standalone — one file, no requests.
+**페이지는 자기가 만든 카드가 아니라 내가 배치한 카드를 그립니다.** 링크가 각 요소의
+위치와 크기, 그리고 QR·코드 칩 표시 여부까지 실어 나르고, 페이지는 화면에 맞춰 축소한
+같은 1000 × 630 격자 위에 카드를 놓습니다. 컴포저에서 QR을 옮기면 상대 휴대폰에서도
+옮겨져 있습니다. QR 자체는 `qr.js` 인코더가 페이지 안에서 그리는데, `gift.html`에는
+인라인으로 들어가 있어 그 파일은 요청 하나 없는 단일 파일로 남습니다.
 
-It is a reproduction, not the exported PNG: fonts and shadows render as the browser draws
-them, so it is very close but not pixel-identical. The app composes in SF Rounded and SF
-Mono, which no browser has, so the same words come out wider on the web — enough that the
-code chip used to slide under the QR. The link therefore also carries the **footprint each
-block occupied** in the preview, and the page scales each piece to that box before
-clamping anything that would still leave the card. Arrangement in, arrangement out.
+이것은 재현이지 내보낸 PNG가 아닙니다. 폰트와 그림자는 브라우저가 그리는 대로 나오므로
+아주 비슷하지만 픽셀 단위로 같지는 않습니다. 앱은 SF Rounded와 SF Mono로 조판하는데
+어느 브라우저에도 없는 폰트라, 같은 글자가 웹에서는 더 넓게 나옵니다 — 코드 칩이 QR
+밑으로 파고들 만큼요. 그래서 링크는 **각 요소가 미리보기에서 차지했던 자리**까지 함께
+싣고, 페이지는 각 요소를 그 상자에 맞춰 줄인 뒤 그래도 카드를 벗어나는 것만 잡아
+넣습니다. 배치한 대로 들어가고, 배치한 대로 나옵니다.
 
-If you host a rendered card somewhere, put its URL in the payload's `img` and the page
-shows that instead. There's a reason it isn't the default — see below.
+렌더링한 카드를 어딘가에 올려 뒀다면 페이로드의 `img`에 그 주소를 넣으면 페이지가 그걸
+대신 보여 줍니다. 기본값이 아닌 데는 이유가 있습니다 — 아래를 보세요.
 
-Four things worth knowing about the design:
+설계에서 알아 둘 만한 네 가지:
 
-- **Everything rides in the URL (`?d=`), so the page stays a plain static file** — one
-  upload serves every gift, and there is no server or database holding anyone's code.
+- **모든 것이 URL(`?d=`)에 실리므로 페이지는 평범한 정적 파일로 남습니다** — 한 번만
+  올리면 모든 선물에 쓰이고, 누구의 코드도 들고 있는 서버나 데이터베이스가 없습니다.
 
-  It used to ride in the fragment (`#`), which browsers never send to the server, keeping
-  the code and the recipient's name out of access logs and referrers. Messengers broke
-  that: some linkify only up to the `#`, and the fragment *was* the gift, so the
-  recipient tapped a link that had lost everything in it. A gift that doesn't arrive
-  beats a gift that arrives privately, so it moved to the query string. Fragments are
-  still read, so links already sent keep working.
+  원래는 브라우저가 서버로 절대 보내지 않는 프래그먼트(`#`)에 실려서, 코드와 받는 사람
+  이름이 접속 로그와 리퍼러에 남지 않았습니다. 메신저가 그걸 깨뜨렸습니다. 일부는 `#`
+  앞까지만 링크로 만드는데 **프래그먼트가 곧 선물이었으므로**, 받는 사람은 알맹이가
+  전부 빠진 링크를 두드리게 됐습니다. 도착하지 않는 선물보다는 비공개가 아니어도
+  도착하는 선물이 낫기에 쿼리 스트링으로 옮겼습니다. 프래그먼트도 계속 읽으므로 이미
+  보낸 링크는 그대로 동작합니다.
 
-  What that costs, and what it doesn't: whoever hosts `gift.html` can now see the gift in
-  their request logs — on GitHub Pages, that's GitHub. It does not go further. The page
-  sends `Referrer-Policy: no-referrer`, so the URL is not handed to Apple or to the icon
-  CDN on the way out, and `noindex` keeps it out of search. Treat a gift link like the
-  code inside it: it is unguessable, not secret. **If that trade isn't right for you,
-  host `gift.html` yourself** — it's one static file, and then the only log is yours.
-- **The message stops teasing.** When a gift-page link is used, the copied message drops
-  the app name and the code — printing them in the chat would spoil the thing the page
-  is about to unwrap. The code and the manual App Store instructions live on the page,
-  so nothing is lost if the button fails.
-- **There's always an escape.** "그냥 바로 받기" skips the animation, and
-  `prefers-reduced-motion` skips it automatically. Nobody has to unwrap to get their code.
-- **The card image is never uploaded.** A PNG is far too big for a link, and hosting one
-  per gift would leave the recipient's name and message sitting on a public URL after the
-  gift is over. The card travels as coordinates instead. The share sheet still sends the
-  real PNG alongside the link, so the recipient sees it in the chat.
+  그 대가와, 대가가 아닌 것: 이제 `gift.html`을 호스팅하는 쪽은 요청 로그에서 선물을
+  볼 수 있습니다. GitHub Pages라면 GitHub입니다. 다만 거기서 더 나가지는 않습니다.
+  페이지가 `Referrer-Policy: no-referrer`를 보내므로 나가는 길에 Apple이나 아이콘 CDN에
+  주소가 넘어가지 않고, `noindex`로 검색에도 잡히지 않습니다. 선물 링크는 그 안의 코드와
+  같은 급으로 다루세요 — 추측할 수 없는 값이지, 비밀은 아닙니다. **이 거래가 마음에 들지
+  않으면 `gift.html`을 직접 호스팅하세요.** 정적 파일 하나이고, 그러면 로그도 내 것뿐입니다.
+- **문구가 김을 새게 하지 않습니다.** 선물 페이지 링크를 쓰면 복사되는 문구에서 앱 이름과
+  코드가 빠집니다. 채팅창에 그걸 적어 버리면 페이지가 이제 막 풀어 보일 것을 미리
+  말해 버리는 셈이니까요. 코드와 수동 App Store 안내는 페이지 안에 있으므로 버튼이
+  실패해도 잃는 것은 없습니다.
+- **언제나 빠져나갈 길이 있습니다.** "그냥 바로 받기"로 애니메이션을 건너뛰고,
+  `prefers-reduced-motion`이면 자동으로 건너뜁니다. 코드를 받으려고 포장을 풀어야 하는
+  사람은 없습니다.
+- **카드 이미지는 절대 업로드되지 않습니다.** PNG는 링크에 싣기엔 턱없이 크고, 선물마다
+  하나씩 호스팅하면 선물이 끝난 뒤에도 받는 사람의 이름과 메시지가 공개 URL에 남습니다.
+  그래서 카드는 좌표로 이동합니다. 공유 시트는 링크와 함께 진짜 PNG를 보내므로 받는
+  사람은 채팅에서 그것을 봅니다.
 
-When the recipient comes back from the App Store, the page notices and offers **앱 열기**
-along with the sender's name — the one place the giver survives the handoff to Apple.
+받는 사람이 App Store에서 돌아오면 페이지가 그걸 알아채고 보낸 사람 이름과 함께
+**앱 열기**를 내놓습니다. Apple로 넘어간 뒤에도 준 사람이 살아남는 유일한 지점입니다.
 
-The page has no build step and no dependencies. Open it with no payload and it renders a
-demo gift, which is also how you preview a design change.
+이 페이지는 빌드 단계도 의존성도 없습니다. 아무것도 붙이지 않고 열면 데모 선물이
+나오는데, 디자인을 바꿨을 때 확인하는 방법이 바로 그것입니다.
 
 ---
 
-## Publishing
+## 게시
 
-`web/` on `main` is the only copy to edit. Pushing it publishes it:
+고쳐야 할 사본은 `main`의 `web/` 하나뿐입니다. 그걸 push하면 게시됩니다.
 
 ```
-web/ on main  ──push──▶  .github/workflows/pages.yml  ──▶  gh-pages  ──▶  m1zz.github.io/GiftWrap/
+main의 web/  ──push──▶  .github/workflows/pages.yml  ──▶  gh-pages  ──▶  m1zz.github.io/GiftWrap/
 ```
 
-`gh-pages` is a build output. It shares no history with `main` and **nothing should be
-committed to it by hand** — the next publish overwrites it to match `web/` exactly,
-deletions included. It used to be maintained by hand, which meant every web change had
-to be committed twice and the two copies could quietly drift.
+`gh-pages`는 빌드 산출물입니다. `main`과 히스토리를 공유하지 않으며 **손으로 커밋할 것이
+아무것도 없습니다** — 다음 게시가 `web/`과 똑같아지도록 덮어쓰고, 삭제까지 반영합니다.
+예전에는 손으로 관리했는데, 그래서 웹을 고칠 때마다 두 번 커밋해야 했고 두 사본이 조용히
+어긋날 수 있었습니다.
 
-To publish without touching `web/`, run the **Publish web/ to gh-pages** workflow from
-the Actions tab. To check what's actually live:
+`web/`을 건드리지 않고 게시하려면 Actions 탭에서 **Publish web/ to gh-pages** 워크플로를
+실행하면 됩니다. 지금 실제로 올라가 있는 것을 확인하려면:
 
 ```bash
 git fetch origin gh-pages
-git diff origin/gh-pages main:web --stat    # empty = the site matches main
+git diff origin/gh-pages main:web --stat    # 아무것도 안 나오면 사이트가 main과 일치
 ```
 
-Hosting it yourself is just uploading `web/` somewhere — three static files, no build.
-Point the macOS app at your copy by changing `GiftLinkBuilder.pageURL`, and the Studio by
-changing its `GIFT_PAGE` constant.
+직접 호스팅하는 것은 `web/`을 어딘가에 올리는 게 전부입니다 — 정적 파일 세 개, 빌드 없음.
+macOS 앱은 `GiftLinkBuilder.pageURL`을, Studio는 `GIFT_PAGE` 상수를 자기 사본 주소로
+바꾸면 됩니다.
 
-## Sending flow
+## 보내는 흐름
 
-1. **Free app + IAP** → offer code. Generate one-time-use codes in App Store Connect
-   (Subscription/IAP → Offer Codes), paste them into the batch tab.
-2. **Paid app** → promo code. App Store Connect → your app → Promo Codes, up to 100 per
-   version per platform, valid four weeks.
-3. Export the HTML page, drop it on GitHub Pages, send the URL. The recipient sees the
-   card, taps **App Store에서 받기**, and the redemption sheet opens with the code prefilled.
-4. Fallback text is already in the page and the copied message: App Store → profile →
+1. **무료 앱 + 인앱 결제** → 오퍼 코드. App Store Connect에서 1회용 코드를 만들고
+   (구독/인앱 결제 → Offer Codes), 여러 장 만들기 탭에 붙여 넣습니다.
+2. **유료 앱** → 프로모션 코드. App Store Connect → 해당 앱 → Promo Codes. 버전·플랫폼당
+   최대 100개, 4주간 유효합니다.
+3. 링크를 복사해 보냅니다. 받는 사람은 카드를 보고 **App Store에서 받기**를 누르고,
+   코드가 미리 채워진 리딤 시트가 열립니다.
+4. 대비 문구는 페이지와 복사된 문구에 이미 들어 있습니다: App Store → 프로필 →
    기프트 카드 또는 코드 사용.
 
 ---
 
-## Two things to keep in mind
+## 유념할 두 가지
 
-- **Promo codes are non-commercial.** Apple's terms don't allow selling them, so this is
-  for giveaways, reviewers, workshops, and events — not a paid gifting product. Paid
-  gifting only exists through App Store's own "앱 선물하기", which covers paid apps only.
-- **No Apple artwork.** The palettes and layout here are drawn from scratch. Don't add the
-  Apple logo or App Store badge artwork to the card unless you follow Apple's marketing
-  guidelines for them; the plain text "App Store에서 받기" used here stays on the safe side.
+- **프로모션 코드는 비상업적 용도입니다.** Apple 약관상 판매할 수 없으므로 증정, 리뷰어,
+  워크숍, 행사용이지 유료 선물 상품이 아닙니다. 유료 선물하기는 App Store 자체의
+  "앱 선물하기"로만 가능하고 그것도 유료 앱에 한합니다.
+- **Apple 아트워크를 쓰지 마세요.** 여기 팔레트와 레이아웃은 전부 직접 그린 것입니다.
+  Apple의 마케팅 가이드라인을 따르지 않는 한 Apple 로고나 App Store 배지 아트워크를
+  카드에 넣지 마세요. 여기서 쓰는 평범한 텍스트 "App Store에서 받기"는 안전한 쪽입니다.
