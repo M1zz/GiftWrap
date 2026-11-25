@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GiftWrap 허브 — 모든 페이지</title>
+<meta name="description" content="GiftWrap의 페이지를 한자리에서. 선물 카드 만들기, 초대장 만들기, 받는 화면 미리보기, 인쇄 시트.">
+<!--
+  페이지가 늘어나면서 필요해진 자리.
+
+  index.html은 처음 온 사람에게 이게 뭔지 설명하는 곳이고, 여기는 이미 아는 사람이
+  가려는 곳으로 바로 가는 곳이다. 그래서 설명은 한 줄로 줄이고, 카드마다 '내가 쓰는 곳'
+  인지 '남에게 보내는 곳'인지를 먼저 적었다 — 이 저장소에서 가장 자주 헷갈리는 구분이
+  그것이라서.
+
+  색과 활자는 index.html에서 그대로 가져왔다. 의존성 없음.
+-->
+<style>
+  :root {
+    --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;
+    --b1: #8AF0FF; --b2: #B08CFF;
+    --bg: #f5f5f7; --panel: #fff; --ink: #1d1d1f; --ink-2: #6e6e73;
+    --line: #d2d2d7; --accent: #0071e3; --radius: 14px;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+          "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+  .wrap { width: min(100% - 40px, 1000px); margin-inline: auto; }
+  a { color: var(--accent); }
+
+  /* ── 머리 ───────────────────────────────────────────────── */
+  .head {
+    position: relative; overflow: hidden; color: #fff; text-align: center;
+    background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3));
+    padding: clamp(44px, 8vw, 76px) 0 clamp(40px, 7vw, 64px);
+  }
+  .head::before, .head::after {
+    content: ""; position: absolute; border-radius: 50%;
+    filter: blur(70px); opacity: .45; pointer-events: none;
+  }
+  .head::before { width: 380px; height: 380px; background: var(--b1); top: -170px; left: -110px; }
+  .head::after  { width: 330px; height: 330px; background: var(--b2); bottom: -170px; right: -90px; }
+  .head > .wrap { position: relative; }
+  .mark {
+    width: 60px; height: 60px; margin: 0 auto 18px; position: relative;
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.34);
+    border-radius: 13px; overflow: hidden; backdrop-filter: blur(6px);
+  }
+  .mark::before, .mark::after { content: ""; position: absolute; background: rgba(255,255,255,.9); }
+  .mark::before { left: 50%; top: 0; bottom: 0; width: 7px; margin-left: -3.5px; }
+  .mark::after  { top: 50%; left: 0; right: 0; height: 7px; margin-top: -3.5px; }
+  .head h1 { margin: 0 0 10px; font-size: clamp(27px, 5vw, 38px); letter-spacing: -.03em; }
+  .head p { margin: 0 auto; max-width: 32em; color: rgba(255,255,255,.9); font-size: 16px; }
+
+  /* ── 묶음 ───────────────────────────────────────────────── */
+  section { padding: clamp(34px, 5vw, 54px) 0 0; }
+  section:last-of-type { padding-bottom: clamp(40px, 6vw, 64px); }
+  h2 { font-size: 20px; letter-spacing: -.02em; margin: 0 0 4px; }
+  .lede { color: var(--ink-2); font-size: 14.5px; margin: 0 0 20px; }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .tile {
+    display: flex; flex-direction: column; gap: 8px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; text-decoration: none; color: inherit;
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease), border-color .18s;
+  }
+  .tile:hover {
+    transform: translateY(-2px); border-color: #c2c2c8;
+    box-shadow: 0 12px 28px rgba(0,0,0,.09);
+  }
+  .tile .icon {
+    width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center;
+    font-size: 20px; margin-bottom: 4px;
+    background: linear-gradient(140deg, var(--g1), var(--g2) 60%, var(--g3)); color: #fff;
+  }
+  .tile h3 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+  .tile p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+  .tile .path {
+    margin-top: auto; padding-top: 10px;
+    font: 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace; color: var(--ink-2);
+  }
+  .tag {
+    align-self: flex-start; padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .01em;
+  }
+  .tag.mine { background: rgba(0,113,227,.12); color: var(--accent); }
+  .tag.theirs { background: rgba(122,91,255,.14); color: #6b46e0; }
+  .tag.repo { background: rgba(110,110,115,.14); color: var(--ink-2); }
+
+  .note {
+    margin-top: 26px; padding: 16px 20px; border-radius: var(--radius);
+    background: var(--panel); border: 1px solid var(--line);
+    color: var(--ink-2); font-size: 14px;
+  }
+  .note b { color: var(--ink); }
+  code { font: .92em/1 ui-monospace, "SF Mono", Menlo, monospace; }
+  footer {
+    border-top: 1px solid var(--line); margin-top: 12px; padding: 26px 0 40px;
+    color: var(--ink-2); font-size: 14px; text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000; --panel: #1c1c1e; --ink: #f5f5f7; --ink-2: #98989d;
+      --line: #38383a; --accent: #0a84ff;
+    }
+    .tile:hover { border-color: #4a4a4e; box-shadow: 0 12px 28px rgba(0,0,0,.5); }
+    .tag.theirs { background: rgba(176,140,255,.18); color: #c4a8ff; }
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true"></div>
+    <h1>GiftWrap 허브</h1>
+    <p>만드는 페이지와 받는 페이지가 여기 다 있습니다. 남에게 건네는 건 그중 링크뿐입니다.</p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>만드는 곳</h2>
+    <p class="lede">내 브라우저에서만 돌아갑니다. 작성한 내용은 이 기기에 남습니다.</p>
+    <div class="grid">
+      <a class="tile" href="studio.html">
+        <div class="icon" aria-hidden="true">🎁</div>
+        <span class="tag mine">내가 쓰는 곳</span>
+        <h3>선물 만들기 — Studio</h3>
+        <p>App Store 앱과 코드를 카드로 포장해 선물 링크를 만듭니다. 여러 장 만들기와 보낸 기록도 여기 있습니다.</p>
+        <div class="path">/studio.html</div>
+      </a>
+      <a class="tile" href="invite-studio.html">
+        <div class="icon" aria-hidden="true">✉️</div>
+        <span class="tag mine">내가 쓰는 곳</span>
+        <h3>초대장 만들기</h3>
+        <p>날짜와 장소, 하고 싶은 말을 적으면 초대장 링크가 나옵니다. 받는 사람은 캘린더에 넣고 바로 회신합니다.</p>
+        <div class="path">/invite-studio.html</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>받는 곳</h2>
+    <p class="lede">링크를 받은 사람이 여는 화면입니다. 선물·초대장은 내용이 없는 예시로 열리고,
+      지금 무료인 앱은 <code>free.json</code>에 적어 둔 실제 목록으로 열립니다.</p>
+    <div class="grid">
+      <a class="tile" href="gift.html">
+        <div class="icon" aria-hidden="true">🎀</div>
+        <span class="tag theirs">상대가 받는 곳</span>
+        <h3>선물 페이지</h3>
+        <p>포장을 풀면 카드가 나오고, App Store로 이어집니다. 선물 전체가 링크 안에 실려 옵니다.</p>
+        <div class="path">/gift.html?d=…</div>
+      </a>
+      <a class="tile" href="invite.html">
+        <div class="icon" aria-hidden="true">💌</div>
+        <span class="tag theirs">상대가 받는 곳</span>
+        <h3>초대장 페이지</h3>
+        <p>봉투를 열면 초대장이 나옵니다. 남은 날짜, 지도, 캘린더 추가, 회신 버튼이 함께 있습니다.</p>
+        <div class="path">/invite.html?d=…</div>
+      </a>
+      <a class="tile" href="free.html">
+        <div class="icon" aria-hidden="true">🏷️</div>
+        <span class="tag theirs">상대가 받는 곳</span>
+        <h3>앱 목록 — 지금 무료 · 할인 중</h3>
+        <p>여러 사람에게 같은 주소를 알리는 공개 목록입니다. 혜택이 위에 오고 전체 앱이 그 아래에. 전체 목록은 <code>artistId</code> 하나로 조회하고, 혜택만 <code>free.json</code>에 적습니다.</p>
+        <div class="path">/free.html · /free.json</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>그 밖에</h2>
+    <p class="lede">저장소에 함께 있는 것들.</p>
+    <div class="grid">
+      <a class="tile" href="index.html">
+        <div class="icon" aria-hidden="true">📖</div>
+        <span class="tag repo">소개</span>
+        <h3>GiftWrap이란</h3>
+        <p>처음 왔다면 여기부터. 무엇을 하는 도구인지 세 단계로 설명합니다.</p>
+        <div class="path">/index.html</div>
+      </a>
+      <a class="tile" href="https://github.com/M1zz/GiftWrap/blob/main/tools/giftsheet.html">
+        <div class="icon" aria-hidden="true">🖨️</div>
+        <span class="tag repo">저장소 파일</span>
+        <h3>인쇄 시트</h3>
+        <p>코드 CSV를 떨어뜨리면 A4 한 장에 명함·라벨 크기로 카드를 앉힙니다. 내려받아 브라우저에서 엽니다.</p>
+        <div class="path">tools/giftsheet.html</div>
+      </a>
+      <a class="tile" href="https://github.com/M1zz/GiftWrap">
+        <div class="icon" aria-hidden="true">⌘</div>
+        <span class="tag repo">저장소</span>
+        <h3>소스와 macOS 앱</h3>
+        <p>같은 일을 하는 네이티브 앱과 README가 들어 있습니다.</p>
+        <div class="path">github.com/M1zz/GiftWrap</div>
+      </a>
+    </div>
+
+    <p class="note">
+      <b>링크는 코드와 같은 급으로 다루세요.</b> 선물이든 초대장이든 내용 전부가 링크 안에
+      들어 있습니다. 서버에 저장되는 것이 없어 편한 대신, 링크를 아는 사람은 내용을 볼 수
+      있습니다. 추측할 수 없는 값이지, 비밀은 아닙니다.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="https://github.com/M1zz/GiftWrap">github.com/M1zz/GiftWrap</a>
+  </div>
+</footer>
+
+</body>
+</html>

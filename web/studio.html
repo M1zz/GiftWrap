@@ -187,6 +187,7 @@
   <header class="top">
     <h1>GiftWrap Studio</h1>
     <span class="sub" data-i18n="tagline">App Store 선물 카드와 링크를 브라우저에서 만듭니다</span>
+    <a href="hub.html" style="margin-left:auto;font-size:13px;text-decoration:none">← 허브</a>
     <div class="lang" id="uiLang">
       <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
       <button type="button" data-lang="en" aria-pressed="false">English</button>
@@ -234,6 +235,7 @@
             <button type="button" data-kind="offerCode" aria-pressed="false" data-i18n="kindOfferCode">인앱 오퍼 코드</button>
           </div>
           <div class="sub" id="kindWhy" style="margin-top:7px"></div>
+          <div class="sub" id="promoNote" style="margin-top:5px" hidden></div>
           <div class="sub" id="autoFill" style="margin-top:5px"></div>
 
           <div id="codeArea" style="margin-top:11px" hidden>
@@ -438,6 +440,7 @@
       kindDirectLinkWhy: '코드 없이 App Store 제품 페이지로 보냅니다. 무료 앱에 적합합니다.',
       kindAppPromoCodeWhy: '유료 앱을 무료로 받는 1회용 코드입니다. 생성 후 4주간 유효합니다.',
       kindOfferCodeWhy: '구독·인앱 결제용 코드입니다. 앱이 무료 다운로드라면 이 방식을 씁니다.',
+      promoManualNote: 'Apple이 문서로 밝힌 리딤 링크는 오퍼 코드뿐입니다. 프로모션 코드는 버튼이 안 열릴 수 있어, 카드에 코드를 싣고 선물 페이지에 직접 입력하는 방법을 펼쳐서 보여줍니다.',
       codeField: '코드', codeAlreadySent: '이미 보낸 코드입니다.',
       showExpiry: '만료일 표시', expiryField: '만료일',
       cardSection: '카드', cardStyle: '디자인',
@@ -524,6 +527,7 @@
       kindDirectLinkWhy: 'Sends them to the App Store product page, no code involved. Right for a free app.',
       kindAppPromoCodeWhy: 'A single-use code for a free copy of a paid app. Valid for four weeks after it’s made.',
       kindOfferCodeWhy: 'A code for a subscription or in-app purchase. Use this when the app itself is a free download.',
+      promoManualNote: 'Apple documents a redeem link for offer codes only. A promo code’s button may not open, so the code goes on the card and the gift page shows the manual steps expanded.',
       codeField: 'Code', codeAlreadySent: 'This code has already been sent.',
       showExpiry: 'Show an expiry date', expiryField: 'Expires',
       cardSection: 'Card', cardStyle: 'Design',
@@ -887,10 +891,76 @@
     return out;
   }
 
-  function inferredKind(explicit, isFree, codePresent) {
+  /**
+   * How long an App Store Connect promo code is, and the shape test that follows from
+   * it. Every promo code is exactly twelve characters; the one-time offer codes App
+   * Store Connect exports are eighteen. That difference is what lets a link-less list
+   * of codes say which kind it is. Mirrors `CodeFileParser.promoCodeLength`.
+   */
+  var PROMO_CODE_LENGTH = 12;
+
+  function looksLikePromoCode(code) {
+    var s = String(code || '').trim();
+    return s.length === PROMO_CODE_LENGTH && /^[A-Za-z0-9]+$/.test(s);
+  }
+
+  /**
+   * Picks the kind when the link didn't say. A paid app can only carry a promo code;
+   * a free app carries an offer code if there's a code at all, otherwise it's a link.
+   *
+   * The code's own shape breaks the last tie. "Free app + a code" used to mean offer
+   * code outright, which is wrong for the case that arrives most often by hand: a promo
+   * code for an app that is a free download with a paid unlock. Sent as an offer code
+   * it becomes a `ctx=offercodes` link Apple won't honour, and the failure surfaces at
+   * the recipient, where nothing can be done about it.
+   */
+  function inferredKind(explicit, isFree, codePresent, code) {
     if (explicit) return explicit;
     if (!isFree) return 'appPromoCode';
-    return codePresent ? 'offerCode' : 'directLink';
+    if (!codePresent) return 'directLink';
+    return looksLikePromoCode(code) ? 'appPromoCode' : 'offerCode';
+  }
+
+  /** Apple documents a redeem URL for offer codes only — `ctx=apps` is not in the docs. */
+  function hasDocumentedRedeemLink(kind) {
+    return kind !== 'appPromoCode';
+  }
+
+  /** The validity the kind fixes, in days, or 0 when it's the sender's to choose. */
+  function fixedValidityDays(kind) {
+    return kind === 'appPromoCode' ? 28 : 0;
+  }
+
+  /**
+   * Settles what the kind decides rather than the sender.
+   *
+   * A promo code dies four weeks after it's generated — a fact about the code, not a
+   * default anyone picked — so an empty expiry field gets filled rather than printing
+   * a card silent about a deadline the recipient will walk into. And since `ctx=apps`
+   * is undocumented, a promo gift has to survive its button not working: the code goes
+   * on the card, where it's the gift on its own.
+   *
+   * Only ever writes into what's empty or off, so the sender's own choices stand.
+   * Returns whether it wrote anything.
+   */
+  function applyFixedValidity() {
+    var wrote = false;
+    var days = fixedValidityDays(draft.kind);
+    if (days && !draft.expiry) {
+      var d = new Date();
+      d.setDate(d.getDate() + days);
+      draft.expiry = d.toISOString().slice(0, 10);
+      $('hasExpiry').checked = true;
+      $('expiryField').hidden = false;
+      $('expiry').value = draft.expiry;
+      wrote = true;
+    }
+    if (!hasDocumentedRedeemLink(draft.kind) && !draft.showCode) {
+      draft.showCode = true;
+      $('showCode').checked = true;
+      wrote = true;
+    }
+    return wrote;
   }
 
   function redeemURL() {
@@ -1067,13 +1137,14 @@
 
     // An explicit ctx= is a fresh statement of intent and outranks an earlier manual pick.
     if (parsed.kind || !kindChosenManually) {
-      var resolved = inferredKind(parsed.kind, draft.app.isFree, !!trimmedCode());
+      var resolved = inferredKind(parsed.kind, draft.app.isFree, !!trimmedCode(), trimmedCode());
       if (resolved !== draft.kind) {
         draft.kind = resolved;
         filled.unshift(t()['kind' + resolved.charAt(0).toUpperCase() + resolved.slice(1)]);
       }
       kindChosenManually = false;
     }
+    if (applyFixedValidity() && filled.indexOf(t().expiryField) < 0) filled.push(t().expiryField);
     $('autoFill').textContent = filled.length ? t().autoFilled(filled.join(' · ')) : '';
   }
 
@@ -1932,10 +2003,16 @@
       b.setAttribute('aria-pressed', String(b.dataset.kind === draft.kind));
     });
     $('kindWhy').textContent = t()['kind' + draft.kind.charAt(0).toUpperCase() + draft.kind.slice(1) + 'Why'];
+    $('promoNote').hidden = hasDocumentedRedeemLink(draft.kind);
+    $('promoNote').textContent = t().promoManualNote;
     $('codeArea').hidden = !requiresCode();
     $('code').value = draft.code;
     $('codeUsed').hidden = !(requiresCode() && codeAlreadySent(draft.code));
     $('codeUsed').textContent = t().codeAlreadySent;
+    $('hasExpiry').checked = !!draft.expiry;
+    $('expiryField').hidden = !draft.expiry;
+    $('expiry').value = draft.expiry || '';
+    $('showCode').checked = draft.showCode;
     $('showCode').disabled = !requiresCode();
 
     [].forEach.call($('cardLangSeg').children, function (b) {
@@ -2037,6 +2114,7 @@
         draft.kind = b.dataset.kind;
         kindChosenManually = true;
         $('autoFill').textContent = '';
+        applyFixedValidity();
         syncForm();
         render();
       });
@@ -2066,11 +2144,28 @@
       });
     });
 
+    // A code typed by hand says which kind it is the same way one read from a file does,
+    // and getting that wrong builds a `ctx=` Apple rejects. Re-read on `change` rather
+    // than on every keystroke: half a code has no shape yet, and a picker that flips
+    // while you type is worse than one that's briefly wrong. A deliberate pick stands.
+    $('code').addEventListener('change', function () {
+      if (kindChosenManually || !draft.app || !trimmedCode()) return;
+      var resolved = inferredKind('', draft.app.isFree, true, trimmedCode());
+      if (resolved === draft.kind) return;
+      draft.kind = resolved;
+      $('autoFill').textContent = t().autoFilled(
+        t()['kind' + resolved.charAt(0).toUpperCase() + resolved.slice(1)]
+      );
+      applyFixedValidity();
+      syncForm();
+      render();
+    });
+
     $('hasExpiry').addEventListener('change', function () {
       $('expiryField').hidden = !this.checked;
       if (this.checked && !$('expiry').value) {
         var d = new Date();
-        d.setDate(d.getDate() + 28);
+        d.setDate(d.getDate() + (fixedValidityDays(draft.kind) || 28));
         $('expiry').value = d.toISOString().slice(0, 10);
       }
       draft.expiry = this.checked ? $('expiry').value : '';
@@ -2204,6 +2299,7 @@
    */
   function parseCodeCSV(text) {
     var out = [], seen = {};
+    out.hasRedeemLinks = false;
     text.split(/\r?\n/).forEach(function (line) {
       line = line.trim();
       if (!line) return;
@@ -2211,6 +2307,7 @@
       if (url) url = url.replace(/[",;]+$/, '');
       var code = null, id = '', ctx = '';
       if (url) {
+        out.hasRedeemLinks = true;
         code = (url.match(/[?&]code=([^&\s]+)/i) || [])[1] || null;
         id = (url.match(/[?&]id=(\d+)/i) || [])[1] || '';
         ctx = ((url.match(/[?&]ctx=(offercodes|apps)\b/i) || [])[1] || '').toLowerCase();
@@ -2228,6 +2325,25 @@
     return out;
   }
 
+  /**
+   * Which redeem flow a parsed file belongs to, letting its silence speak.
+   *
+   * A link that spelled out `ctx=` always wins. Failing that, a file with no links at
+   * all whose codes are every one of them promo-length is a promo export — the only
+   * thing App Store Connect ships without the link column, because there is no
+   * documented redeem link for it to print.
+   *
+   * Anything else stays empty rather than guessing: a paste of offer codes with the URL
+   * column stripped is link-less too, and its eighteen characters are what tell it apart.
+   */
+  function resolvedContext(parsed) {
+    var stated = (parsed.find(function (e) { return e.ctx; }) || {}).ctx;
+    if (stated) return stated;
+    var promoShaped = !parsed.hasRedeemLinks && parsed.length &&
+      parsed.every(function (e) { return looksLikePromoCode(e.code); });
+    return promoShaped ? 'apps' : '';
+  }
+
   /** Takes a parsed file and sets up the whole batch from it. */
   function ingestCodes(text, label) {
     var parsed = parseCodeCSV(text);
@@ -2235,13 +2351,15 @@
 
     $('batchInput').value = parsed.map(function (e) { return e.code; }).join('\n');
 
-    // The file says which kind of code these are, and it is the only thing here that
-    // actually knows. Marked as a deliberate choice so the lookup that follows doesn't
-    // infer its way back to a plain download link from an app that happens to be free.
-    var withCtx = parsed.find(function (e) { return e.ctx; });
-    if (withCtx) {
-      draft.kind = withCtx.ctx === 'apps' ? 'appPromoCode' : 'offerCode';
+    // The file says which kind of code these are — including by saying nothing, which
+    // is how a promo export identifies itself. Either way it is the only thing here
+    // that actually knows. Marked as a deliberate choice so the lookup that follows
+    // doesn't infer its way back to a plain download link from a free app.
+    var ctx = resolvedContext(parsed);
+    if (ctx) {
+      draft.kind = ctx === 'apps' ? 'appPromoCode' : 'offerCode';
       kindChosenManually = true;
+      applyFixedValidity();
       syncForm();
     }
 
@@ -2249,7 +2367,8 @@
     var withID = parsed.find(function (e) { return e.id; });
     var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); }).length;
     var dropped = lines - parsed.length;
-    $('batchStatus').textContent = t().csvLoaded(label, parsed.length, dropped);
+    $('batchStatus').textContent = t().csvLoaded(label, parsed.length, dropped)
+      + (ctx ? ' · ' + t()['kind' + draft.kind.charAt(0).toUpperCase() + draft.kind.slice(1)] : '');
 
     if (withID && (!draft.app || String(draft.app.id) !== withID.id)) {
       $('query').value = withID.id;

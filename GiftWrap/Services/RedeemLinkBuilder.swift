@@ -98,10 +98,23 @@ enum RedeemLinkBuilder {
 
     /// Picks the kind when the link didn't say. A paid app can only carry a promo code;
     /// a free app carries an offer code if there's a code at all, otherwise it's just a link.
-    static func inferredKind(explicit: GiftLinkKind?, isFree: Bool, hasCode: Bool) -> GiftLinkKind {
+    ///
+    /// The code's own shape breaks the remaining tie. "Free app + a code" used to mean
+    /// offer code outright, which is wrong for the case that arrives most often by hand:
+    /// a promo code for an app that is a free download with a paid unlock. Sent as an
+    /// offer code it becomes a `ctx=offercodes` link Apple won't honour, and the failure
+    /// shows up at the recipient. Promo codes are twelve characters and the one-time
+    /// offer codes App Store Connect exports are eighteen, so the code says which it is.
+    static func inferredKind(
+        explicit: GiftLinkKind?,
+        isFree: Bool,
+        hasCode: Bool,
+        code: String = ""
+    ) -> GiftLinkKind {
         if let explicit { return explicit }
         if !isFree { return .appPromoCode }
-        return hasCode ? .offerCode : .directLink
+        guard hasCode else { return .directLink }
+        return CodeFileParser.looksLikePromoCode(code) ? .appPromoCode : .offerCode
     }
 
     /// Pulls the numeric Apple ID out of anything the user pastes.

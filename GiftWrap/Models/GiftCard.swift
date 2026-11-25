@@ -339,6 +339,25 @@ enum GiftLinkKind: String, Codable, CaseIterable, Identifiable {
 
     /// Whether this kind can carry an expiry date worth printing on the card.
     var hasExpiry: Bool { self != .directLink }
+
+    /// How long the code lives, when Apple fixes it. Promo codes expire four weeks
+    /// after they're generated whether or not anyone says so, so the card should say
+    /// so — an unmarked promo code is a gift with a hidden deadline. Offer codes take
+    /// whatever expiry the developer set, which this can't know.
+    var fixedValidityDays: Int? {
+        self == .appPromoCode ? 28 : nil
+    }
+
+    /// Whether Apple documents a redeem URL for this kind.
+    ///
+    /// `ctx=offercodes` is in Apple's own docs. `ctx=apps` is not — it works today and
+    /// it's what every promo-code link in the wild uses, but nothing promises it will,
+    /// and there's no version of it that works on the web. So a promo gift has to stand
+    /// up without the button: the code goes on the card and the manual instructions
+    /// open by default, rather than hiding behind "if the button doesn't work".
+    var hasDocumentedRedeemLink: Bool {
+        self != .appPromoCode
+    }
 }
 
 /// Everything the composer needs to render one card.

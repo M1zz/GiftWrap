@@ -599,6 +599,7 @@
       blocks: { logo: '앱 로고', brand: '앱 이름', hero: '액면',
                 note: '메시지', code: '코드', fine: '약관', qr: 'QR' },
       noCodes: '코드를 찾지 못했습니다. 파일 형식을 확인해 주세요.',
+      kindPromo: '앱 프로모션 코드', kindOffer: '인앱 오퍼 코드',
       pastedLabel: '붙여넣기',
       loaded: function (label, n, dropped) {
         return label + ' — 코드 ' + n + '개' +
@@ -722,6 +723,7 @@
       blocks: { logo: 'App logo', brand: 'App name', hero: 'Value',
                 note: 'Message', code: 'Code', fine: 'Terms', qr: 'QR' },
       noCodes: 'No codes found. Check the file’s format.',
+      kindPromo: 'App promo code', kindOffer: 'In-app offer code',
       pastedLabel: 'Pasted text',
       loaded: function (label, n, dropped) {
         return label + ' — ' + n + ' code' + (n === 1 ? '' : 's') +
@@ -1000,9 +1002,45 @@
   }
 
   // ---------- CSV ----------
+
+  /**
+   * How long an App Store Connect promo code is. Every one is exactly this; the
+   * one-time offer codes App Store Connect exports are eighteen. That difference is
+   * what lets a list of bare codes say which kind it is.
+   * Mirrors `CodeFileParser.promoCodeLength` and studio's `PROMO_CODE_LENGTH`.
+   */
+  var PROMO_CODE_LENGTH = 12;
+
+  function looksLikePromoCode(code) {
+    var c = String(code || '').trim();
+    return c.length === PROMO_CODE_LENGTH && /^[A-Za-z0-9]+$/.test(c);
+  }
+
+  /**
+   * Which redeem flow a parsed file belongs to, letting its silence speak.
+   *
+   * A link that spelled out `ctx=` wins. Failing that, a file with no links at all
+   * whose codes are every one of them promo-length is a promo export — the only thing
+   * App Store Connect ships without the link column, since promo codes have no
+   * documented redeem link to print. Anything else stays empty rather than guessing:
+   * offer codes pasted without their URL column are link-less too, and their eighteen
+   * characters are what tell them apart.
+   *
+   * This matters more here than anywhere: a printed card can't be corrected later.
+   */
+  function resolvedContextOf(parsed) {
+    var stated = '';
+    parsed.forEach(function (e) { if (!stated) stated = extractCtx(e.url); });
+    if (stated) return stated;
+    var promoShaped = !parsed.hasRedeemLinks && parsed.length &&
+      parsed.every(function (e) { return looksLikePromoCode(e.code); });
+    return promoShaped ? 'apps' : '';
+  }
+
   function parse(text) {
     var out = [];
     var seen = {};
+    out.hasRedeemLinks = false;
     text.split(/\r?\n/).forEach(function (line) {
       line = line.trim();
       if (!line) return;
@@ -1010,6 +1048,7 @@
       if (url) url = url.replace(/[",;]+$/, '');
       var code = null, id = null;
       if (url) {
+        out.hasRedeemLinks = true;
         code = (url.match(/[?&]code=([^&\s]+)/i) || [])[1] || null;
         id = (url.match(/[?&]id=(\d+)/i) || [])[1] || null;
       }
@@ -1049,6 +1088,15 @@
     $('count').value = Math.min(parsed.length, 20);
     $('count').max = parsed.length;
     $('from').max = parsed.length;
+
+    // What the file says about which kind of code these are, including what it says
+    // by staying silent. Set before the lookup so a promo batch never spends a moment
+    // as `ctx=offercodes`.
+    var ctx = resolvedContextOf(parsed);
+    if (ctx) {
+      app.ctx = ctx;
+      $('loadStatus').textContent += ' · ' + (ctx === 'apps' ? t().kindPromo : t().kindOffer);
+    }
 
     // Hand over the whole URL when the CSV carries one — it may name the ctx too.
     var found = parsed.find(function (c) { return c.id; });

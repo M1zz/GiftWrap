@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>지금 무료로 받을 수 있는 앱</title>
+<meta name="description" content="지금 무료로 받을 수 있는 앱과 할인 중인 앱, 그리고 전체 앱 목록.">
+<!--
+  공개 배포 페이지 — 목록 하나를 여러 사람에게 보여 주는 곳.
+
+  ── 세 묶음, 그 순서
+
+  1. 지금 무료   코드가 있어 값을 치르지 않고 받는 것
+  2. 할인 중     값이 내려간 것
+  3. 전체 앱     나머지 전부
+
+  혜택이 있는 것이 위에 오고 전체 목록이 그 아래를 받친다. 위 두 묶음은 비어 있으면
+  묶음째 사라진다 — 빈 제목만 남은 자리는 '없음'을 알리는 게 아니라 고장처럼 보인다.
+
+  ── 왜 서버가 없어도 되는가
+
+  이 페이지가 다루는 것은 **커스텀 오퍼 코드**다. 1회용 코드와 달리 여러 사람이 같은
+  코드를 쓴다. 그래서 "누가 먼저 집었나"를 정할 일이 없고, 방문자마다 다른 코드를 꺼내
+  주는 장치도, 그 장치가 요구하는 상태 저장소도 필요 없다. 나눠 줄 것이 없으면 나눠 주는
+  기계도 필요 없다.
+
+  1회용 코드를 이 페이지에 올리면 이 성질이 깨진다. 목록을 본 첫 사람이 전부 가져가고
+  나머지는 죽은 코드를 본다. 그 경우는 studio.html에서 한 사람씩 선물 링크로 보내는 쪽이다.
+
+  ── 여기 적힌 코드는 공개된 값이다
+
+  링크를 아는 누구나 코드를 볼 수 있고, 크롤러도 본다. 그것이 이 페이지의 목적이다.
+  숨겨야 하는 코드는 여기 두면 안 된다.
+
+  ── free.json이 적지 않는 것
+
+  앱 이름·아이콘·가격·개발자는 적지 않는다. 전체 목록은 `artistId` 하나로 조회하고,
+  혜택 항목은 리딤 링크 안의 `id`로 조회한다. 앱이 늘거나 이름·가격이 바뀌어도 목록
+  파일을 고칠 일이 없다는 뜻이다. 옮겨 적는 곳이 곧 틀리는 곳이므로.
+
+  예외가 하나 있다: 할인의 **원래 값**(`was`)은 적어야 한다. 조회는 지금 값만 알려 주고,
+  얼마에서 내려왔는지는 어디에도 남지 않기 때문이다.
+
+  의존성 없음. 다크 모드·reduced-motion 대응.
+-->
+<style>
+  :root {
+    --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;
+    --b1: #8AF0FF; --b2: #B08CFF;
+    --bg: #f5f5f7; --panel: #fff; --ink: #1d1d1f; --ink-2: #6e6e73;
+    --line: #d2d2d7; --accent: #0071e3; --radius: 14px;
+    --good: #0a7c4a; --good-bg: rgba(10,124,74,.12);
+    --sale: #b1420a; --sale-bg: rgba(177,66,10,.12);
+    --over: #86868b; --over-bg: rgba(110,110,115,.14);
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+          "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+  .wrap { width: min(100% - 40px, 1060px); margin-inline: auto; }
+  a { color: var(--accent); }
+
+  /* ── 머리 ───────────────────────────────────────────────── */
+  .head {
+    position: relative; overflow: hidden; color: #fff; text-align: center;
+    background: linear-gradient(135deg, var(--g1), var(--g2) 55%, var(--g3));
+    padding: clamp(44px, 8vw, 76px) 0 clamp(40px, 7vw, 64px);
+  }
+  .head::before, .head::after {
+    content: ""; position: absolute; border-radius: 50%;
+    filter: blur(70px); opacity: .45; pointer-events: none;
+  }
+  .head::before { width: 380px; height: 380px; background: var(--b1); top: -170px; left: -110px; }
+  .head::after  { width: 330px; height: 330px; background: var(--b2); bottom: -170px; right: -90px; }
+  .head > .wrap { position: relative; }
+  .head h1 { margin: 0 0 10px; font-size: clamp(27px, 5vw, 38px); letter-spacing: -.03em; }
+  .head p { margin: 0 auto; max-width: 34em; color: rgba(255,255,255,.9); font-size: 16px; }
+
+  /* ── 묶음 ───────────────────────────────────────────────── */
+  main { padding: clamp(28px, 4vw, 44px) 0 clamp(40px, 6vw, 64px); }
+  section { margin-bottom: clamp(30px, 5vw, 46px); }
+  section:last-child { margin-bottom: 0; }
+  .h {
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+    margin: 0 0 4px;
+  }
+  .h h2 { font-size: 21px; letter-spacing: -.02em; margin: 0; }
+  .h .count { color: var(--ink-2); font-size: 14px; }
+  .lede { color: var(--ink-2); font-size: 14.5px; margin: 0 0 18px; }
+
+  /* ── 혜택 카드 ──────────────────────────────────────────── */
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); }
+
+  .app {
+    display: flex; flex-direction: column; gap: 12px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .app.is-over { opacity: .62; }
+
+  .top { display: flex; gap: 14px; align-items: flex-start; }
+  .art {
+    width: 62px; height: 62px; flex: none; border-radius: 14px; overflow: hidden;
+    background: linear-gradient(140deg, var(--g1), var(--g2) 60%, var(--g3));
+    color: #fff; display: grid; place-items: center;
+    font-size: 24px; font-weight: 700; letter-spacing: -.02em;
+  }
+  .art img { width: 100%; height: 100%; display: block; object-fit: cover; }
+  .meta { min-width: 0; flex: 1; }
+  .name { margin: 0; font-size: 17px; letter-spacing: -.01em; line-height: 1.35; }
+  .dev { margin: 2px 0 0; color: var(--ink-2); font-size: 13.5px; }
+
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .01em; margin-top: 7px;
+  }
+  .badge.now  { background: var(--good-bg); color: var(--good); }
+  .badge.sale { background: var(--sale-bg); color: var(--sale); }
+  .badge.over { background: var(--over-bg); color: var(--over); }
+
+  .price { font-size: 14.5px; color: var(--ink-2); margin: 0; }
+  .price s { opacity: .7; }
+  .price b { color: var(--ink); }
+
+  .note { margin: 0; font-size: 14px; color: var(--ink-2); }
+
+  .get {
+    display: block; text-align: center; text-decoration: none;
+    background: var(--accent); color: #fff; font-weight: 600; font-size: 15.5px;
+    border-radius: 11px; padding: 12px 16px;
+    transition: transform .16s var(--ease), filter .16s;
+  }
+  .get:hover { filter: brightness(1.07); transform: translateY(-1px); }
+  .app.is-over .get { background: var(--over); pointer-events: none; }
+
+  details.manual { font-size: 13.5px; color: var(--ink-2); }
+  details.manual summary { cursor: pointer; }
+  details.manual p { margin: 8px 0 0; }
+  .codeRow { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .code {
+    font: 14px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .06em;
+    background: rgba(110,110,115,.12); border-radius: 8px; padding: 8px 11px; color: var(--ink);
+    user-select: all;
+  }
+  .copy {
+    font: inherit; font-size: 13px; cursor: pointer;
+    background: transparent; border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 12px; color: var(--ink);
+  }
+  .copy:hover { border-color: #b6b6bd; }
+
+  /* ── 전체 목록 ──────────────────────────────────────────── */
+  .all { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .mini {
+    display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 11px 13px;
+    transition: transform .16s var(--ease), border-color .16s, box-shadow .16s var(--ease);
+  }
+  .mini:hover {
+    transform: translateY(-1px); border-color: #c2c2c8;
+    box-shadow: 0 8px 20px rgba(0,0,0,.07);
+  }
+  .mini .art { width: 44px; height: 44px; border-radius: 10px; font-size: 17px; }
+  .mini .t { min-width: 0; }
+  .mini .t b {
+    display: block; font-size: 14.5px; font-weight: 600; letter-spacing: -.01em;
+    line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .mini .t span { font-size: 12.5px; color: var(--ink-2); }
+  .mini .t .flag { color: var(--good); font-weight: 700; }
+  .mini .t .flag.sale { color: var(--sale); }
+
+  .msg {
+    padding: 22px; border-radius: var(--radius);
+    background: var(--panel); border: 1px solid var(--line); color: var(--ink-2);
+  }
+  .msg b { color: var(--ink); }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 26px 0 40px;
+    color: var(--ink-2); font-size: 14px; text-align: center;
+  }
+  footer p { margin: 0 auto 8px; max-width: 40em; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000; --panel: #1c1c1e; --ink: #f5f5f7; --ink-2: #98989d;
+      --line: #38383a; --accent: #0a84ff;
+      --good: #30d158; --good-bg: rgba(48,209,88,.16);
+      --sale: #ff9f0a; --sale-bg: rgba(255,159,10,.16);
+      --over: #98989d; --over-bg: rgba(152,152,157,.18);
+    }
+    .copy:hover { border-color: #4a4a4e; }
+    .mini:hover { border-color: #4a4a4e; box-shadow: 0 8px 20px rgba(0,0,0,.5); }
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <div class="wrap">
+    <h1 id="title">지금 무료로 받을 수 있는 앱</h1>
+    <p id="lede"></p>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <section id="freeSec" hidden>
+      <div class="h"><h2>지금 무료</h2><span class="count" id="freeCount"></span></div>
+      <p class="lede">코드가 살아 있는 동안은 누구나 받을 수 있습니다.</p>
+      <div class="grid" id="freeGrid"></div>
+    </section>
+
+    <section id="saleSec" hidden>
+      <div class="h"><h2>할인 중</h2><span class="count" id="saleCount"></span></div>
+      <p class="lede">값이 내려가 있는 앱입니다.</p>
+      <div class="grid" id="saleGrid"></div>
+    </section>
+
+    <section id="allSec" hidden>
+      <div class="h"><h2>전체 앱</h2><span class="count" id="allCount"></span></div>
+      <p class="lede">눌러서 App Store로 갑니다.</p>
+      <div class="all" id="allGrid"></div>
+    </section>
+
+    <div class="msg" id="msg" hidden></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>코드는 App Store 앱에서도 직접 쓸 수 있습니다 — 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b>.</p>
+    <p><a href="hub.html">GiftWrap</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var STR = {
+    empty: '아직 올려 둔 앱이 없습니다.',
+    noList: '목록을 읽지 못했습니다. free.json이 이 페이지 옆에 있는지 확인해 주세요.',
+    badList: '목록 파일이 깨져 있습니다 (free.json).',
+    free: '무료 배포 중',
+    sale: '할인 중',
+    over: '종료됨',
+    freeApp: '무료 앱 · 이 코드로 인앱 잠금 해제',
+    nowFree: '지금 무료',
+    freeLabel: '무료',
+    count: function (n) { return n + '개'; },
+    until: function (y, m, d) { return y + '년 ' + m + '월 ' + d + '일까지'; },
+    ended: function (y, m, d) { return y + '년 ' + m + '월 ' + d + '일에 끝났습니다'; },
+    get: 'App Store에서 받기',
+    copy: '코드 복사',
+    copied: '복사했어요',
+    manual: '코드를 직접 입력해서 받기',
+    manualBody: 'App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.',
+    manualPromo: 'App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요. ' +
+                 '위 버튼은 기기에 따라 열리지 않을 수 있습니다.'
+  };
+
+  /* ─────────────────────────────────────────────────────────
+   * 한 줄이 말하는 것을 읽는다
+   *
+   * free.json에는 App Store Connect가 준 리딤 링크를 그대로 붙여넣으면 된다. 그 링크
+   * 안에 어느 앱인지(`id`), 어떤 종류인지(`ctx`), 코드가 무엇인지(`code`)가 전부 들어
+   * 있으므로 옮겨 적을 것이 없다 — 옮겨 적는 곳이 곧 틀리는 곳이다.
+   *
+   * `RedeemLinkBuilder.parse()`와 같은 규칙: 쿼리의 `id=`를 경로 슬러그보다 먼저 본다.
+   * 앱 이름 슬러그에 우연히 `id123456`이 들어 있어도 지지 않게.
+   * ───────────────────────────────────────────────────────── */
+  function parseEntry(raw) {
+    var e = (raw && typeof raw === 'object') ? raw : { url: String(raw || '') };
+    var url = String(e.url || '');
+
+    var id = String(e.id || '');
+    if (!id) {
+      var q = url.match(/[?&]id=(\d+)/i);
+      id = q ? q[1] : ((url.match(/\/id(\d{5,})/) || [])[1] || '');
+    }
+
+    var ctx = String(e.ctx || '').toLowerCase();
+    if (!ctx) ctx = ((url.match(/[?&]ctx=(offercodes|apps)\b/i) || [])[1] || '').toLowerCase();
+
+    var code = String(e.code || '');
+    if (!code) {
+      var c = url.match(/[?&]code=([^&\s]+)/i);
+      code = c ? decodeURIComponent(c[1]) : '';
+    }
+
+    if (!id && !url) return null;
+    return {
+      id: id,
+      ctx: ctx,
+      code: code,
+      url: url || redeemURL(id, ctx, code),
+      name: String(e.name || ''),      // 조회가 실패할 때 쓰는 대비 이름
+      note: String(e.note || ''),
+      until: String(e.until || ''),
+      // 할인의 원래 값. 조회는 지금 값만 알려 주므로 이것만은 적어야 한다.
+      was: Number(e.was) || 0
+    };
+  }
+
+  function redeemURL(id, ctx, code) {
+    if (!id) return '';
+    if (!ctx || !code) return 'https://apps.apple.com/app/id' + id;
+    return 'https://apps.apple.com/redeem?ctx=' + encodeURIComponent(ctx) +
+           '&id=' + id + '&code=' + encodeURIComponent(code);
+  }
+
+  /* 날짜는 적혀 있을 때만 본다. 하루의 끝까지 살아 있는 것으로 읽어, 마지막 날에 이미
+     끝난 것처럼 보이지 않게 한다. */
+  function isOver(iso) {
+    var p = String(iso || '').split('-');
+    if (p.length !== 3) return false;
+    var end = new Date(+p[0], +p[1] - 1, +p[2], 23, 59, 59);
+    return isFinite(end) && Date.now() > end.getTime();
+  }
+
+  function dateText(iso, over) {
+    var p = String(iso || '').split('-');
+    if (p.length !== 3) return '';
+    return (over ? STR.ended : STR.until)(+p[0], +p[1], +p[2]);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+   * 앱 정보 조회
+   *
+   * 두 갈래를 한 번씩 부른다. `artistId`는 전체 앱을, 쉼표로 이은 id들은 혜택 항목 중
+   * 그 카탈로그에 없는 것(다른 개발자의 앱)을 가져온다. 대개 두 번째는 부를 일이 없다.
+   *
+   * `cb=`는 캐시 우회다. 이 응답은 공유 캐시에 들어가는데, 그 URL을 처음 데운 사람의
+   * `Access-Control-Allow-Origin`이 헤더에 박혀 다른 출처에서 읽지 못하게 되는 일이
+   * 실제로 있었다 (todo의 '아이콘이 안 뜨던 문제'). 요청마다 다른 값을 달아 각자 캐시
+   * 항목을 갖게 한다.
+   * ───────────────────────────────────────────────────────── */
+  function ask(query, storefront) {
+    var url = 'https://itunes.apple.com/lookup?' + query +
+              '&country=' + encodeURIComponent(storefront || 'kr') +
+              '&cb=' + Math.random().toString(36).slice(2);
+    return fetch(url, { referrerPolicy: 'no-referrer' })
+      .then(function (r) { return r.ok ? r.json() : { results: [] }; })
+      .then(function (d) {
+        return (d.results || []).filter(function (r) { return r.wrapperType === 'software'; });
+      })
+      .catch(function () { return []; });   // 조회가 없어도 링크는 산다
+  }
+
+  function node(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  /** 아이콘이 아직 없거나 끝내 안 올 때 자리를 지키는 첫 글자. */
+  function monogram(name) {
+    var s = String(name || '').trim();
+    return s ? s.slice(0, 1).toUpperCase() : '?';
+  }
+
+  function artBox(info, name, size) {
+    var art = node('div', 'art');
+    var src = info && (size === 'mini' ? (info.artworkUrl60 || info.artworkUrl100)
+                                       : (info.artworkUrl100 || info.artworkUrl60));
+    if (src) {
+      var img = new Image();
+      img.alt = '';
+      img.loading = 'lazy';
+      // 아이콘이 끝내 안 오면 첫 글자로 돌아간다. 빈 사각형보다 낫고, 높이가 흔들리지 않는다.
+      img.onerror = function () { art.textContent = monogram(name); };
+      img.src = src;
+      art.appendChild(img);
+    } else {
+      art.textContent = monogram(name);
+    }
+    return art;
+  }
+
+  function priceOf(info) {
+    return info && info.formattedPrice ? info.formattedPrice : '';
+  }
+
+  function isPaid(info) {
+    return !!(info && info.price > 0);
+  }
+
+  /* ── 혜택 카드 ─────────────────────────────────────────── */
+
+  function card(entry, info, kind) {
+    var over = isOver(entry.until);
+    var el = node('div', 'app' + (over ? ' is-over' : ''));
+    var name = (info && info.trackName) || entry.name || ('앱 ' + entry.id);
+
+    var top = node('div', 'top');
+    top.appendChild(artBox(info, name));
+    var meta = node('div', 'meta');
+    // h3 — 묶음 제목이 h2다. 카드마다 h2를 내면 문서 개요가 '지금 무료 / 클립키보드 /
+    // 전체 앱'처럼 읽혀, 앱 하나가 묶음과 같은 급으로 올라선다.
+    meta.appendChild(node('h3', 'name', name));
+    if (info && info.artistName) meta.appendChild(node('p', 'dev', info.artistName));
+    meta.appendChild(node('span', 'badge ' + (over ? 'over' : kind),
+                          over ? STR.over : (kind === 'sale' ? STR.sale : STR.free)));
+    top.appendChild(meta);
+    el.appendChild(top);
+
+    var price = priceLine(entry, info, kind);
+    if (price) el.appendChild(price);
+
+    var when = dateText(entry.until, over);
+    if (when) el.appendChild(node('p', 'note', when));
+    if (entry.note) el.appendChild(node('p', 'note', entry.note));
+
+    var get = node('a', 'get', over ? STR.over : STR.get);
+    get.href = over ? '#' : (entry.url || (info && info.trackViewUrl) || '#');
+    get.rel = 'noopener';
+    if (over) get.setAttribute('aria-disabled', 'true');
+    el.appendChild(get);
+
+    if (entry.code && !over) el.appendChild(manualBlock(entry));
+    return el;
+  }
+
+  /**
+   * 값이 얼마였는지가 혜택에 크기를 준다.
+   *
+   * 무료 묶음: 유료 앱이면 원래 값에 줄을 긋고 `지금 무료`. 원래 무료인 앱에 그렇게
+   *   쓰면 거짓이므로 — 오퍼 코드가 여는 것은 인앱 쪽이다 — 다르게 적는다.
+   * 할인 묶음: 적어 둔 `was`에 줄을 긋고 조회한 지금 값을 세운다. 지금 값이 `was`보다
+   *   싸지 않으면 할인이 아니므로 줄을 긋지 않는다 — 끝난 할인을 광고하지 않기 위해.
+   */
+  function priceLine(entry, info, kind) {
+    var p = node('p', 'price');
+
+    if (kind === 'sale') {
+      var now = priceOf(info) || (info && info.price === 0 ? STR.freeLabel : '');
+      var cheaper = info && entry.was > 0 && info.price < entry.was;
+      if (cheaper) {
+        p.appendChild(node('s', null, money(entry.was, info)));
+        p.appendChild(document.createTextNode(' '));
+        p.appendChild(node('b', null, now));
+      } else if (now) {
+        p.appendChild(node('b', null, now));
+      }
+      return p.childNodes.length ? p : null;
+    }
+
+    if (isPaid(info)) {
+      p.appendChild(node('s', null, priceOf(info)));
+      p.appendChild(document.createTextNode(' '));
+      p.appendChild(node('b', null, STR.nowFree));
+    } else if (info) {
+      p.textContent = STR.freeApp;
+    }
+    return p.childNodes.length ? p : null;
+  }
+
+  /**
+   * `was`는 숫자로 적힌다. 통화 기호는 조회가 돌려준 지금 값에서 빌려 온다 — 그래야
+   * 스토어를 바꿔도 두 값이 같은 표기로 나란히 선다. 기호를 못 찾으면 숫자만 쓴다.
+   */
+  function money(amount, info) {
+    var sample = priceOf(info);
+    var symbol = (String(sample).match(/^[^\d]+/) || [''])[0];
+    return symbol + Number(amount).toLocaleString();
+  }
+
+  /* 코드를 손으로 넣는 길.
+   *
+   * 프로모션 코드(`ctx=apps`)일 때는 접지 않고 펼쳐 둔다. Apple이 문서로 밝힌 리딤
+   * URL은 `ctx=offercodes`뿐이고 `ctx=apps`는 비공식이라 버튼이 아무 반응 없이 끝날 수
+   * 있는데, 그때 받는 사람이 삼각형을 찾아 누르지는 않는다. gift.html과 같은 규칙. */
+  function manualBlock(entry) {
+    var promo = entry.ctx === 'apps';
+    var d = node('details', 'manual');
+    if (promo) d.open = true;
+    d.appendChild(node('summary', null, STR.manual));
+
+    var p = node('p');
+    p.innerHTML = promo ? STR.manualPromo : STR.manualBody;
+    d.appendChild(p);
+
+    var row = node('div', 'codeRow');
+    row.appendChild(node('span', 'code', entry.code));
+    var btn = node('button', 'copy', STR.copy);
+    btn.type = 'button';
+    btn.addEventListener('click', function () {
+      var done = function () { btn.textContent = STR.copied; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(entry.code).then(done, done);
+      } else {
+        var t = document.createElement('textarea');
+        t.value = entry.code;
+        document.body.appendChild(t);
+        t.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(t);
+        done();
+      }
+    });
+    row.appendChild(btn);
+    d.appendChild(row);
+    return d;
+  }
+
+  /* ── 전체 목록의 한 칸 ─────────────────────────────────── */
+
+  function mini(info, flag) {
+    var a = node('a', 'mini');
+    a.href = info.trackViewUrl || ('https://apps.apple.com/app/id' + info.trackId);
+    a.rel = 'noopener';
+    a.appendChild(artBox(info, info.trackName, 'mini'));
+
+    var t = node('div', 't');
+    t.appendChild(node('b', null, info.trackName));
+    // 혜택이 걸린 앱은 값 대신 그 사실을 적는다. 위 묶음에 이미 카드가 있지만, 전체
+    // 목록만 훑는 사람에게도 보이는 편이 낫다.
+    t.appendChild(node('span', flag ? 'flag' + (flag === 'sale' ? ' sale' : '') : null,
+                       flag === 'free' ? STR.free
+                     : flag === 'sale' ? STR.sale
+                     : (priceOf(info) || STR.freeLabel)));
+    a.appendChild(t);
+    return a;
+  }
+
+  function say(text) {
+    $('msg').textContent = text;
+    $('msg').hidden = false;
+  }
+
+  /* ── 조립 ──────────────────────────────────────────────── */
+
+  function start(list) {
+    if (list.title) { $('title').textContent = list.title; document.title = list.title; }
+    $('lede').textContent = list.lede || '';
+
+    // `apps`는 무료 묶음의 옛 이름. 먼저 만든 목록 파일이 그대로 열리도록 남긴다.
+    var free = (list.free || list.apps || []).map(parseEntry).filter(Boolean);
+    var sales = (list.sales || []).map(parseEntry).filter(Boolean);
+
+    // 끝난 것은 각 묶음 안에서 뒤로. 묶음의 첫머리는 지금 받을 수 있는 것이어야 한다.
+    var byLive = function (a, b) { return (isOver(a.until) ? 1 : 0) - (isOver(b.until) ? 1 : 0); };
+    free.sort(byLive);
+    sales.sort(byLive);
+
+    var storefront = list.storefront;
+    var featured = free.concat(sales);
+
+    if (!featured.length && !list.artistId) { say(STR.empty); return; }
+
+    // 링크만으로 먼저 그린다. 조회가 늦거나 끝내 실패해도 받을 수는 있어야 하므로.
+    var drawn = {
+      free: paint($('freeGrid'), free, null, 'now'),
+      sale: paint($('saleGrid'), sales, null, 'sale')
+    };
+    reveal('freeSec', 'freeCount', free.length);
+    reveal('saleSec', 'saleCount', sales.length);
+
+    var catalogQuery = list.artistId ? ('id=' + encodeURIComponent(list.artistId) + '&entity=software&limit=200') : '';
+    var jobs = [catalogQuery ? ask(catalogQuery, storefront) : Promise.resolve([])];
+
+    jobs[0].then(function (catalog) {
+      var by = {};
+      catalog.forEach(function (r) { by[String(r.trackId)] = r; });
+
+      // 카탈로그에 없는 혜택 항목만 따로 묻는다 — 대개 없다.
+      var missing = featured.map(function (e) { return e.id; })
+        .filter(function (id) { return id && !by[id]; })
+        .filter(function (id, i, a) { return a.indexOf(id) === i; });
+
+      var rest = missing.length ? ask('id=' + missing.join(','), storefront) : Promise.resolve([]);
+      return rest.then(function (extra) {
+        extra.forEach(function (r) { by[String(r.trackId)] = r; });
+        return { by: by, catalog: catalog };
+      });
+    }).then(function (out) {
+      var by = out.by;
+
+      repaint($('freeGrid'), free, by, 'now', drawn.free);
+      repaint($('saleGrid'), sales, by, 'sale', drawn.sale);
+
+      var flags = {};
+      free.forEach(function (e) { if (!isOver(e.until)) flags[e.id] = 'free'; });
+      sales.forEach(function (e) { if (!isOver(e.until) && !flags[e.id]) flags[e.id] = 'sale'; });
+
+      // 새 앱이 위로. 목록을 다시 보는 사람에게 달라진 것이 먼저 보이게.
+      var all = out.catalog.slice().sort(function (a, b) {
+        return String(b.releaseDate || '').localeCompare(String(a.releaseDate || ''));
+      });
+      var grid = $('allGrid');
+      all.forEach(function (info) { grid.appendChild(mini(info, flags[String(info.trackId)])); });
+      reveal('allSec', 'allCount', all.length);
+
+      if (!free.length && !sales.length && !all.length) say(STR.empty);
+    });
+  }
+
+  function paint(grid, entries, by, kind) {
+    return entries.map(function (e) {
+      var el = card(e, by ? by[e.id] : null, kind);
+      grid.appendChild(el);
+      return el;
+    });
+  }
+
+  function repaint(grid, entries, by, kind, drawn) {
+    entries.forEach(function (e, i) {
+      var info = by[e.id];
+      if (!info || !drawn[i]) return;
+      var fresh = card(e, info, kind);
+      grid.replaceChild(fresh, drawn[i]);
+      drawn[i] = fresh;
+    });
+  }
+
+  /** 비어 있는 묶음은 제목째 감춘다 — 빈 제목은 '없음'이 아니라 고장으로 읽힌다. */
+  function reveal(sectionId, countId, n) {
+    if (!n) return;
+    $(countId).textContent = STR.count(n);
+    $(sectionId).hidden = false;
+  }
+
+  fetch('free.json', { cache: 'no-cache' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    })
+    .then(start)
+    .catch(function (err) {
+      say(String(err && err.message).indexOf('JSON') > -1 ? STR.badList : STR.noList);
+    });
+})();
+</script>
+
+</body>
+</html>

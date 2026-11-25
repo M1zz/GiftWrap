@@ -90,8 +90,40 @@ final class ComposerModel: ObservableObject {
                 self.draft.kind = newValue
                 self.kindChosenManually = true
                 self.autoFillNotice = nil
+                _ = self.applyFixedValidity()
             }
         )
+    }
+
+    /// Settles what the kind decides rather than the sender.
+    ///
+    /// **The expiry.** Promo codes die four weeks after they're generated. That isn't a
+    /// default the sender picked, it's a fact about the code, and an unfilled field
+    /// prints a card that says nothing about a deadline the recipient will walk into.
+    /// Only ever writes into an empty field, so a date already set stays set.
+    ///
+    /// **The code on the card.** `ctx=apps` is undocumented, so a promo gift has to
+    /// survive its button not working. The code itself is the gift then, and it has to
+    /// be legible on the card rather than only inside a link.
+    ///
+    /// Returns whether it wrote anything, so the caller can say so.
+    @discardableResult
+    func applyFixedValidity() -> Bool {
+        var wrote = false
+
+        if draft.expiry == nil,
+           let days = draft.kind.fixedValidityDays,
+           let date = Calendar.current.date(byAdding: .day, value: days, to: Date()) {
+            draft.expiry = date
+            wrote = true
+        }
+
+        if !draft.kind.hasDocumentedRedeemLink, !draft.showCodeOnCard {
+            draft.showCodeOnCard = true
+            wrote = true
+        }
+
+        return wrote
     }
 
     func lookup() async {
@@ -147,13 +179,18 @@ final class ComposerModel: ObservableObject {
             let resolved = RedeemLinkBuilder.inferredKind(
                 explicit: explicit,
                 isFree: isFree,
-                hasCode: !draft.trimmedCode.isEmpty
+                hasCode: !draft.trimmedCode.isEmpty,
+                code: draft.trimmedCode
             )
             if resolved != draft.kind {
                 draft.kind = resolved
                 filled.insert(resolved.label, at: 0)
             }
             kindChosenManually = false
+        }
+
+        if applyFixedValidity(), !filled.contains(T.expiryField.text) {
+            filled.append(T.expiryField.text)
         }
 
         autoFillNotice = filled.isEmpty
@@ -289,14 +326,19 @@ final class ComposerModel: ObservableObject {
         batchInput = parsed.codes.joined(separator: "\n")
         errorMessage = nil
 
-        if let context = parsed.context {
+        // What the file says, including what it says by saying nothing: a list with no
+        // redeem links and nothing but twelve-character codes is a promo export, since
+        // that's the only thing App Store Connect ships without the link column.
+        if let context = parsed.resolvedContext {
             draft.kind = context == "apps" ? .appPromoCode : .offerCode
             // The file stated it. Marked as deliberate so the lookup below doesn't
             // infer its way back to a plain link from an app that happens to be free.
             kindChosenManually = true
+            applyFixedValidity()
         }
 
         status = T.batchCSVLoaded(label, parsed.codes.count, parsed.skipped).text
+            + (parsed.resolvedContext == nil ? "" : " · " + draft.kind.label)
 
         if let id = parsed.appleID, draft.app?.id != id {
             query = String(id)

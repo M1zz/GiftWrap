@@ -411,6 +411,17 @@ enum T {
         en: "A code for a subscription or in-app purchase. Use this when the app itself is a free download."
     )
 
+    /// Why a promo gift is composed differently — the sender should know before they
+    /// send it that the button is the part Apple doesn't promise.
+    static let promoManualNote = Loc(
+        ko: "Apple이 문서로 밝힌 리딤 링크는 오퍼 코드뿐입니다. "
+            + "프로모션 코드는 버튼이 안 열릴 수 있어, 카드에 코드를 싣고 "
+            + "선물 페이지에 직접 입력하는 방법을 펼쳐서 보여줍니다.",
+        en: "Apple documents a redeem link for offer codes only. A promo code's button "
+            + "may not open, so the code goes on the card and the gift page shows the "
+            + "manual steps expanded."
+    )
+
     // MARK: Panels and errors
 
     static let chooseFolder = Loc(ko: "이 폴더에 저장", en: "Save here")

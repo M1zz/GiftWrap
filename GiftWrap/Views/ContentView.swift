@@ -34,7 +34,6 @@ struct ComposerView: View {
     @ObservedObject var model: ComposerModel
     @EnvironmentObject private var ledger: GiftLedger
     @ObservedObject private var loc = Localization.shared
-    @State private var hasExpiry = false
 
     var body: some View {
         HSplitView {
@@ -111,6 +110,12 @@ struct ComposerView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                if !model.draft.kind.hasDocumentedRedeemLink {
+                    Label(loc.s(T.promoManualNote), systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 if model.draft.kind.requiresCode {
                     TextField(loc.s(T.codeField), text: $model.draft.code)
                         .textFieldStyle(.roundedBorder)
@@ -122,14 +127,24 @@ struct ComposerView: View {
                             .foregroundStyle(.orange)
                     }
 
-                    Toggle(loc.s(T.showExpiry), isOn: $hasExpiry)
-                        .onChange(of: hasExpiry) { _, isOn in
+                    // Read from the draft rather than kept alongside it: the model fills
+                    // the expiry in on its own when the kind fixes it (a promo code is
+                    // always four weeks), and a toggle holding its own idea of on/off
+                    // would sit unchecked over a date that's already set.
+                    Toggle(loc.s(T.showExpiry), isOn: Binding(
+                        get: { model.draft.expiry != nil },
+                        set: { isOn in
                             model.draft.expiry = isOn
-                                ? Calendar.current.date(byAdding: .day, value: 28, to: Date())
+                                ? Calendar.current.date(
+                                    byAdding: .day,
+                                    value: model.draft.kind.fixedValidityDays ?? 28,
+                                    to: Date()
+                                )
                                 : nil
                         }
+                    ))
 
-                    if hasExpiry {
+                    if model.draft.expiry != nil {
                         DatePicker(
                             loc.s(T.expiryField),
                             selection: Binding(

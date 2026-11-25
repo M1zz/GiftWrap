@@ -1,20 +1,40 @@
 import Foundation
 
-/// Reads the CSV App Store Connect hands you for one-time offer codes.
+/// Reads the code files App Store Connect hands you.
 ///
-/// The file has no header — the first line is already a code — and two columns: the
-/// code, and a redeem URL carrying `ctx`, the Apple ID and the code again:
+/// Two different files arrive, and telling them apart is most of this file's job.
+///
+/// **One-time offer codes** come as a CSV with no header — the first line is already a
+/// code — and two columns: the code, and a redeem URL carrying `ctx`, the Apple ID and
+/// the code again:
 ///
 ///     F4ERH8YJF7XETYLY7N,https://apps.apple.com/redeem?ctx=offercodes&id=6759643878&code=F4ERH8YJF7XETYLY7N
 ///
-/// Both columns are read. Either alone is enough to place a code, and the URL is what
-/// says which app the batch is for and which kind of code these are — neither of which
-/// the operator should have to type back in.
+/// **App promo codes** come as a bare list. No header, no link, no app — just the codes,
+/// twelve characters each:
+///
+///     4KXJPHYRLMNE
+///     H7T2WA9DQ3RB
+///
+/// Both columns of the first are read. Either alone is enough to place a code, and the
+/// URL is what says which app the batch is for and which kind of code these are —
+/// neither of which the operator should have to type back in.
+///
+/// The second file states none of that, which is itself the tell: App Store Connect
+/// only omits the redeem link for promo codes, because there is no documented redeem
+/// link for them to print. `promoShapedList` reads that absence, so dropping a promo
+/// file doesn't land as an offer code and quietly build a `ctx=offercodes` link that
+/// Apple will reject.
 ///
 /// Deliberately forgiving: a file exported with only the codes, or one pasted with
 /// quoting and trailing punctuation, still lands. Deliberately free of dependencies,
 /// so it can be exercised on a real file without launching anything.
 enum CodeFileParser {
+
+    /// How long an App Store Connect promo code is. Every one of them is exactly this,
+    /// which is what separates a link-less promo list from a paste of offer codes with
+    /// the URL column cut off — those run to eighteen.
+    static let promoCodeLength = 12
 
     struct Result: Equatable {
         /// The codes, in file order, uppercased, with repeats dropped.
@@ -23,8 +43,41 @@ enum CodeFileParser {
         var appleID: Int?
         /// `offercodes` or `apps`, as the links spelled it. Left nil when they didn't.
         var context: String?
+        /// Whether any line carried a redeem URL at all.
+        var hasRedeemLinks: Bool = false
         /// Non-empty lines that carried no code — a stray header, a repeat, a footer.
         var skipped: Int = 0
+
+        /// Which redeem flow this batch belongs to, letting the file's silence speak.
+        ///
+        /// A link that spelled out `ctx=` always wins. Failing that, a file with no
+        /// links at all whose codes are all promo-length is a promo export — the only
+        /// thing App Store Connect ships that way.
+        ///
+        /// Anything else stays nil rather than guessing: a paste of offer codes with
+        /// the URL column stripped looks link-less too, and its eighteen-character
+        /// codes are what tell it apart.
+        var resolvedContext: String? {
+            if let context { return context }
+            return promoShapedList ? "apps" : nil
+        }
+
+        /// No links anywhere, at least one code, and every code exactly promo-length.
+        var promoShapedList: Bool {
+            !hasRedeemLinks
+                && !codes.isEmpty
+                && codes.allSatisfy { $0.count == CodeFileParser.promoCodeLength }
+        }
+    }
+
+    /// Whether one code, on its own, has the shape of an App Store promo code.
+    ///
+    /// Lives here rather than in `RedeemLinkBuilder` so this file keeps its promise of
+    /// depending on nothing; the builder reads it from here.
+    static func looksLikePromoCode(_ code: String) -> Bool {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count == promoCodeLength
+            && trimmed.range(of: #"^[A-Za-z0-9]+$"#, options: .regularExpression) != nil
     }
 
     static func parse(_ text: String) -> Result {
@@ -45,6 +98,7 @@ enum CodeFileParser {
             var code = url.flatMap { capture(#"[?&]code=([^&\s]+)"#, in: $0) }
 
             if let url {
+                result.hasRedeemLinks = true
                 if result.appleID == nil, let id = capture(#"[?&]id=(\d+)"#, in: url) {
                     result.appleID = Int(id)
                 }

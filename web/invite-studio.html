@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>초대장 만들기 — GiftWrap</title>
+<!--
+  The composer for invite.html — what studio.html is to gift.html.
+
+  One decision shapes the whole file: the preview is invite.html itself, in an iframe,
+  fed by postMessage. The card is drawn by exactly one renderer, so the pane and the
+  link can never disagree — which is the failure this repo has already paid for once,
+  when the composer and the recipient's page drew the same card at different scales.
+
+  Same payload rules as the gift link: short keys, base64url, and anything the page
+  can work out for itself stays out of the URL. Messengers stop linkifying somewhere
+  past a few hundred characters, and an invitation that arrives cut in half is worse
+  than one that arrives plain.
+-->
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --panel: #ffffff;
+    --ink: #1d1d1f;
+    --ink-2: #6e6e73;
+    --line: #d2d2d7;
+    --accent: #0071e3;
+    --warn: #b25000;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  /* .qr sets its own display, which would otherwise beat the UA rule for [hidden]. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 15.5px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .sub { color: var(--ink-2); font-size: 13px; }
+  a { color: var(--accent); }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 22px 20px 80px; }
+  header.top {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+  }
+  header.top .spacer { flex: 1; }
+  header.top a.hub { font-size: 13px; text-decoration: none; }
+  header.top a.hub:hover { text-decoration: underline; }
+
+  .studio { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .studio { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+  }
+  .side { position: sticky; top: 16px; }
+  @media (max-width: 900px) { .side { position: static; } }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 150px; }
+  .field > label { font-size: 12.5px; color: var(--ink-2); }
+  input[type=text], input[type=date], input[type=time], input[type=url], select, textarea {
+    font: inherit; padding: 7px 9px; width: 100%;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: inherit;
+  }
+  textarea { resize: vertical; font-size: 14px; }
+  input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+  button {
+    font: inherit; font-weight: 500; padding: 7px 13px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; color: inherit; cursor: pointer;
+  }
+  button:hover { background: #fafafa; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { filter: brightness(1.06); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* Segmented pickers — occasion, theme, language. */
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { border-radius: 999px; font-size: 13.5px; padding: 6px 12px; }
+  .seg button[aria-pressed=true] {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 54px; height: 40px; border-radius: 9px; border: 1px solid var(--line);
+    cursor: pointer; padding: 0; position: relative;
+  }
+  .swatch[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatch span {
+    position: absolute; inset: 0; bottom: auto; top: 100%; margin-top: 4px;
+    font-size: 11px; color: var(--ink-2); text-align: center;
+  }
+  .swatches { padding-bottom: 20px; }
+
+  /* Preview pane — invite.html, running for real. */
+  .previewBox {
+    border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+    background: #0e0e12; margin-bottom: 12px;
+  }
+  .previewBox iframe { display: block; width: 100%; height: 660px; border: 0; }
+
+  .link {
+    display: block; width: 100%; font: 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); resize: vertical; min-height: 68px;
+    word-break: break-all;
+  }
+  .len { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
+  .len.warn { color: var(--warn); }
+  .btnRow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .said { font-size: 12.5px; color: var(--accent); margin-top: 8px; min-height: 1.2em; }
+
+  .qr { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+  .qr svg { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+  .qr .sub { flex: 1; }
+
+  .missing {
+    background: #fff8e6; border: 1px solid #f0d089; color: #7a5300;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px;
+  }
+  .hintline { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>초대장 만들기</h1>
+    <span class="sub">링크 하나에 초대장 전부를 실어 보냅니다</span>
+    <span class="spacer"></span>
+    <a class="hub" href="hub.html">← 허브</a>
+  </header>
+
+  <div class="studio">
+    <div>
+
+      <section class="panel">
+        <h2>어떤 자리인가요</h2>
+        <div class="seg" id="kindSeg">
+          <button type="button" data-kind="birthday" aria-pressed="false">🎂 생일</button>
+          <button type="button" data-kind="housewarming" aria-pressed="true">🏡 집들이</button>
+          <button type="button" data-kind="wedding" aria-pressed="false">💍 결혼</button>
+          <button type="button" data-kind="party" aria-pressed="false">🎉 파티</button>
+          <button type="button" data-kind="dinner" aria-pressed="false">🍽️ 식사</button>
+          <button type="button" data-kind="meetup" aria-pressed="false">☕ 모임</button>
+          <button type="button" data-kind="workshop" aria-pressed="false">🛠️ 워크숍</button>
+          <button type="button" data-kind="opening" aria-pressed="false">✂️ 오픈</button>
+          <button type="button" data-kind="baby" aria-pressed="false">👶 돌·백일</button>
+          <button type="button" data-kind="other" aria-pressed="false">✉️ 그 밖에</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="field" style="flex:2">
+            <label for="title">제목</label>
+            <input type="text" id="title" placeholder="집들이에 초대합니다" maxlength="60">
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field">
+            <label for="host">여는 사람</label>
+            <input type="text" id="host" placeholder="현호" maxlength="30">
+          </div>
+          <div class="field">
+            <label for="guest">받는 사람 <span class="sub">(비워도 됩니다)</span></label>
+            <input type="text" id="guest" placeholder="지민" maxlength="30">
+          </div>
+        </div>
+        <p class="hintline">받는 사람을 적으면 그 사람 이름이 초대장에 들어갑니다. 여러 명에게
+          같은 링크를 보낼 거라면 비워 두세요.</p>
+      </section>
+
+      <section class="panel">
+        <h2>언제</h2>
+        <div class="row">
+          <div class="field">
+            <label for="date">날짜</label>
+            <input type="date" id="date">
+          </div>
+          <div class="field">
+            <label for="start">시작 <span class="sub">(비우면 종일)</span></label>
+            <input type="time" id="start" step="300">
+          </div>
+          <div class="field">
+            <label for="end">끝 <span class="sub">(선택)</span></label>
+            <input type="time" id="end" step="300">
+          </div>
+        </div>
+        <p class="hintline">시간은 시계에 적힌 그대로 전달됩니다. 받는 사람의 캘린더에도 같은
+          시각으로 들어갑니다.</p>
+      </section>
+
+      <section class="panel">
+        <h2>어디서</h2>
+        <div class="row">
+          <div class="field">
+            <label for="place">장소 이름</label>
+            <input type="text" id="place" placeholder="새로 이사한 집" maxlength="40">
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field">
+            <label for="addr">주소</label>
+            <input type="text" id="addr" placeholder="서울 서대문구 연희로 21, 3층" maxlength="80">
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field">
+            <label for="map">지도 링크 <span class="sub">(비우면 주소로 지도를 엽니다)</span></label>
+            <input type="url" id="map" placeholder="https://naver.me/…">
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>하고 싶은 말</h2>
+        <div class="field">
+          <label for="message">메시지</label>
+          <textarea id="message" rows="3" maxlength="300"
+            placeholder="마지막 상자를 드디어 풀었어요.&#10;와서 밥 한 끼 하고 가세요."></textarea>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label for="note">안내 <span class="sub">(드레스 코드·준비물·주차 같은 것)</span></label>
+          <input type="text" id="note" placeholder="빈손으로 오시면 됩니다." maxlength="80">
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>회신</h2>
+        <div class="row">
+          <div class="field" style="flex:2">
+            <label for="rsvp">연락처 <span class="sub">(전화번호 · 메일 · 링크)</span></label>
+            <input type="text" id="rsvp" placeholder="010-1234-5678" maxlength="120">
+          </div>
+          <div class="field">
+            <label for="rsvpBy">회신 마감 <span class="sub">(선택)</span></label>
+            <input type="date" id="rsvpBy">
+          </div>
+        </div>
+        <p class="hintline">적은 것이 무엇인지 알아서 판단합니다 — 번호면 문자, 메일이면 메일,
+          링크면 그 링크를 여는 버튼이 됩니다.</p>
+      </section>
+
+      <section class="panel">
+        <h2>모양</h2>
+        <div class="swatches" id="themeSwatches"></div>
+        <div class="row" style="margin-top:14px">
+          <div class="field" style="max-width:220px">
+            <span class="sub">초대장 언어</span>
+            <div class="seg" id="langSeg">
+              <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+              <button type="button" data-lang="en" aria-pressed="false">English</button>
+            </div>
+          </div>
+        </div>
+        <p class="hintline">받는 사람이 열었을 때 이 언어로 열립니다. 날짜와 시간 표기도 함께
+          바뀝니다.</p>
+      </section>
+
+      <div class="btnRow">
+        <button type="button" id="sampleBtn">예시로 채우기</button>
+        <button type="button" id="clearBtn">비우기</button>
+      </div>
+
+    </div>
+
+    <div class="side">
+      <section class="panel">
+        <h2>받는 사람에게 보이는 화면</h2>
+        <div class="previewBox">
+          <iframe id="preview" src="invite.html?preview=1" title="초대장 미리보기"></iframe>
+        </div>
+
+        <div id="missing" class="missing" hidden></div>
+
+        <label class="sub" for="linkOut">보낼 링크</label>
+        <textarea class="link" id="linkOut" readonly spellcheck="false"></textarea>
+        <div class="len" id="linkLen"></div>
+        <div class="btnRow">
+          <button type="button" class="primary" id="copyBtn">링크 복사</button>
+          <button type="button" id="openBtn">열어 보기</button>
+          <button type="button" id="qrBtn">QR 코드</button>
+        </div>
+        <div class="said" id="said"></div>
+
+        <div class="qr" id="qrBox" hidden>
+          <div id="qrHolder"></div>
+          <p class="sub" id="qrNote">인쇄해서 붙이거나 화면으로 보여 줄 때 씁니다.</p>
+          <!-- qr.js는 버전 10까지라 271바이트가 한계다. 짧은 초대장은 담기고,
+               긴 것은 아래 안내가 이유를 말한다. -->
+        </div>
+
+        <p class="hintline">초대장은 서버에 저장되지 않습니다. 링크 안에 전부 들어 있으니,
+          링크를 아는 사람은 초대장을 볼 수 있습니다.</p>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script src="qr.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* The five looks, as the [gradient, blooms] pairs invite.html expects.
+     `night` is what invite.html already draws with no payload — so choosing it means
+     writing nothing into the link. */
+  var THEMES = {
+    night:  { label: '기본',   g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF'] },
+    sunset: { label: '노을',   g: ['FF7A59', 'FF3D77', '7A5BFF'], b: ['FFC98A', 'FF8AB0'] },
+    forest: { label: '숲',     g: ['0EA47A', '2ED8C3', '3D5AFE'], b: ['9BF6C8', '8AF0FF'] },
+    rose:   { label: '로즈',   g: ['C08497', '8E6C88', '6C5B7B'], b: ['FFD9E0', 'C9B6E4'] },
+    ink:    { label: '먹',     g: ['1F2450', '3A3F6E', '5B4E8C'], b: ['6C7AE0', '3E9AD8'] }
+  };
+  var DEFAULT_THEME = 'night';
+
+  var state = {
+    kind: 'housewarming', theme: DEFAULT_THEME, lang: 'ko'
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var FIELDS = ['title', 'host', 'guest', 'date', 'start', 'end', 'place', 'addr',
+                'map', 'message', 'note', 'rsvp', 'rsvpBy'];
+
+  /* ---------- theme swatches ---------- */
+
+  var swatchBox = $('themeSwatches');
+  Object.keys(THEMES).forEach(function (key) {
+    var t = THEMES[key];
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'swatch'; b.dataset.theme = key;
+    b.setAttribute('aria-pressed', String(key === state.theme));
+    b.setAttribute('aria-label', t.label);
+    b.style.background = 'linear-gradient(140deg,#' + t.g[0] + ',#' + t.g[1] + ' 60%,#' + t.g[2] + ')';
+    var s = document.createElement('span'); s.textContent = t.label;
+    b.appendChild(s);
+    swatchBox.appendChild(b);
+  });
+
+  function wireSeg(el, key, onPick) {
+    el.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-' + key + ']');
+      if (!b) return;
+      state[key] = b.dataset[key];
+      Array.prototype.forEach.call(el.querySelectorAll('button'), function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      if (onPick) onPick();
+      update();
+    });
+  }
+  wireSeg($('kindSeg'), 'kind');
+  wireSeg($('langSeg'), 'lang');
+  wireSeg(swatchBox, 'theme');
+
+  /* ---------- the payload ---------- */
+
+  function val(id) { return $(id).value.trim(); }
+
+  /**
+   * Start and end, as invite.html reads them.
+   *
+   * No time at all means an all-day invitation — a wedding that says "Saturday" and
+   * nothing else is a real invitation, and forcing an hour would be inventing one.
+   * An end earlier than the start is read as running past midnight rather than as a
+   * mistake to reject; that is what a party does.
+   */
+  function whenKeys(out) {
+    var date = val('date');
+    if (!date) return;
+    var start = val('start'), end = val('end');
+    out.s = start ? date + 'T' + start : date;
+    if (start && end) {
+      var endDate = date;
+      if (end <= start) {
+        var d = new Date(date + 'T00:00');
+        d.setDate(d.getDate() + 1);
+        endDate = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      }
+      out.e = endDate + 'T' + end;
+    }
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  /** Only what the page can't work out for itself goes into the link. */
+  function payload() {
+    var out = { v: 1, k: state.kind };
+    var map = { title: 't', host: 'h', guest: 'r', place: 'p', addr: 'ad',
+                map: 'mp', message: 'm', note: 'dr', rsvp: 'rs', rsvpBy: 'rb' };
+    Object.keys(map).forEach(function (id) {
+      var v = val(id);
+      if (v) out[map[id]] = v;
+    });
+    whenKeys(out);
+    if (state.theme !== DEFAULT_THEME) {
+      out.g = THEMES[state.theme].g;
+      out.b = THEMES[state.theme].b;
+    }
+    out.lg = state.lang;
+    return out;
+  }
+
+  /** UTF-8 text → base64url. Korean has to go through bytes, not charCodeAt. */
+  function encode(text) {
+    var bytes = new TextEncoder().encode(text), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function inviteURL(data) {
+    var base = new URL('invite.html', location.href);
+    base.search = '?d=' + encode(JSON.stringify(data));
+    return base.href;
+  }
+
+  /* ---------- preview ---------- */
+
+  var frame = $('preview'), frameReady = false, pending = null;
+
+  window.addEventListener('message', function (ev) {
+    if (ev.source !== frame.contentWindow) return;
+    var msg = ev.data || {};
+    if (msg.type === 'giftwrap-invite-ready') {
+      frameReady = true;
+      if (pending) { push(pending); pending = null; }
+    } else if (msg.type === 'giftwrap-invite-height' && msg.height) {
+      /* The card is as tall as what was typed into it — let the pane follow rather
+         than scroll inside a fixed box. */
+      frame.style.height = Math.max(360, Math.min(1100, msg.height + 24)) + 'px';
+    }
+  });
+
+  function push(data) {
+    if (!frameReady) { pending = data; return; }
+    frame.contentWindow.postMessage({ type: 'giftwrap-invite', payload: data }, '*');
+  }
+
+  /* ---------- what is still missing ---------- */
+
+  /* A link can be built from almost nothing, but an invitation with no date isn't an
+     invitation yet. Name what's missing instead of quietly producing a thin card. */
+  function missingParts() {
+    var out = [];
+    if (!val('title')) out.push('제목');
+    if (!val('date')) out.push('날짜');
+    if (!val('place') && !val('addr')) out.push('장소');
+    return out;
+  }
+
+  /* ---------- draft ---------- */
+
+  var DRAFT_KEY = 'giftwrap.invite.draft.v1';
+
+  function saveDraft() {
+    try {
+      var d = { state: state, fields: {} };
+      FIELDS.forEach(function (id) { d.fields[id] = $(id).value; });
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+    } catch (e) { /* private browsing, a full quota — the draft is a convenience */ }
+  }
+
+  function loadDraft() {
+    var raw;
+    try { raw = localStorage.getItem(DRAFT_KEY); } catch (e) { return false; }
+    if (!raw) return false;
+    try {
+      var d = JSON.parse(raw);
+      if (d.state) {
+        if (THEMES[d.state.theme]) state.theme = d.state.theme;
+        if (d.state.kind) state.kind = d.state.kind;
+        if (d.state.lang === 'en' || d.state.lang === 'ko') state.lang = d.state.lang;
+      }
+      FIELDS.forEach(function (id) {
+        if (d.fields && typeof d.fields[id] === 'string') $(id).value = d.fields[id];
+      });
+      syncSegs();
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function syncSegs() {
+    [['kindSeg', 'kind'], ['langSeg', 'lang']].forEach(function (p) {
+      Array.prototype.forEach.call($(p[0]).querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset[p[1]] === state[p[1]]));
+      });
+    });
+    Array.prototype.forEach.call(swatchBox.querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.theme === state.theme));
+    });
+  }
+
+  /* ---------- the link box ---------- */
+
+  var linkOut = $('linkOut'), lenEl = $('linkLen'), saidEl = $('said');
+  var currentURL = '';
+
+  function say(text) {
+    saidEl.textContent = text;
+    clearTimeout(say._t);
+    say._t = setTimeout(function () { saidEl.textContent = ''; }, 2600);
+  }
+
+  function update() {
+    var data = payload();
+    push(data);
+
+    currentURL = inviteURL(data);
+    linkOut.value = currentURL;
+
+    var n = currentURL.length;
+    lenEl.textContent = n + '자';
+    /* Messengers stop linkifying long URLs — iMessage gave up on a 754-character gift
+       link, which is why the gift payload was slimmed. Same warning here. */
+    if (n > 600) {
+      lenEl.className = 'len warn';
+      lenEl.textContent = n + '자 — 메신저가 링크를 자를 수 있습니다. 메시지나 주소를 줄여 보세요.';
+    } else {
+      lenEl.className = 'len';
+    }
+
+    var miss = missingParts();
+    var box = $('missing');
+    if (miss.length) {
+      box.hidden = false;
+      box.textContent = '아직 비어 있습니다 — ' + miss.join(' · ') + '. 채우면 초대장이 완성됩니다.';
+    } else {
+      box.hidden = true;
+    }
+
+    if ($('qrBox').hidden === false) drawQR();
+    saveDraft();
+  }
+
+  FIELDS.forEach(function (id) {
+    $(id).addEventListener('input', update);
+    $(id).addEventListener('change', update);
+  });
+
+  /* ---------- buttons ---------- */
+
+  $('copyBtn').addEventListener('click', function () {
+    var done = function () { say('복사했습니다. 그대로 보내면 됩니다.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(currentURL).then(done, fallback);
+    } else fallback();
+
+    function fallback() {
+      linkOut.removeAttribute('readonly');
+      linkOut.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { say('복사하지 못했습니다. 링크를 직접 선택해 복사해 주세요.'); }
+      linkOut.setAttribute('readonly', '');
+    }
+  });
+
+  $('openBtn').addEventListener('click', function () {
+    /* The real page, envelope and all — the preview deliberately skips that part. */
+    window.open(currentURL, '_blank', 'noopener');
+  });
+
+  /* ---------- QR ---------- */
+
+  function drawQR() {
+    var holder = $('qrHolder');
+    holder.textContent = '';
+    var m = null;
+    /* Try the sturdier level first and fall back — a longer invitation only fits at L,
+       and a QR that exists at L beats no QR at M. */
+    try { m = window.QR.matrix(currentURL, 'M'); }
+    catch (e) {
+      try { m = window.QR.matrix(currentURL, 'L'); }
+      catch (e2) { m = null; }
+    }
+    if (!m) {
+      $('qrNote').textContent = '링크가 길어 QR에 담기지 않습니다. 메시지나 주소를 줄이면 담깁니다.';
+      return;
+    }
+    $('qrNote').textContent = '인쇄해서 붙이거나 화면으로 보여 줄 때 씁니다. 눌러서 PNG로 저장하세요.';
+    var size = m.length, quiet = 4, total = size + quiet * 2;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + total + ' ' + total);
+    svg.setAttribute('width', '128'); svg.setAttribute('height', '128');
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', 'translate(' + quiet + ',' + quiet + ')');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', window.QR.path(m));
+    p.setAttribute('fill', '#000');
+    g.appendChild(p); svg.appendChild(g);
+    svg.style.cursor = 'pointer';
+    svg.addEventListener('click', function () { savePNG(m); });
+    holder.appendChild(svg);
+  }
+
+  /** The QR as a PNG, drawn module by module so it stays sharp at any print size. */
+  function savePNG(m) {
+    var quiet = 4, scale = 10, total = (m.length + quiet * 2) * scale;
+    var c = document.createElement('canvas');
+    c.width = c.height = total;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, total, total);
+    ctx.fillStyle = '#000';
+    for (var r = 0; r < m.length; r++) {
+      for (var col = 0; col < m.length; col++) {
+        if (m[r][col]) ctx.fillRect((col + quiet) * scale, (r + quiet) * scale, scale, scale);
+      }
+    }
+    c.toBlob(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = (val('title') || 'invite') + ' QR.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      say('QR을 저장했습니다.');
+    }, 'image/png');
+  }
+
+  $('qrBtn').addEventListener('click', function () {
+    var box = $('qrBox');
+    box.hidden = !box.hidden;
+    if (!box.hidden) drawQR();
+  });
+
+  /* ---------- sample / clear ---------- */
+
+  function sample() {
+    var d = new Date();
+    d.setDate(d.getDate() + 12);
+    $('date').value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    $('start').value = '18:00';
+    $('end').value = '21:00';
+    $('title').value = '집들이에 초대합니다';
+    $('host').value = '현호';
+    $('guest').value = '지민';
+    $('place').value = '새로 이사한 집';
+    $('addr').value = '서울 서대문구 연희로 21, 3층';
+    $('map').value = '';
+    $('message').value = '마지막 상자를 드디어 풀었어요.\n와서 밥 한 끼 하고 가세요.';
+    $('note').value = '빈손으로 오시면 됩니다.';
+    $('rsvp').value = '010-1234-5678';
+    var by = new Date(d.getTime()); by.setDate(by.getDate() - 4);
+    $('rsvpBy').value = by.getFullYear() + '-' + pad(by.getMonth() + 1) + '-' + pad(by.getDate());
+    state.kind = 'housewarming'; state.theme = DEFAULT_THEME; state.lang = 'ko';
+    syncSegs();
+    update();
+  }
+
+  $('sampleBtn').addEventListener('click', sample);
+  $('clearBtn').addEventListener('click', function () {
+    FIELDS.forEach(function (id) { $(id).value = ''; });
+    state.kind = 'housewarming'; state.theme = DEFAULT_THEME; state.lang = 'ko';
+    syncSegs();
+    update();
+    say('비웠습니다.');
+  });
+
+  /* ---------- start ---------- */
+
+  if (!loadDraft()) sample();
+  update();
+})();
+</script>
+</body>
+</html>

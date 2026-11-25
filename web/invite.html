@@ -1,0 +1,756 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<!--
+  The invitation rides in the query string, so it is also in this page's own URL.
+  Without this, that URL — which carries a name, a home address and a phone number —
+  would be handed to any host the page reaches out to as a Referer.
+-->
+<meta name="referrer" content="no-referrer">
+<title>초대장이 도착했어요</title>
+<style>
+  /*
+   * One page, many invitations. Everything it shows arrives in the URL, so the file
+   * is static and can sit on any host — the same bargain gift.html makes.
+   *
+   * Two things are different from gift.html, and both follow from what an invitation
+   * is. First, it is *dated*: the page has to say how far away the day is, and say
+   * something else once the day has passed. Second, it asks for something back —
+   * a calendar entry and a reply — so the two buttons at the bottom are the point of
+   * the page, not decoration.
+   *
+   * Everything the recipient reads is written with textContent. The payload is
+   * attacker-controllable by anyone who can hand over a link, and none of it is
+   * markup.
+   */
+  :root {
+    --g1: #3D5AFE; --g2: #7A5BFF; --g3: #2ED8C3;   /* card gradient, overwritten by the payload */
+    --b1: #8AF0FF; --b2: #B08CFF;                  /* soft blooms behind the card */
+    --ink: #fff;
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    /* Top padding clears the language switch: a long invitation is taller than the
+       screen, so the card starts at the top instead of being centred under it. */
+    padding: 54px 20px calc(24px + env(safe-area-inset-bottom));
+    background: #0e0e12;
+    color: var(--ink);
+    font: 16px/1.6 -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all;              /* Korean shouldn't break mid-word */
+    overflow-x: hidden;
+  }
+  /* The room the card sits in — a wash of the card's own colours. */
+  body::before {
+    content: ""; position: fixed; inset: -20%;
+    background:
+      radial-gradient(45% 45% at 22% 18%, color-mix(in srgb, var(--b1) 45%, transparent), transparent 70%),
+      radial-gradient(50% 50% at 80% 82%, color-mix(in srgb, var(--b2) 40%, transparent), transparent 70%);
+    filter: blur(40px); opacity: .5; z-index: 0; pointer-events: none;
+  }
+  .stage {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 460px; min-width: 0;
+    text-align: center;
+  }
+  [hidden] { display: none !important; }
+
+  /* The language switch — the sender already chose; this is for when they chose wrong. */
+  .lang {
+    position: fixed; top: 0; right: 0; z-index: 5;
+    display: flex; gap: 2px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  }
+  .lang button {
+    padding: 5px 9px; border: 0; border-radius: 999px; cursor: pointer;
+    background: none; color: #fff; font: inherit; font-size: 12px;
+    opacity: .38; -webkit-tap-highlight-color: transparent;
+  }
+  .lang button:hover { opacity: .7; }
+  .lang button[aria-pressed=true] { opacity: .9; font-weight: 600; background: rgba(255,255,255,.16); }
+
+  /* ── the envelope ───────────────────────────────────────────────────────
+     Closed, this is the whole page. It exists so the invitation has a moment
+     of arriving rather than simply being there. */
+  .envelope {
+    position: relative; margin: 0 auto; width: min(100%, 340px);
+    aspect-ratio: 3 / 2; cursor: pointer; border: 0; padding: 0;
+    background: none; color: inherit; font: inherit;
+    -webkit-tap-highlight-color: transparent;
+    animation: bob 4.5s var(--ease) infinite;
+  }
+  .envelope .body {
+    position: absolute; inset: 0; border-radius: 14px;
+    background: linear-gradient(160deg, var(--g1), var(--g2) 60%, var(--g3));
+    box-shadow: 0 26px 60px rgba(0,0,0,.45);
+    overflow: hidden;
+  }
+  /* The two folds that make a paper envelope read as one. */
+  .envelope .body::before, .envelope .body::after {
+    content: ""; position: absolute; inset: 0;
+    background: rgba(0,0,0,.12);
+  }
+  .envelope .body::before { clip-path: polygon(0 0, 50% 58%, 0 100%); }
+  .envelope .body::after  { clip-path: polygon(100% 0, 50% 58%, 100% 100%); }
+  /* The flap, hinged at the top. */
+  .envelope .flap {
+    position: absolute; left: 0; right: 0; top: 0; height: 62%;
+    background: linear-gradient(175deg, color-mix(in srgb, var(--g2) 82%, #fff 18%), var(--g1));
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    transform-origin: top center; transform: rotateX(0deg);
+    transition: transform .75s var(--ease);
+    border-radius: 14px 14px 0 0;
+  }
+  .envelope .seal {
+    position: absolute; left: 50%; top: 52%; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+    border-radius: 50%; display: grid; place-items: center; font-size: 24px;
+    background: rgba(255,255,255,.94); color: #1a1a2e;
+    box-shadow: 0 8px 20px rgba(0,0,0,.3);
+    transition: transform .4s var(--ease), opacity .4s var(--ease);
+  }
+  .envelope .hint {
+    position: absolute; left: 0; right: 0; bottom: -34px;
+    font-size: 13.5px; color: rgba(255,255,255,.72);
+  }
+  .envelope:hover .seal { transform: scale(1.06); }
+  .envelope.open { animation: none; pointer-events: none; }
+  .envelope.open .flap { transform: rotateX(-172deg); }
+  .envelope.open .seal { opacity: 0; transform: scale(.6); }
+  .envelope.open .hint { opacity: 0; transition: opacity .2s; }
+  .envelope.gone { opacity: 0; transform: translateY(14px) scale(.97); transition: opacity .5s, transform .5s var(--ease); }
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+
+  /* ── the card ───────────────────────────────────────────────────────── */
+  .card {
+    position: relative; overflow: hidden; text-align: center;
+    padding: 34px 26px 30px; border-radius: 22px;
+    background: linear-gradient(155deg, var(--g1), var(--g2) 58%, var(--g3));
+    box-shadow: 0 30px 70px rgba(0,0,0,.45);
+  }
+  /* The hairline frame every printed invitation has. */
+  .card::before {
+    content: ""; position: absolute; inset: 10px; border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.28); pointer-events: none;
+  }
+  .card > * { position: relative; }
+  .reveal > * { opacity: 0; transform: translateY(10px); animation: rise .6s var(--ease) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none } }
+
+  .glyph { font-size: 34px; line-height: 1; margin-bottom: 12px; }
+  .overline {
+    font-size: 12.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(255,255,255,.78); margin-bottom: 10px;
+  }
+  h1 {
+    margin: 0 0 6px; font-size: clamp(25px, 7vw, 33px); line-height: 1.28;
+    letter-spacing: -.02em; font-weight: 700;
+  }
+  .to { font-size: 15px; color: rgba(255,255,255,.86); margin-bottom: 18px; }
+  .rule {
+    width: 46px; height: 1px; margin: 0 auto 20px;
+    background: rgba(255,255,255,.5);
+  }
+
+  /* The block the recipient is actually looking for. */
+  .when { margin-bottom: 6px; }
+  .when .date { font-size: 20px; font-weight: 650; letter-spacing: -.01em; }
+  .when .time { font-size: 16px; color: rgba(255,255,255,.9); margin-top: 2px; }
+  .dday {
+    display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; letter-spacing: .01em;
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.28);
+  }
+  .dday.past { background: rgba(0,0,0,.24); border-color: rgba(255,255,255,.16); color: rgba(255,255,255,.8); }
+
+  .where { margin-top: 20px; }
+  .where .place { font-size: 16.5px; font-weight: 600; }
+  .where .addr { font-size: 14px; color: rgba(255,255,255,.84); margin-top: 3px; }
+
+  .message {
+    margin: 22px 0 0; padding: 16px 16px; border-radius: 12px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+    font-size: 15px; line-height: 1.7; white-space: pre-wrap; text-align: left;
+    color: rgba(255,255,255,.95);
+  }
+  .note { margin-top: 14px; font-size: 13.5px; color: rgba(255,255,255,.82); white-space: pre-wrap; }
+
+  .actions { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+  .btn {
+    display: inline-block; padding: 12px 20px; border-radius: 999px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 600; text-decoration: none; border: 0;
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-solid { background: #fff; color: #1a1a2e; box-shadow: 0 10px 26px rgba(0,0,0,.28); }
+  .btn-ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.42); }
+  .rsvpBy { margin-top: 12px; font-size: 13px; color: rgba(255,255,255,.8); }
+  .host { margin-top: 22px; font-size: 13.5px; color: rgba(255,255,255,.86); }
+
+  .why {
+    margin: 0 0 14px; padding: 9px 13px; border-radius: 10px; font-size: 13px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+    color: rgba(255,255,255,.88);
+  }
+  .made { margin-top: 18px; font-size: 12.5px; color: rgba(255,255,255,.45); }
+  .made a { color: inherit; }
+
+  /* In the composer's preview pane the page is a renderer, nothing more. */
+  body.preview { padding: 14px; align-items: flex-start; }
+  body.preview .lang, body.preview .made { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    .reveal > * { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang" id="langSwitch">
+  <button type="button" data-lang="ko" aria-pressed="true">한국어</button>
+  <button type="button" data-lang="en" aria-pressed="false">English</button>
+</div>
+
+<div class="stage">
+  <button class="envelope" id="envelope" type="button">
+    <span class="body"></span>
+    <span class="flap"></span>
+    <span class="seal" id="seal">✉️</span>
+    <span class="hint" id="hint">눌러서 열어 보세요</span>
+  </button>
+
+  <div id="cardWrap" hidden>
+    <p class="why" id="why" hidden></p>
+    <div class="card reveal" id="card"></div>
+    <p class="made" id="made"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- words ---------- */
+
+  var STR = {
+    ko: {
+      docTitle: '초대장이 도착했어요',
+      hint: '눌러서 열어 보세요',
+      invites: '초대합니다',
+      hostInvites: function (h) { return h + '님이 초대합니다'; },
+      toName: function (r) { return r + '님께'; },
+      dday: function (n) { return 'D-' + n; },
+      today: '오늘입니다',
+      tomorrow: '내일입니다',
+      past: '지난 일정입니다',
+      ongoing: '지금 진행 중입니다',
+      addCal: '캘린더에 추가',
+      openMap: '지도에서 보기',
+      rsvp: '참석 회신',
+      rsvpCall: '전화로 회신',
+      rsvpText: '문자로 회신',
+      rsvpMail: '메일로 회신',
+      rsvpBy: function (d) { return d + '까지 알려 주세요'; },
+      rsvpSubject: function (t) { return '「' + t + '」 참석 회신'; },
+      from: function (h) { return '보낸 사람 · ' + h; },
+      made: '<a href="index.html">GiftWrap</a>으로 만든 초대장',
+      demoNoPayload: '링크에 초대장이 들어 있지 않아 예시를 보여 드립니다.',
+      demoBroken: '링크가 중간에서 잘린 것 같습니다. 보낸 분에게 다시 받아 보세요. 아래는 예시입니다.',
+      demoUnreadable: '링크를 읽지 못했습니다. 아래는 예시입니다.',
+      weekdays: ['일', '월', '화', '수', '목', '금', '토'],
+      date: function (y, m, d, w) { return y + '년 ' + m + '월 ' + d + '일 (' + w + ')'; },
+      shortDate: function (m, d) { return m + '월 ' + d + '일'; },
+      time: function (h, mi) {
+        var ap = h < 12 ? '오전' : '오후';
+        var hh = h % 12; if (hh === 0) hh = 12;
+        return ap + ' ' + hh + (mi ? ':' + (mi < 10 ? '0' + mi : mi) : '시');
+      },
+      timeRange: function (a, b) { return a + ' – ' + b; }
+    },
+    en: {
+      docTitle: 'You are invited',
+      hint: 'Tap to open',
+      invites: 'You are invited',
+      hostInvites: function (h) { return h + ' invites you'; },
+      toName: function (r) { return 'For ' + r; },
+      dday: function (n) { return 'In ' + n + (n === 1 ? ' day' : ' days'); },
+      today: 'Today',
+      tomorrow: 'Tomorrow',
+      past: 'This has passed',
+      ongoing: 'Happening now',
+      addCal: 'Add to calendar',
+      openMap: 'Open in Maps',
+      rsvp: 'RSVP',
+      rsvpCall: 'Call to RSVP',
+      rsvpText: 'Text to RSVP',
+      rsvpMail: 'Email to RSVP',
+      rsvpBy: function (d) { return 'Please reply by ' + d; },
+      rsvpSubject: function (t) { return 'RSVP — ' + t; },
+      from: function (h) { return 'From ' + h; },
+      made: 'An invitation made with <a href="index.html">GiftWrap</a>',
+      demoNoPayload: 'This link carries no invitation, so here is a sample.',
+      demoBroken: 'The link looks cut off. Ask the sender for it again — a sample is shown below.',
+      demoUnreadable: "This link couldn't be read. A sample is shown below.",
+      weekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      date: function (y, m, d, w) {
+        var M = ['January','February','March','April','May','June','July',
+                 'August','September','October','November','December'];
+        return w + ', ' + M[m - 1] + ' ' + d + ', ' + y;
+      },
+      shortDate: function (m, d) {
+        var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return M[m - 1] + ' ' + d;
+      },
+      time: function (h, mi) {
+        var ap = h < 12 ? 'AM' : 'PM';
+        var hh = h % 12; if (hh === 0) hh = 12;
+        return hh + (mi ? ':' + (mi < 10 ? '0' + mi : mi) : '') + ' ' + ap;
+      },
+      timeRange: function (a, b) { return a + ' – ' + b; }
+    }
+  };
+
+  /* The face of the occasion. One character does the work a photograph would. */
+  var GLYPH = {
+    birthday: '🎂', housewarming: '🏡', wedding: '💍', party: '🎉', dinner: '🍽️',
+    meetup: '☕', workshop: '🛠️', opening: '✂️', baby: '👶', other: '✉️'
+  };
+
+  /* ---------- payload ---------- */
+
+  /** base64url → UTF-8 text. The payload carries Korean, so decode through bytes. */
+  function decode(raw) {
+    var s = raw.replace(/-/g, '+').replace(/_/g, '/');
+    s += '==='.slice((s.length + 3) % 4);
+    var bin = atob(s);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  /** The stand-in invitation, in whichever language the page is speaking. */
+  function demoFor(lang) {
+    /* Dated relative to today so the sample never shows up as an event that has
+       already passed — a demo that says "this has passed" reads as a bug. */
+    var d = new Date();
+    d.setDate(d.getDate() + 12);
+    var iso = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    var base = {
+      v: 1, k: 'housewarming',
+      s: iso + 'T18:00', e: iso + 'T21:00',
+      g: ['3D5AFE', '7A5BFF', '2ED8C3'], b: ['8AF0FF', 'B08CFF']
+    };
+    if (lang === 'en') {
+      base.t = 'Housewarming';
+      base.h = 'Hyunho'; base.r = 'Jimin';
+      base.p = 'Our new place';
+      base.ad = '3F, 21 Yeonhui-ro, Seodaemun-gu, Seoul';
+      base.m = 'We finally unpacked the last box.\nCome eat something and see the view.';
+      base.dr = 'Bring nothing but yourself.';
+      base.rs = 'hyunho@example.com';
+    } else {
+      base.t = '집들이에 초대합니다';
+      base.h = '현호'; base.r = '지민';
+      base.p = '새로 이사한 집';
+      base.ad = '서울 서대문구 연희로 21, 3층';
+      base.m = '마지막 상자를 드디어 풀었어요.\n와서 밥 한 끼 하고 가세요.';
+      base.dr = '빈손으로 오시면 됩니다.';
+      base.rs = 'hyunho@example.com';
+    }
+    return base;
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  /**
+   * The payload, from `?d=` first and the fragment second — same order as gift.html,
+   * for the same reason: links already sent have to keep working.
+   */
+  function payloadFromURL() {
+    var d = new URLSearchParams(location.search).get('d');
+    if (d) return d;
+    return location.hash.replace(/^#/, '');
+  }
+
+  var PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
+
+  var sent = null, whyKey = '';
+  var raw = payloadFromURL();
+  if (PREVIEW) {
+    whyKey = '';                       // the composer supplies the invitation over postMessage
+  } else if (!raw) {
+    whyKey = 'demoNoPayload';
+  } else {
+    try {
+      var parsed = JSON.parse(decode(raw));
+      if (parsed && typeof parsed === 'object') sent = parsed;
+      else whyKey = 'demoUnreadable';
+    } catch (e) {
+      whyKey = 'demoBroken';
+    }
+  }
+
+  /** The sender's choice wins; links from before `lg` existed fall back to the browser. */
+  function initialLanguage() {
+    var chosen = sent && sent.lg;
+    if (chosen === 'ko' || chosen === 'en') return chosen;
+    var nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+    return nav.indexOf('ko') === 0 ? 'ko' : 'en';
+  }
+
+  var LANG = initialLanguage();
+  var invite = sent || demoFor(LANG);
+
+  /* ---------- dates ---------- */
+
+  /**
+   * "2026-10-04T18:00" → a local Date.
+   *
+   * Deliberately not `new Date(string)`: an invitation says six in the evening, and
+   * six in the evening is whatever the clock on the wall says — both the host's wall
+   * and, in practice, the guest's. Parsing by hand keeps it local and keeps Safari
+   * from disagreeing about the format.
+   */
+  function parseLocal(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(s || ''));
+    if (!m) return null;
+    return new Date(+m[1], +m[2] - 1, +m[3], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0, 0, 0);
+  }
+  function hasTime(s) { return /[T ]\d{2}:\d{2}/.test(String(s || '')); }
+  function midnight(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+  function dateText(d, lang) {
+    var S = STR[lang];
+    return S.date(d.getFullYear(), d.getMonth() + 1, d.getDate(), S.weekdays[d.getDay()]);
+  }
+  function timeText(d, lang) { return STR[lang].time(d.getHours(), d.getMinutes()); }
+  function shortDateText(d, lang) { return STR[lang].shortDate(d.getMonth() + 1, d.getDate()); }
+
+  /* ---------- the calendar file ---------- */
+
+  /** RFC 5545 escaping — commas, semicolons and backslashes are separators there. */
+  function icsEscape(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;')
+                          .replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  }
+  /** Fold at 75 octets, continuation lines starting with a space. */
+  function icsFold(line) {
+    var enc = new TextEncoder();
+    if (enc.encode(line).length <= 75) return line;
+    // Fold on character boundaries so multi-byte Korean is never split in half.
+    var chars = Array.from(line), out = '', cur = '', curLen = 0, first = true;
+    for (var i = 0; i < chars.length; i++) {
+      var w = enc.encode(chars[i]).length;
+      if (curLen + w > (first ? 75 : 73)) {
+        out += (out ? '\r\n ' : '') + cur;
+        cur = ''; curLen = 0; first = false;
+      }
+      cur += chars[i]; curLen += w;
+    }
+    return out + (out ? '\r\n ' : '') + cur;
+  }
+
+  function icsStamp(d) {
+    return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + 'T' +
+           pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds()) + 'Z';
+  }
+  function icsLocal(d) {
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' +
+           pad(d.getHours()) + pad(d.getMinutes()) + '00';
+  }
+  function icsDate(d) { return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); }
+
+  /**
+   * A calendar entry for this invitation.
+   *
+   * Times are written floating (no Z, no TZID) on purpose — see parseLocal. An
+   * all-day event is written as a DATE range, which is what a calendar expects when
+   * the invitation never named an hour.
+   */
+  function buildICS(data, lang) {
+    var start = parseLocal(data.s);
+    if (!start) return null;
+    var timed = hasTime(data.s);
+    var end = parseLocal(data.e);
+    if (!end || end <= start) {
+      end = new Date(start.getTime());
+      if (timed) end.setHours(end.getHours() + 2);
+      else end.setDate(end.getDate() + 1);
+    }
+
+    var where = [data.p, data.ad].filter(Boolean).join(', ');
+    var desc = [data.m, data.dr, data.h ? STR[lang].from(data.h) : ''].filter(Boolean).join('\n\n');
+
+    /* The UID has to be stable for the same invitation and different for another, so
+       that re-adding it updates the entry instead of duplicating it. The payload is
+       exactly that identity. */
+    var seed = [data.t, data.s, data.p, data.h].join('|');
+    var hash = 0;
+    for (var i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+
+    var lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GiftWrap//Invite//EN', 'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT',
+      'UID:' + Math.abs(hash).toString(36) + '-' + icsDate(start) + '@giftwrap.invite',
+      'DTSTAMP:' + icsStamp(new Date()),
+      timed ? 'DTSTART:' + icsLocal(start) : 'DTSTART;VALUE=DATE:' + icsDate(start),
+      timed ? 'DTEND:' + icsLocal(end) : 'DTEND;VALUE=DATE:' + icsDate(end),
+      'SUMMARY:' + icsEscape(data.t || STR[lang].invites)
+    ];
+    if (where) lines.push('LOCATION:' + icsEscape(where));
+    if (desc) lines.push('DESCRIPTION:' + icsEscape(desc));
+    if (data.h) lines.push('ORGANIZER;CN=' + icsEscape(data.h) + ':MAILTO:noreply@invalid');
+    lines.push('END:VEVENT', 'END:VCALENDAR');
+
+    return lines.map(icsFold).join('\r\n') + '\r\n';
+  }
+
+  function downloadICS(data, lang) {
+    var text = buildICS(data, lang);
+    if (!text) return;
+    var name = (data.t || 'invitation').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 40) + '.ics';
+    var blob = new Blob([text], { type: 'text/calendar;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  /* ---------- links ---------- */
+
+  /** The sender's own map link wins; otherwise the address is handed to Maps as a query. */
+  function mapURL(data) {
+    if (data.mp && /^https?:\/\//i.test(data.mp)) return data.mp;
+    var q = [data.p, data.ad].filter(Boolean).join(' ');
+    if (!q) return '';
+    return 'https://maps.apple.com/?q=' + encodeURIComponent(q);
+  }
+
+  /**
+   * What "reply" means depends on what the host left behind — a number, an address or
+   * a link. Rather than make the host classify it, read it.
+   */
+  function rsvpAction(data, lang) {
+    var raw = String(data.rs || '').trim();
+    if (!raw) return null;
+    var S = STR[lang];
+    var subject = S.rsvpSubject(data.t || '');
+    if (/^https?:\/\//i.test(raw)) return { href: raw, label: S.rsvp, external: true };
+    if (raw.indexOf('@') > 0 && !/\s/.test(raw)) {
+      return { href: 'mailto:' + raw + '?subject=' + encodeURIComponent(subject), label: S.rsvpMail };
+    }
+    var digits = raw.replace(/[^\d+]/g, '');
+    if (digits.length >= 7) {
+      /* `?body=` is the RFC 5724 form and the one both iOS 8+ and Android accept;
+         the `&body=` variant only ever worked on iOS. */
+      return { href: 'sms:' + digits + '?body=' + encodeURIComponent(subject + ' — '),
+               label: S.rsvpText };
+    }
+    return null;                    // something else entirely; shown as a note instead
+  }
+
+  /* ---------- rendering ---------- */
+
+  var cardEl = document.getElementById('card');
+  var whyEl = document.getElementById('why');
+  var madeEl = document.getElementById('made');
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function applyTheme(data) {
+    var g = Array.isArray(data.g) ? data.g : [];
+    var b = Array.isArray(data.b) ? data.b : [];
+    var root = document.documentElement.style;
+    if (g[0]) root.setProperty('--g1', '#' + String(g[0]).replace('#', ''));
+    if (g[1]) root.setProperty('--g2', '#' + String(g[1]).replace('#', ''));
+    if (g[2]) root.setProperty('--g3', '#' + String(g[2]).replace('#', ''));
+    if (b[0]) root.setProperty('--b1', '#' + String(b[0]).replace('#', ''));
+    if (b[1]) root.setProperty('--b2', '#' + String(b[1]).replace('#', ''));
+  }
+
+  /** The line under the date: how far away the day is, or that it is behind us. */
+  function ddayNode(data, lang) {
+    var start = parseLocal(data.s);
+    if (!start) return null;
+    var S = STR[lang];
+    var end = parseLocal(data.e);
+    var now = new Date();
+    var days = Math.round((midnight(start) - midnight(now)) / 86400000);
+
+    var chip = el('span', 'dday');
+    if (days > 1) chip.textContent = S.dday(days);
+    else if (days === 1) chip.textContent = S.tomorrow;
+    else if (days === 0) {
+      var over = end && end < now;
+      chip.textContent = over ? S.past : (start <= now ? S.ongoing : S.today);
+      if (over) chip.className = 'dday past';
+    } else { chip.textContent = S.past; chip.className = 'dday past'; }
+    return chip;
+  }
+
+  function render() {
+    var data = invite, S = STR[LANG], lang = LANG;
+    document.documentElement.lang = lang;
+    document.title = data.t ? data.t : S.docTitle;
+    applyTheme(data);
+
+    document.getElementById('hint').textContent = S.hint;
+    document.getElementById('seal').textContent = GLYPH[data.k] || GLYPH.other;
+    madeEl.innerHTML = S.made;
+
+    if (whyKey) { whyEl.textContent = S[whyKey]; whyEl.hidden = false; }
+    else whyEl.hidden = true;
+
+    cardEl.textContent = '';
+
+    cardEl.appendChild(el('div', 'glyph', GLYPH[data.k] || GLYPH.other));
+    cardEl.appendChild(el('div', 'overline', data.h ? S.hostInvites(data.h) : S.invites));
+    cardEl.appendChild(el('h1', null, data.t || S.invites));
+    if (data.r) cardEl.appendChild(el('p', 'to', S.toName(data.r)));
+    cardEl.appendChild(el('div', 'rule'));
+
+    var start = parseLocal(data.s);
+    if (start) {
+      var when = el('div', 'when');
+      when.appendChild(el('div', 'date', dateText(start, lang)));
+      if (hasTime(data.s)) {
+        var t = timeText(start, lang);
+        var end = parseLocal(data.e);
+        if (end && end > start && hasTime(data.e)) t = S.timeRange(t, timeText(end, lang));
+        when.appendChild(el('div', 'time', t));
+      }
+      var chip = ddayNode(data, lang);
+      if (chip) when.appendChild(chip);
+      cardEl.appendChild(when);
+    }
+
+    if (data.p || data.ad) {
+      var where = el('div', 'where');
+      if (data.p) where.appendChild(el('div', 'place', data.p));
+      if (data.ad) where.appendChild(el('div', 'addr', data.ad));
+      cardEl.appendChild(where);
+    }
+
+    if (data.m) cardEl.appendChild(el('p', 'message', data.m));
+    if (data.dr) cardEl.appendChild(el('p', 'note', data.dr));
+
+    /* The two things the invitation asks for. Calendar first: it is the one the guest
+       does immediately, and the one that keeps the invitation alive after the link is
+       buried in a chat thread. */
+    var actions = el('div', 'actions');
+    if (start) {
+      var cal = el('button', 'btn btn-solid', S.addCal);
+      cal.type = 'button';
+      cal.addEventListener('click', function () { downloadICS(data, lang); });
+      actions.appendChild(cal);
+    }
+    var map = mapURL(data);
+    if (map) {
+      var a = el('a', 'btn btn-ghost', S.openMap);
+      a.href = map; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      actions.appendChild(a);
+    }
+    var rsvp = rsvpAction(data, lang);
+    if (rsvp) {
+      var rb = el('a', 'btn btn-ghost', rsvp.label);
+      rb.href = rsvp.href;
+      if (rsvp.external) { rb.target = '_blank'; rb.rel = 'noopener noreferrer'; }
+      actions.appendChild(rb);
+    }
+    if (actions.childNodes.length) cardEl.appendChild(actions);
+
+    if (data.rb) {
+      var by = parseLocal(data.rb);
+      if (by) cardEl.appendChild(el('p', 'rsvpBy', S.rsvpBy(shortDateText(by, lang))));
+    }
+    /* A contact that isn't a phone, an address or a link still has to be readable —
+       a KakaoTalk ID, a room number, "just tell me at work". */
+    if (data.rs && !rsvp) cardEl.appendChild(el('p', 'rsvpBy', data.rs));
+
+    if (data.h) cardEl.appendChild(el('p', 'host', S.from(data.h)));
+
+    // Stagger the reveal, in DOM order.
+    var kids = cardEl.children;
+    for (var i = 0; i < kids.length; i++) kids[i].style.animationDelay = (0.05 + i * 0.055) + 's';
+  }
+
+  /* ---------- opening ---------- */
+
+  var envelope = document.getElementById('envelope');
+  var cardWrap = document.getElementById('cardWrap');
+
+  function open() {
+    envelope.classList.add('open');
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(function () {
+      envelope.classList.add('gone');
+      setTimeout(function () {
+        envelope.hidden = true;
+        cardWrap.hidden = false;
+      }, reduced ? 0 : 380);
+    }, reduced ? 0 : 620);
+  }
+
+  envelope.addEventListener('click', open);
+
+  /* ---------- language switch ---------- */
+
+  var langSwitch = document.getElementById('langSwitch');
+  langSwitch.addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-lang]');
+    if (!b) return;
+    LANG = b.dataset.lang;
+    /* The sample is written in one language at a time, so switching re-writes it —
+       a real invitation keeps whatever the host typed. */
+    if (!sent) invite = demoFor(LANG);
+    Array.prototype.forEach.call(langSwitch.querySelectorAll('button'), function (x) {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    render();
+  });
+
+  /* ---------- the composer's preview ---------- */
+
+  if (PREVIEW) {
+    document.body.classList.add('preview');
+    envelope.hidden = true;
+    cardWrap.hidden = false;
+    /* Same origin, same file — the composer draws its preview by handing this page a
+       payload rather than reimplementing the card. One renderer, two places. */
+    window.addEventListener('message', function (ev) {
+      if (ev.origin !== location.origin && ev.origin !== 'null') return;
+      var msg = ev.data;
+      if (!msg || msg.type !== 'giftwrap-invite') return;
+      sent = msg.payload && Object.keys(msg.payload).length ? msg.payload : null;
+      LANG = (msg.payload && msg.payload.lg) || LANG;
+      invite = sent || demoFor(LANG);
+      whyKey = '';
+      render();
+      /* Tell the composer how tall the card came out, so the pane can fit it. */
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'giftwrap-invite-height',
+                                    height: document.body.scrollHeight }, '*');
+      }
+    });
+    if (window.parent !== window) window.parent.postMessage({ type: 'giftwrap-invite-ready' }, '*');
+  }
+
+  render();
+})();
+</script>
+
+</body>
+</html>
