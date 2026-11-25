@@ -847,6 +847,8 @@
       badge: 'App Store에서 받기',
       howtoSummary: '버튼이 열리지 않으면',
       howtoBody: 'App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요.',
+      promoSummary: '코드를 직접 입력해서 받기',
+      promoBody: '이 코드는 App Store 앱에서 직접 입력해 받습니다. App Store 앱 → 오른쪽 위 프로필 → <b>기프트 카드 또는 코드 사용</b> → 아래 코드를 입력하세요. 위 버튼은 기기에 따라 열리지 않을 수 있습니다.',
       copy: '복사',
       copied: '복사했어요',
       openApp: '앱 열기',
@@ -879,6 +881,8 @@
       badge: 'Get it on the App Store',
       howtoSummary: 'If the button doesn’t open',
       howtoBody: 'App Store app → your profile, top right → <b>Redeem Gift Card or Code</b> → enter the code below.',
+      promoSummary: 'Redeem it by entering the code',
+      promoBody: 'This code is redeemed by hand in the App Store app. App Store app → your profile, top right → <b>Redeem Gift Card or Code</b> → enter the code below. The button above may not open, depending on the device.',
       copy: 'Copy',
       copied: 'Copied',
       openApp: 'Open the app',
@@ -1254,6 +1258,26 @@
   }
 
   /**
+   * Whether this gift is an App Store promo code.
+   *
+   * Worth asking because the two kinds are not equally supported. `ctx=offercodes` is
+   * in Apple's documentation; `ctx=apps` is not. It works today, and it's what every
+   * promo link in the wild uses, but nothing promises it will and there's no web
+   * version of it — a recipient on a desktop browser has no button that can succeed.
+   * So a promo gift is drawn to survive its button: the code is shown, and the manual
+   * steps are open rather than folded away.
+   *
+   * Read from `x` alone. An older link that carries `u` in full still states `x`
+   * beside it, and one that states neither has no code to redeem either way.
+   */
+  function isPromo() {
+    return gift.x === 'apps' && !!gift.c;
+  }
+
+  /** Set once the manual steps have been opened, so a language flip doesn't reclose them. */
+  var howtoOpened = false;
+
+  /**
    * The icon.
    *
    * The link no longer states it — at 160 characters it was the single biggest thing
@@ -1409,8 +1433,13 @@
     $('openBtn').textContent = S.open;
     $('skipBtn').textContent = S.skip;
     $('cta').textContent = S.cta;
-    $('howto').querySelector('summary').textContent = S.howtoSummary;
-    $('howtoBody').innerHTML = S.howtoBody;
+    // A promo code's redeem link is the undocumented one, so the steps stop being a
+    // footnote for when the button misbehaves and become the way in. Different words,
+    // and open rather than folded away — see `promoManual` below.
+    var manual = isPromo();
+    $('howto').querySelector('summary').textContent =
+      manual ? S.promoSummary : S.howtoSummary;
+    $('howtoBody').innerHTML = manual ? S.promoBody : S.howtoBody;
     $('copyBtn').textContent = S.copy;
     $('openApp').textContent = S.openApp;
     $('backMsg').textContent = gift.f ? S.backFrom(gift.f) : S.back;
@@ -1420,6 +1449,11 @@
     $('openApp').href = productURL() || redeem || '#';
 
     $('howto').hidden = !gift.c;
+    // Folded shut, the steps are a fallback. For a promo code they're the gift's only
+    // guaranteed route in, and a recipient who taps a button that does nothing doesn't
+    // go looking for a disclosure triangle — so it opens itself. Set once, not on every
+    // language flip, or reading it in the other language would close it under them.
+    if (manual && !howtoOpened) { $('howto').open = true; howtoOpened = true; }
     $('code').textContent = gift.c || '';
 
     // Redraw the card in the new language. Anything the previous paint had in flight
